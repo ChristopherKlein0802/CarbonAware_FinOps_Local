@@ -30,5 +30,5 @@ This project implements a Carbon-Aware FinOps framework that demonstrates how or
 
 1. Clone the repository
 ```bash
-git clone https://github.com/CortexReply/CarbonAware_FinOps.git
-cd carbon-aware-finops
+git clone https://github.com/ChristopherKlein0802/CarbonAware_FinOps_Local.git
+cd CarbonAware_FinOps_Local
