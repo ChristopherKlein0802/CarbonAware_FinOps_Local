@@ -1,0 +1,32 @@
+# Scheduling rules for different instance groups
+office-hours:
+  name: "Standard Office Hours"
+  shutdown_time: "19:00"
+  startup_time: "07:00"
+  days: ["monday", "tuesday", "wednesday", "thursday", "friday"]
+  carbon_threshold: 500  # gCO2/kWh
+  timezone: "Europe/Berlin"
+
+development:
+  name: "Development Environment"
+  shutdown_time: "21:00"
+  startup_time: "06:00"
+  days: ["monday", "tuesday", "wednesday", "thursday", "friday"]
+  carbon_threshold: null  # No carbon threshold
+  timezone: "Europe/Berlin"
+
+24x7-low-carbon:
+  name: "24/7 with Carbon Optimization"
+  shutdown_time: null
+  startup_time: null
+  days: []
+  carbon_threshold: 300  # Only run when carbon intensity is low
+  timezone: "Europe/Berlin"
+
+weekend-off:
+  name: "Weekday Only"
+  shutdown_time: "18:00"
+  startup_time: "08:00"
+  days: ["monday", "tuesday", "wednesday", "thursday", "friday"]
+  carbon_threshold: 450
+  timezone: "Europe/Berlin"

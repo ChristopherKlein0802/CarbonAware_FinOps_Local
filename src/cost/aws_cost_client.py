@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 class AWSCostClient:
     """Client for AWS Cost Explorer API."""
     
-    def __init__(self, region: str = 'us-east-1'):
+    def __init__(self, region: str = 'eu-central-1'):
         self.ce_client = boto3.client('ce', region_name=region)
         self.region = region
     

@@ -60,10 +60,11 @@ class WattTimeClient(CarbonAPIClient):
         
         # Map AWS regions to WattTime balancing authorities
         region_mapping = {
-            'us-east-1': 'PJM_NJ',
-            'us-west-2': 'CAISO_NORTH',
-            'eu-west-1': 'IE',
-            'eu-north-1': 'SE'
+            'eu-central-1': 'DE',  # Germany
+            'eu-west-1': 'IE',     # Ireland
+            'eu-west-2': 'GB',     # United Kingdom
+            'eu-west-3': 'FR',     # France
+            'eu-north-1': 'SE',    # Sweden
         }
         
         ba = region_mapping.get(region, 'PJM_NJ')

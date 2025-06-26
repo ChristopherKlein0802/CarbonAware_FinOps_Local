@@ -7,7 +7,7 @@ setup(
     name="carbon-aware-finops",
     version="0.1.0",
     author="Christopher Klein",
-    author_email="your.email@example.com",
+    author_email="ch.klein@reply.de",
     description="Carbon-Aware FinOps Framework for AWS EC2 optimization",
     long_description=long_description,
     long_description_content_type="text/markdown",

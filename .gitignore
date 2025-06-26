@@ -68,3 +68,4 @@ Thumbs.db
 # Credentials
 config/credentials.yaml
 *_secret.yaml
+.env.example
