@@ -269,6 +269,59 @@ resource "aws_cloudwatch_log_group" "main" {
   }
 }
 
+# Test EC2 instances
+module "test_instances" {
+  source = "./modules/ec2"
+  
+  instance_count       = var.test_instance_count
+  instance_type        = var.instance_type
+  subnet_id            = aws_subnet.public.id
+  security_group_id    = aws_security_group.main.id
+  iam_instance_profile = aws_iam_instance_profile.ec2_profile.name
+  
+  tags = {
+    Project     = var.project_name
+    Environment = var.environment
+    Owner       = "carbon-aware-finops"
+    Name        = "${var.project_name}-instance"
+  }
+}
+
+# Create instances with different schedules
+resource "aws_instance" "scheduled_instances" {
+  for_each = {
+    "web-server"    = "24/7 Always Running"
+    "app-server"    = "Office Hours + Weekend Shutdown"
+    "db-server"     = "Extended Development Hours"
+    "batch-server"  = "Carbon-Aware 24/7"
+  }
+
+  ami                    = data.aws_ami.amazon_linux.id
+  instance_type          = var.instance_type
+  subnet_id              = aws_subnet.public.id
+  vpc_security_group_ids = [aws_security_group.main.id]
+  iam_instance_profile   = aws_iam_instance_profile.ec2_profile.name
+  monitoring             = true
+
+  tags = {
+    Name        = "${var.project_name}-${each.key}"
+    Project     = var.project_name
+    Environment = var.environment
+    Schedule    = each.value
+  }
+}
+
+# Data source for Amazon Linux AMI
+data "aws_ami" "amazon_linux" {
+  most_recent = true
+  owners      = ["amazon"]
+
+  filter {
+    name   = "name"
+    values = ["amzn2-ami-hvm-*-x86_64-gp2"]
+  }
+}
+
 # Output values
 output "vpc_id" {
   value = aws_vpc.main.id

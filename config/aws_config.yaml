@@ -10,28 +10,28 @@ test_instances:
     type: t3.medium
     tags:
       Environment: development
-      Schedule: office-hours
+      Schedule: 24/7 Always Running
       Project: carbon-aware-finops
   
   - name: app-server-1
     type: t3.large
     tags:
       Environment: development
-      Schedule: office-hours
+      Schedule: Office Hours + Weekend Shutdown
       Project: carbon-aware-finops
   
   - name: db-server-1
     type: t3.xlarge
     tags:
       Environment: development
-      Schedule: 24x7-low-carbon
+      Schedule: Extended Development Hours
       Project: carbon-aware-finops
   
   - name: batch-processor-1
     type: t3.large
     tags:
       Environment: development
-      Schedule: weekend-off
+      Schedule: Carbon-Aware 24/7
       Project: carbon-aware-finops
 
 # CloudWatch configuration
