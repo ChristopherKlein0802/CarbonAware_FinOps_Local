@@ -9,6 +9,11 @@ variable "aws_account_id" {
   type        = string
 }
 
+variable "aws_profile"  {
+  description = "AWS profile for authentication"
+  type        = string
+}
+
 variable "project_name" {
   description = "Name of the project"
   type        = string

@@ -7,7 +7,7 @@ import os
 import requests
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 import logging
 from dataclasses import dataclass
 
