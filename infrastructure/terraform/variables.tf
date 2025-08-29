@@ -54,3 +54,42 @@ variable "carbon_api_provider" {
     error_message = "Carbon API provider must be either 'watttime' or 'electricitymap'."
   }
 }
+# Lambda-spezifische Variablen
+variable "electricitymap_api_key" {
+  description = "ElectricityMap API Key"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "watttime_username" {
+  description = "WattTime API Username"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "watttime_password" {
+  description = "WattTime API Password"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "notification_email" {
+  description = "Email address for notifications"
+  type        = string
+  default     = "ch.klein@reply.de"
+}
+
+variable "enable_lambda_functions" {
+  description = "Enable Lambda functions deployment"
+  type        = bool
+  default     = false
+}
+
+variable "lambda_log_retention_days" {
+  description = "CloudWatch Log retention in days for Lambda functions"
+  type        = number
+  default     = 7
+}
