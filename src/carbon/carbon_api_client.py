@@ -13,6 +13,27 @@ from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
+def parse_iso_datetime(datetime_str: str) -> datetime:
+    """Parse ISO datetime string, handling 'Z' timezone indicator."""
+    if datetime_str.endswith('Z'):
+        datetime_str = datetime_str[:-1]
+    
+    if '+' in datetime_str:
+        datetime_str = datetime_str.split('+')[0]
+    elif datetime_str.count('-') > 2:
+        for i in range(len(datetime_str) - 1, -1, -1):
+            if datetime_str[i] in ['-', '+'] and i > 10:
+                datetime_str = datetime_str[:i]
+                break
+    
+    try:
+        if '.' in datetime_str:
+            return datetime.strptime(datetime_str, '%Y-%m-%dT%H:%M:%S.%f')
+        else:
+            return datetime.strptime(datetime_str, '%Y-%m-%dT%H:%M:%S')
+    except ValueError:
+        return parse_iso_datetime(datetime_str)
+
 @dataclass
 class CarbonIntensity:
     """Carbon intensity data structure."""
@@ -91,7 +112,7 @@ class WattTimeClient(CarbonAPIClient):
             data = response.json()
             return CarbonIntensity(
                 value=data['value'],
-                timestamp=datetime.fromisoformat(data['point_time']),
+                timestamp=parse_iso_datetime(data['point_time']),
                 region=region,
                 source='watttime'
             )
@@ -137,7 +158,7 @@ class WattTimeClient(CarbonAPIClient):
             for item in data.get('data', []):
                 forecasts.append(CarbonIntensity(
                     value=item['value'],
-                    timestamp=datetime.fromisoformat(item['point_time']),
+                    timestamp=parse_iso_datetime(item['point_time']),
                     region=region,
                     source='watttime'
                 ))
@@ -226,7 +247,7 @@ class ElectricityMapClient(CarbonAPIClient):
             data = response.json()
             return CarbonIntensity(
                 value=data['carbonIntensity'],
-                timestamp=datetime.fromisoformat(data['datetime']),
+                timestamp=parse_iso_datetime(data['datetime']),
                 region=region,
                 source='electricitymap'
             )
@@ -273,7 +294,7 @@ class ElectricityMapClient(CarbonAPIClient):
             for item in data.get('forecast', []):
                 forecasts.append(CarbonIntensity(
                     value=item['carbonIntensity'],
-                    timestamp=datetime.fromisoformat(item['datetime']),
+                    timestamp=parse_iso_datetime(item['datetime']),
                     region=region,
                     source='electricitymap'
                 ))
