@@ -1,0 +1,36 @@
+# Development dependencies for Carbon-Aware FinOps
+
+# Code Quality
+black>=23.0.0                  # Code formatting
+flake8>=6.0.0                  # Linting
+mypy>=1.0.0                    # Type checking
+isort>=5.0.0                   # Import sorting
+
+# Testing
+pytest>=7.0.0                  # Testing framework
+pytest-cov>=4.0.0              # Coverage reporting
+pytest-asyncio>=0.21.0         # Async testing support
+pytest-mock>=3.10.0            # Mocking utilities
+
+# Documentation
+sphinx>=6.0.0                  # Documentation generation
+sphinx-rtd-theme>=1.0.0        # ReadTheDocs theme
+myst-parser>=1.0.0             # Markdown parser for Sphinx
+
+# Development utilities
+jupyter>=1.0.0                 # Jupyter notebooks
+ipython>=8.0.0                 # Enhanced Python REPL
+pre-commit>=3.0.0              # Pre-commit hooks
+bandit>=1.7.0                  # Security linting
+
+# AWS Development
+moto>=4.0.0                    # AWS mocking for tests
+localstack>=2.0.0              # Local AWS stack for testing
+
+# Performance profiling
+memory-profiler>=0.60.0        # Memory usage profiling
+line-profiler>=4.0.0           # Line-by-line profiling
+
+# Additional utilities
+python-dotenv>=1.0.0           # Environment variable loading
+freezegun>=1.2.0               # Time mocking for tests

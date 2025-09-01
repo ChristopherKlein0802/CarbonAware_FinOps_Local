@@ -4,7 +4,6 @@ Carbon-aware shutdown scheduler for EC2 instances.
 Implements off-hours automation with carbon intensity consideration.
 """
 
-import boto3
 from datetime import datetime, timezone
 from typing import List, Dict, Optional
 import yaml
@@ -88,7 +87,7 @@ class ShutdownScheduler(LoggerMixin):
         # Load schedule rules
         schedule_rule = self._load_schedule_rule(schedule_tag)
         if not schedule_rule:
-            logger.warning(f"No schedule rule found for tag: {schedule_tag}")
+            self.logger.warning(f"No schedule rule found for tag: {schedule_tag}")
             return False
 
         # Check if shutdown time is defined
@@ -97,7 +96,7 @@ class ShutdownScheduler(LoggerMixin):
             if schedule_rule.carbon_threshold:
                 current_carbon = self.carbon_client.get_current_intensity(self.region)
                 if current_carbon > schedule_rule.carbon_threshold:
-                    logger.info(f"Carbon intensity {current_carbon} above threshold {schedule_rule.carbon_threshold}")
+                    self.logger.info(f"Carbon intensity {current_carbon} above threshold {schedule_rule.carbon_threshold}")
                     return True
             return False
 
@@ -109,7 +108,7 @@ class ShutdownScheduler(LoggerMixin):
         if schedule_rule.carbon_threshold:
             current_carbon = self.carbon_client.get_current_intensity(self.region)
             if current_carbon < schedule_rule.carbon_threshold:
-                logger.info(f"Carbon intensity {current_carbon} below threshold {schedule_rule.carbon_threshold} - keeping instance running")
+                self.logger.info(f"Carbon intensity {current_carbon} below threshold {schedule_rule.carbon_threshold} - keeping instance running")
                 return False
 
         return True
@@ -144,7 +143,7 @@ class ShutdownScheduler(LoggerMixin):
                     if schedule_rule.carbon_threshold:
                         current_carbon = self.carbon_client.get_current_intensity(self.region)
                         if current_carbon > schedule_rule.carbon_threshold:
-                            logger.info(f"Carbon intensity {current_carbon} above threshold - delaying startup")
+                            self.logger.info(f"Carbon intensity {current_carbon} above threshold - delaying startup")
                             return False
                     return True
 
@@ -193,13 +192,13 @@ class ShutdownScheduler(LoggerMixin):
         startup_count = 0
         skipped_count = 0
 
-        logger.info(f"Executing schedule at {current_time}")
+        self.logger.info(f"Executing schedule at {current_time}")
 
         for instance in instances:
             instance_id = instance['InstanceId']
             current_state = instance['State']
 
-            logger.debug(f"Processing instance {instance_id} (state: {current_state})")
+            self.logger.debug(f"Processing instance {instance_id} (state: {current_state})")
 
             if current_state == 'running' and self.should_shutdown(instance, current_time):
                 if self.shutdown_instance(instance_id):

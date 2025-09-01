@@ -193,7 +193,7 @@ class CarbonFinOpsDashboard(LoggerMixin):
         self.cache.set(cache_key, kpis)
         return kpis
     
-    def _calculate_kpis_from_data(self, state_data: List, rightsizing_data: List, cost_data: List) -> Dict[str, Any]:
+    def _calculate_kpis_from_data(self, state_data: List, rightsizing_data: List, _cost_data: List) -> Dict[str, Any]:
         """Calculate KPIs from fetched data."""
         try:
             # Calculate cost savings
@@ -358,7 +358,7 @@ class CarbonFinOpsDashboard(LoggerMixin):
              Output('instance-status-chart', 'figure')],
             [Input('interval-component', 'n_intervals')]
         )
-        def update_dashboard(_):
+        def update_dashboard(_n_intervals):
             # Get current metrics
             metrics = self.get_current_metrics()
 
@@ -427,7 +427,7 @@ class CarbonFinOpsDashboard(LoggerMixin):
                 'total_startups': total_startups
             }
         except Exception as e:
-            logger.error(f"Error getting metrics: {e}")
+            self.logger.error(f"Error getting metrics: {e}")
             return default_metrics
 
     def create_cost_timeline(self):
@@ -489,7 +489,7 @@ class CarbonFinOpsDashboard(LoggerMixin):
             return fig
 
         except Exception as e:
-            logger.error(f"Error creating cost timeline: {e}")
+            self.logger.error(f"Error creating cost timeline: {e}")
             # Return empty figure on error
             return go.Figure()
 
@@ -575,7 +575,7 @@ class CarbonFinOpsDashboard(LoggerMixin):
                 return fig
 
         except Exception as e:
-            logger.error(f"Error getting carbon timeline data: {e}")
+            self.logger.error(f"Error getting carbon timeline data: {e}")
 
         # Fallback empty chart with specific error handling
         fig = go.Figure()
@@ -675,7 +675,7 @@ class CarbonFinOpsDashboard(LoggerMixin):
             )
 
         except Exception as e:
-            logger.error(f"Error getting recommendations: {e}")
+            self.logger.error(f"Error getting recommendations: {e}")
             
             # Handle specific DynamoDB table not found error
             if "ResourceNotFoundException" in str(e):
@@ -725,7 +725,7 @@ class CarbonFinOpsDashboard(LoggerMixin):
                         if state in status_counts:
                             status_counts[state] += 1
             except Exception as e:
-                logger.error(f"Error getting instance status: {e}")
+                self.logger.error(f"Error getting instance status: {e}")
                 status_counts = {'running': 0, 'stopped': 0}
 
         fig = go.Figure(data=[go.Pie(
@@ -750,10 +750,8 @@ class CarbonFinOpsDashboard(LoggerMixin):
 
 def main():
     """Main entry point for the dashboard."""
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
+    logger = get_logger('dashboard')
+    logger.info("Starting Carbon-Aware FinOps Dashboard")
 
     dashboard = CarbonFinOpsDashboard()
     dashboard.run()
