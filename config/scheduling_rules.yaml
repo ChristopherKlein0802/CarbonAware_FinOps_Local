@@ -4,7 +4,7 @@ always-on:
   shutdown_time: null
   startup_time: null
   days: []
-  carbon_threshold: null  # Keine Einschränkungen
+  carbon_threshold: null  # No restrictions
   timezone: "Europe/Berlin"
 
 office-hours-weekdays:
@@ -20,7 +20,7 @@ development-extended:
   shutdown_time: "20:00"
   startup_time: "07:00"
   days: ["monday", "tuesday", "wednesday", "thursday", "friday"]
-  carbon_threshold: 500  # Optional: Carbon-Optimierung
+  carbon_threshold: 500  # Optional: Carbon optimization
   timezone: "Europe/Berlin"
 
 carbon-optimized:
@@ -28,5 +28,5 @@ carbon-optimized:
   shutdown_time: null
   startup_time: null
   days: []
-  carbon_threshold: 300  # Nur bei niedrigem CO2-Ausstoß
+  carbon_threshold: 300  # Only during low CO2 emissions
   timezone: "Europe/Berlin"

@@ -87,20 +87,45 @@ infrastructure-init: ## Initialize Terraform
 	cd $(TERRAFORM_DIR) && $(TERRAFORM) init
 	@echo "$(GREEN)✅ Terraform initialized$(NC)"
 
+infrastructure-validate: ## Validate Terraform configuration
+	@echo "$(YELLOW)Validating Terraform configuration...$(NC)"
+	cd $(TERRAFORM_DIR) && $(TERRAFORM) validate
+	@echo "$(GREEN)✅ Configuration is valid$(NC)"
+
+infrastructure-format: ## Format Terraform files
+	@echo "$(YELLOW)Formatting Terraform files...$(NC)"
+	cd $(TERRAFORM_DIR) && $(TERRAFORM) fmt -recursive
+	@echo "$(GREEN)✅ Formatted$(NC)"
+
+infrastructure-build: ## Build Lambda deployment packages
+	@echo "$(YELLOW)Building Lambda packages...$(NC)"
+	cd $(TERRAFORM_DIR) && $(MAKE) build-lambda
+	@echo "$(GREEN)✅ Lambda packages built$(NC)"
+
 infrastructure-plan: ## Plan Terraform deployment
 	@echo "$(YELLOW)Planning infrastructure deployment...$(NC)"
-	cd $(TERRAFORM_DIR) && $(TERRAFORM) plan -var="aws_profile=$(AWS_PROFILE)" -var="aws_region=$(AWS_REGION)"
+	cd $(TERRAFORM_DIR) && $(TERRAFORM) plan -var="aws_profile=$(AWS_PROFILE)" -var="aws_region=$(AWS_REGION)" -out=tfplan
 	@echo "$(GREEN)✅ Infrastructure plan complete$(NC)"
 
-infrastructure-apply: ## Deploy infrastructure with Terraform
+infrastructure-apply: infrastructure-build ## Deploy infrastructure with Terraform
 	@echo "$(YELLOW)Deploying infrastructure...$(NC)"
 	cd $(TERRAFORM_DIR) && $(TERRAFORM) apply -var="aws_profile=$(AWS_PROFILE)" -var="aws_region=$(AWS_REGION)" -auto-approve
 	@echo "$(GREEN)✅ Infrastructure deployed successfully$(NC)"
 
+infrastructure-apply-plan: ## Apply using saved plan file
+	@echo "$(YELLOW)Applying Terraform plan...$(NC)"
+	cd $(TERRAFORM_DIR) && \
+	if [ -f tfplan ]; then \
+		$(TERRAFORM) apply tfplan && rm -f tfplan; \
+	else \
+		echo "$(RED)No plan file found. Run 'make infrastructure-plan' first.$(NC)"; \
+		exit 1; \
+	fi
+
 infrastructure-destroy: ## Destroy Terraform infrastructure
 	@echo "$(RED)⚠️  WARNING: This will destroy all infrastructure!$(NC)"
-	@read -p "Are you sure? [y/N] " -n 1 -r; \
-	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
+	@read -p "Are you sure? Type 'yes' to continue: " confirm; \
+	if [ "$$confirm" = "yes" ]; then \
 		cd $(TERRAFORM_DIR) && $(TERRAFORM) destroy -var="aws_profile=$(AWS_PROFILE)" -var="aws_region=$(AWS_REGION)" -auto-approve; \
 		echo "$(GREEN)✅ Infrastructure destroyed$(NC)"; \
 	else \
@@ -110,6 +135,48 @@ infrastructure-destroy: ## Destroy Terraform infrastructure
 infrastructure-output: ## Show Terraform outputs
 	@echo "$(YELLOW)Infrastructure outputs:$(NC)"
 	cd $(TERRAFORM_DIR) && $(TERRAFORM) output
+
+infrastructure-clean: ## Clean up Terraform temporary files
+	@echo "$(YELLOW)Cleaning up Terraform files...$(NC)"
+	cd $(TERRAFORM_DIR) && rm -rf .terraform/ .terraform.lock.hcl terraform.tfstate* tfplan* lambda_*.zip build_tmp/
+	@echo "$(GREEN)✅ Terraform cleanup complete$(NC)"
+
+# Partial Infrastructure Deployment
+deploy-core: ## Deploy only core infrastructure (VPC, DynamoDB, S3)
+	@echo "$(YELLOW)Deploying core infrastructure...$(NC)"
+	cd $(TERRAFORM_DIR) && $(TERRAFORM) apply \
+		-target=aws_vpc.main \
+		-target=aws_subnet.public \
+		-target=aws_security_group.main \
+		-target=aws_dynamodb_table.state \
+		-target=aws_dynamodb_table.rightsizing \
+		-target=aws_dynamodb_table.costs \
+		-target=aws_s3_bucket.data \
+		-var="aws_profile=$(AWS_PROFILE)" -var="aws_region=$(AWS_REGION)" \
+		-auto-approve
+	@echo "$(GREEN)✅ Core infrastructure deployed$(NC)"
+
+deploy-instances: ## Deploy EC2 instances
+	@echo "$(YELLOW)Deploying EC2 instances...$(NC)"
+	cd $(TERRAFORM_DIR) && $(TERRAFORM) apply \
+		-target=module.test_instances \
+		-target='aws_instance.scheduled_instances["web-server"]' \
+		-target='aws_instance.scheduled_instances["app-server"]' \
+		-target='aws_instance.scheduled_instances["db-server"]' \
+		-target='aws_instance.scheduled_instances["batch-server"]' \
+		-var="aws_profile=$(AWS_PROFILE)" -var="aws_region=$(AWS_REGION)" \
+		-auto-approve
+	@echo "$(GREEN)✅ EC2 instances deployed$(NC)"
+
+deploy-lambda: infrastructure-build ## Deploy Lambda functions
+	@echo "$(YELLOW)Deploying Lambda functions...$(NC)"
+	cd $(TERRAFORM_DIR) && $(TERRAFORM) apply \
+		-target=aws_lambda_layer_version.python_dependencies \
+		-target=aws_lambda_function.scheduler \
+		-target=aws_lambda_function.rightsizing \
+		-var="aws_profile=$(AWS_PROFILE)" -var="aws_region=$(AWS_REGION)" \
+		-auto-approve
+	@echo "$(GREEN)✅ Lambda functions deployed$(NC)"
 
 # Secrets Management
 secrets-setup: ## Interactive setup of API keys and secrets
@@ -186,9 +253,52 @@ check-aws: ## Check AWS configuration and connectivity
 	@echo "$(GREEN)✅ AWS check complete$(NC)"
 
 # Monitoring and Observability
+# Lambda Management
+enable-schedules: ## Enable EventBridge schedules
+	@echo "$(YELLOW)Enabling EventBridge schedules...$(NC)"
+	aws events enable-rule --name carbon-aware-finops-scheduler-rule --region $(AWS_REGION) --profile $(AWS_PROFILE)
+	aws events enable-rule --name carbon-aware-finops-rightsizing-rule --region $(AWS_REGION) --profile $(AWS_PROFILE)
+	@echo "$(GREEN)✅ Schedules enabled$(NC)"
+
+disable-schedules: ## Disable EventBridge schedules
+	@echo "$(YELLOW)Disabling EventBridge schedules...$(NC)"
+	aws events disable-rule --name carbon-aware-finops-scheduler-rule --region $(AWS_REGION) --profile $(AWS_PROFILE) || true
+	aws events disable-rule --name carbon-aware-finops-rightsizing-rule --region $(AWS_REGION) --profile $(AWS_PROFILE) || true
+	@echo "$(GREEN)✅ Schedules disabled$(NC)"
+
+test-lambda-scheduler: ## Manually invoke scheduler Lambda
+	@echo "$(YELLOW)Manually invoking scheduler Lambda...$(NC)"
+	aws lambda invoke \
+		--function-name carbon-aware-finops-scheduler \
+		--region $(AWS_REGION) \
+		--profile $(AWS_PROFILE) \
+		--payload '{}' \
+		response.json
+	@cat response.json | python -m json.tool
+	@rm -f response.json
+
+test-lambda-rightsizing: ## Manually invoke rightsizing Lambda
+	@echo "$(YELLOW)Manually invoking rightsizing Lambda...$(NC)"
+	aws lambda invoke \
+		--function-name carbon-aware-finops-rightsizing \
+		--region $(AWS_REGION) \
+		--profile $(AWS_PROFILE) \
+		--payload '{}' \
+		response.json
+	@cat response.json | python -m json.tool
+	@rm -f response.json
+
 logs: ## View application logs
 	@echo "$(YELLOW)Application logs:$(NC)"
 	@find logs -name "*.log" -type f -exec echo "$(BLUE)=== {} ===$(NC)" \; -exec tail -20 {} \; 2>/dev/null || echo "$(YELLOW)⚠️  No log files found in logs/ directory$(NC)"
+
+logs-scheduler: ## View scheduler Lambda logs
+	@echo "$(YELLOW)Viewing scheduler Lambda logs...$(NC)"
+	aws logs tail /aws/lambda/carbon-aware-finops-scheduler --follow --region $(AWS_REGION) --profile $(AWS_PROFILE)
+
+logs-rightsizing: ## View rightsizing Lambda logs
+	@echo "$(YELLOW)Viewing rightsizing Lambda logs...$(NC)"
+	aws logs tail /aws/lambda/carbon-aware-finops-rightsizing --follow --region $(AWS_REGION) --profile $(AWS_PROFILE)
 
 metrics: ## Show CloudWatch metrics
 	@echo "$(YELLOW)Fetching CloudWatch metrics...$(NC)"
@@ -209,6 +319,19 @@ instances: ## List managed EC2 instances
 		--query 'Reservations[*].Instances[*].[InstanceId,State.Name,InstanceType,Tags[?Key==`Schedule`].Value|[0],Tags[?Key==`Name`].Value|[0]]' \
 		--output table \
 		--profile $(AWS_PROFILE)
+
+cost-estimate: ## Estimate monthly costs
+	@echo "$(YELLOW)Estimating monthly costs...$(NC)"
+	@echo "Approximate monthly costs ($(AWS_REGION)):"
+	@echo "  - 4x t3.micro instances (on-demand): ~$$30"
+	@echo "  - Lambda executions (96/day): ~$$0.50"
+	@echo "  - DynamoDB: ~$$1"
+	@echo "  - S3 storage: ~$$1"
+	@echo "  - CloudWatch Logs: ~$$2"
+	@echo "  $(GREEN)Total: ~$$35/month$(NC)"
+	@echo ""
+	@echo "With optimization (50% shutdown time):"
+	@echo "  $(GREEN)Estimated savings: ~$$15/month$(NC)"
 
 # Development and Maintenance
 clean: ## Clean temporary files and caches
@@ -256,6 +379,12 @@ dev-setup: ## Development setup: install dev dependencies and run quality checks
 	$(MAKE) lint
 	$(MAKE) test
 	@echo "$(GREEN)✅ Development environment ready!$(NC)"
+
+optimize: ## Run project optimization analysis
+	@echo "$(YELLOW)Running project optimization analysis...$(NC)"
+	./$(VENV)/bin/python $(SCRIPTS_DIR)/optimize_project.py
+	@echo "$(GREEN)✅ Optimization analysis complete$(NC)"
+	@echo "$(BLUE)📄 Check OPTIMIZATION_REPORT.md for details$(NC)"
 
 # Status and Information
 status: ## Show system status

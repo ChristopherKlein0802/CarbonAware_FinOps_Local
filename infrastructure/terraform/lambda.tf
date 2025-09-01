@@ -5,7 +5,7 @@ resource "aws_lambda_layer_version" "python_dependencies" {
 
   compatible_runtimes = ["python3.9", "python3.10", "python3.11"]
   
-  # Nur neu bauen wenn sich die Datei ändert
+  # Only rebuild when file changes
   source_code_hash = fileexists("${path.module}/lambda_layer.zip") ? filebase64sha256("${path.module}/lambda_layer.zip") : ""
 }
 
@@ -86,25 +86,23 @@ resource "aws_iam_role_policy_attachment" "lambda_logs" {
 }
 
 # EventBridge Rule for Scheduler (every 15 minutes)
-# FIX: state anstatt is_enabled verwenden
 resource "aws_cloudwatch_event_rule" "scheduler_rule" {
   name                = "${var.project_name}-scheduler-rule"
   description         = "Trigger scheduler Lambda every 15 minutes"
   schedule_expression = "rate(15 minutes)"
   
   # Start disabled, enable after testing
-  state = "DISABLED"  # FIX: Changed from is_enabled to state
+  state = "DISABLED"
 }
 
 # EventBridge Rule for Rightsizing (daily)
-# FIX: state anstatt is_enabled verwenden
 resource "aws_cloudwatch_event_rule" "rightsizing_rule" {
   name                = "${var.project_name}-rightsizing-rule"
   description         = "Trigger rightsizing analysis daily"
   schedule_expression = "cron(0 2 * * ? *)"  # 2 AM UTC daily
   
   # Start disabled, enable after testing
-  state = "DISABLED"  # FIX: Changed from is_enabled to state
+  state = "DISABLED"
 }
 
 # EventBridge Targets
