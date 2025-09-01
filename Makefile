@@ -1,286 +1,320 @@
-# Carbon-Aware FinOps Makefile
-# Provides convenient commands for development, testing, and deployment
+# Carbon-Aware FinOps - Streamlined Makefile
+# Essential commands for efficient development and deployment
 
-.PHONY: help install test lint format clean build deploy infrastructure dashboard scheduler rightsizing baseline secrets validate docs
-
-# Default target
+.PHONY: help setup dev test deploy run clean
 .DEFAULT_GOAL := help
 
-# Variables
+# Configuration
 PYTHON := python3
-PIP := pip3
 VENV := venv
-TERRAFORM := terraform
 AWS_PROFILE := carbon-finops-sandbox
 AWS_REGION := eu-central-1
-TERRAFORM_DIR := infrastructure/terraform
-SCRIPTS_DIR := scripts
-SRC_DIR := src
 
 # Colors for output
-RED := \033[0;31m
 GREEN := \033[0;32m
 YELLOW := \033[1;33m
 BLUE := \033[0;34m
-NC := \033[0m # No Color
+RED := \033[0;31m
+BOLD := \033[1m
+NC := \033[0m
 
-help: ## Show this help message
-	@echo "$(GREEN)Carbon-Aware FinOps - Available Commands$(NC)"
+help: ## 📋 Show available commands
+	@echo "$(BOLD)$(GREEN)🌱 Carbon-Aware FinOps - Essential Commands$(NC)"
+	@echo "=================================================="
+	@echo ""
+	@echo "$(BOLD)🚀 Getting Started:$(NC)"
+	@echo "  $(BLUE)make setup$(NC)        - Complete project setup (first time)"
+	@echo "  $(BLUE)make dev$(NC)          - Setup development environment"
+	@echo "  $(BLUE)make fresh-start$(NC)  - Complete reset + setup + deploy + run (testing)"
+	@echo ""
+	@echo "$(BOLD)💻 Development:$(NC)"
+	@echo "  $(BLUE)make test$(NC)         - Run all tests and quality checks"
+	@echo "  $(BLUE)make clean$(NC)        - Clean temporary files and caches"
+	@echo "  $(BLUE)make reset$(NC)        - Complete project cleanup (⚠️  removes everything!)"
+	@echo ""
+	@echo "$(BOLD)☁️  Deployment:$(NC)"
+	@echo "  $(BLUE)make deploy$(NC)       - Deploy complete infrastructure to AWS"
+	@echo "  $(BLUE)make destroy$(NC)      - Destroy AWS infrastructure (⚠️  careful!)"
+	@echo ""
+	@echo "$(BOLD)🏃 Operations:$(NC)"
+	@echo "  $(BLUE)make run$(NC)          - Run the complete carbon-aware system"
+	@echo "  $(BLUE)make dashboard$(NC)    - Launch real-time dashboard"
+	@echo "  $(BLUE)make status$(NC)       - Show system and infrastructure status"
+	@echo ""
+	@echo "$(BOLD)🔧 Advanced:$(NC)"
+	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / && !/help|setup|dev|test|deploy|run|clean|dashboard|status|destroy|reset|fresh-start/ {printf "  $(BLUE)%-12s$(NC) %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+
+# 🚀 GETTING STARTED
+setup: ## 🔧 Complete project setup (run this first!)
+	@echo "$(BOLD)$(GREEN)🚀 Setting up Carbon-Aware FinOps Project$(NC)"
 	@echo "=========================================="
-	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "$(BLUE)%-20s$(NC) %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@echo "$(YELLOW)1/4 Creating virtual environment...$(NC)"
+	@$(PYTHON) -m venv $(VENV)
+	@./$(VENV)/bin/pip install --upgrade pip setuptools wheel
+	@echo "$(YELLOW)2/4 Installing dependencies...$(NC)"
+	@./$(VENV)/bin/pip install -r requirements.txt
+	@./$(VENV)/bin/pip install -r requirements-dev.txt 2>/dev/null || echo "$(YELLOW)⚠️  Dev requirements not found, skipping$(NC)"
+	@./$(VENV)/bin/pip install -e .
+	@echo "$(YELLOW)3/4 Running quality checks...$(NC)"
+	@$(MAKE) _quick-test
+	@echo "$(YELLOW)4/4 Checking AWS connectivity...$(NC)"
+	@aws sts get-caller-identity --profile $(AWS_PROFILE) >/dev/null 2>&1 && \
+		echo "$(GREEN)✅ AWS connection successful$(NC)" || \
+		echo "$(RED)⚠️  AWS not configured. Run: aws configure --profile $(AWS_PROFILE)$(NC)"
+	@echo ""
+	@echo "$(BOLD)$(GREEN)🎉 Setup complete!$(NC)"
+	@echo "$(BLUE)Next steps:$(NC)"
+	@echo "  • Run '$(BOLD)make deploy$(NC)' to deploy infrastructure"
+	@echo "  • Run '$(BOLD)make run$(NC)' to start the carbon-aware system"
+	@echo "  • Run '$(BOLD)make dashboard$(NC)' to view real-time metrics"
 
-# Environment Setup
-install: ## Install Python dependencies and setup virtual environment
-	@echo "$(YELLOW)Setting up virtual environment...$(NC)"
-	$(PYTHON) -m venv $(VENV)
-	./$(VENV)/bin/pip install --upgrade pip
-	./$(VENV)/bin/pip install -r requirements.txt
-	@echo "$(GREEN)✅ Virtual environment setup complete$(NC)"
-	@echo "$(BLUE)To activate: source $(VENV)/bin/activate$(NC)"
-
-install-dev: install ## Install development dependencies
-	@echo "$(YELLOW)Installing development dependencies...$(NC)"
-	./$(VENV)/bin/pip install -r requirements-dev.txt || echo "$(YELLOW)⚠️  requirements-dev.txt not found, skipping$(NC)"
-	@echo "$(GREEN)✅ Development dependencies installed$(NC)"
-
-# Code Quality
-lint: ## Run code linting with flake8
-	@echo "$(YELLOW)Running code linting...$(NC)"
-	./$(VENV)/bin/flake8 $(SRC_DIR) --max-line-length=120 --extend-ignore=E203,W503 || echo "$(RED)❌ Linting issues found$(NC)"
-	@echo "$(GREEN)✅ Linting complete$(NC)"
-
-format: ## Format code with black
+dev: ## 💻 Setup development environment
+	@echo "$(BOLD)$(YELLOW)💻 Development Environment Setup$(NC)"
+	@echo "=================================="
+	@$(MAKE) _ensure-venv
+	@echo "$(YELLOW)Installing development tools...$(NC)"
+	@./$(VENV)/bin/pip install -r requirements-dev.txt
+	@./$(VENV)/bin/pip install -e .
 	@echo "$(YELLOW)Formatting code...$(NC)"
-	./$(VENV)/bin/black $(SRC_DIR) --line-length=120
-	@echo "$(GREEN)✅ Code formatting complete$(NC)"
+	@./$(VENV)/bin/black src tests --line-length=120 --quiet
+	@echo "$(YELLOW)Running quality checks...$(NC)"
+	@$(MAKE) test
+	@echo "$(GREEN)✅ Development environment ready!$(NC)"
 
-type-check: ## Run type checking with mypy
-	@echo "$(YELLOW)Running type checks...$(NC)"
-	./$(VENV)/bin/mypy $(SRC_DIR) --ignore-missing-imports || echo "$(RED)❌ Type checking issues found$(NC)"
-	@echo "$(GREEN)✅ Type checking complete$(NC)"
+# 💻 DEVELOPMENT
+test: ## 🧪 Run comprehensive tests and quality checks
+	@echo "$(BOLD)$(YELLOW)🧪 Running Quality Checks$(NC)"
+	@echo "=========================="
+	@$(MAKE) _ensure-venv
+	@echo "$(YELLOW)1/4 Linting code...$(NC)"
+	@./$(VENV)/bin/flake8 src --max-line-length=120 --extend-ignore=E203,W503 || (echo "$(RED)❌ Linting failed$(NC)" && exit 1)
+	@echo "$(YELLOW)2/4 Type checking...$(NC)"
+	@./$(VENV)/bin/mypy src --ignore-missing-imports || (echo "$(RED)❌ Type checking failed$(NC)" && exit 1)
+	@echo "$(YELLOW)3/4 Running tests...$(NC)"
+	@./$(VENV)/bin/pytest tests/ -v --tb=short || (echo "$(RED)❌ Tests failed$(NC)" && exit 1)
+	@echo "$(YELLOW)4/4 Security scan...$(NC)"
+	@./$(VENV)/bin/bandit -r src --quiet || echo "$(YELLOW)⚠️  Security warnings found$(NC)"
+	@echo "$(GREEN)✅ All quality checks passed!$(NC)"
 
-# Testing
-test: ## Run all tests
-	@echo "$(YELLOW)Running tests...$(NC)"
-	./$(VENV)/bin/pytest tests/ -v --tb=short
-	@echo "$(GREEN)✅ Tests complete$(NC)"
+clean: ## 🧹 Clean temporary files and caches
+	@echo "$(YELLOW)🧹 Cleaning project...$(NC)"
+	@find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+	@find . -type f -name "*.pyc" -delete 2>/dev/null || true
+	@find . -type d -name ".pytest_cache" -exec rm -rf {} + 2>/dev/null || true
+	@rm -rf .mypy_cache htmlcov carbon_aware_finops.egg-info 2>/dev/null || true
+	@find infrastructure/ -name "*.tfstate.backup" -delete 2>/dev/null || true
+	@find . -name ".DS_Store" -delete 2>/dev/null || true
+	@echo "$(GREEN)✅ Cleanup complete$(NC)"
 
-test-coverage: ## Run tests with coverage report
-	@echo "$(YELLOW)Running tests with coverage...$(NC)"
-	./$(VENV)/bin/pytest tests/ -v --cov=$(SRC_DIR) --cov-report=html --cov-report=term
-	@echo "$(GREEN)✅ Coverage report generated$(NC)"
-	@echo "$(BLUE)📊 View HTML report: open htmlcov/index.html$(NC)"
-
-
-# Infrastructure Management
-infrastructure-plan: ## Plan Terraform deployment
-	@echo "$(YELLOW)Planning infrastructure deployment...$(NC)"
-	cd $(TERRAFORM_DIR) && $(TERRAFORM) init
-	cd $(TERRAFORM_DIR) && ./build_lambda.sh
-	cd $(TERRAFORM_DIR) && $(TERRAFORM) plan -var="aws_profile=$(AWS_PROFILE)" -var="aws_region=$(AWS_REGION)"
-	@echo "$(GREEN)✅ Infrastructure plan complete$(NC)"
-
-infrastructure-apply: ## Deploy infrastructure with Terraform  
-	@echo "$(YELLOW)Deploying infrastructure...$(NC)"
-	cd $(TERRAFORM_DIR) && $(TERRAFORM) init
-	cd $(TERRAFORM_DIR) && ./build_lambda.sh
-	cd $(TERRAFORM_DIR) && $(TERRAFORM) apply -var="aws_profile=$(AWS_PROFILE)" -var="aws_region=$(AWS_REGION)" -auto-approve
-	@echo "$(GREEN)✅ Infrastructure deployed successfully$(NC)"
-
-infrastructure-destroy: ## Destroy Terraform infrastructure
-	@echo "$(RED)⚠️  WARNING: This will destroy all infrastructure!$(NC)"
-	@read -p "Are you sure? Type 'yes' to continue: " confirm; \
-	if [ "$$confirm" = "yes" ]; then \
-		cd $(TERRAFORM_DIR) && $(TERRAFORM) destroy -var="aws_profile=$(AWS_PROFILE)" -var="aws_region=$(AWS_REGION)" -auto-approve; \
-		echo "$(GREEN)✅ Infrastructure destroyed$(NC)"; \
+reset: ## 🔥 Complete project reset (removes everything!)
+	@echo "$(BOLD)$(RED)🔥 COMPLETE PROJECT RESET$(NC)"
+	@echo "=========================="
+	@echo "$(RED)⚠️  This will remove:$(NC)"
+	@echo "  • Virtual environment"
+	@echo "  • All temporary/cache files"
+	@echo "  • Terraform state and cache"
+	@echo "  • Lambda zip files"
+	@echo "  • Log files"
+	@echo "  • All build artifacts"
+	@echo ""
+	@read -p "⚠️  Continue with complete reset? [y/N] " -r && \
+	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
+		echo "$(YELLOW)1/6 Removing virtual environment...$(NC)"; \
+		rm -rf $(VENV) 2>/dev/null || true; \
+		echo "$(YELLOW)2/6 Cleaning Python artifacts...$(NC)"; \
+		find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true; \
+		find . -type f -name "*.pyc" -delete 2>/dev/null || true; \
+		find . -type f -name "*.pyo" -delete 2>/dev/null || true; \
+		rm -rf .mypy_cache .pytest_cache htmlcov carbon_aware_finops.egg-info 2>/dev/null || true; \
+		echo "$(YELLOW)3/6 Cleaning Terraform artifacts...$(NC)"; \
+		rm -rf infrastructure/terraform/.terraform 2>/dev/null || true; \
+		rm -rf infrastructure/terraform/.terraform.lock.hcl 2>/dev/null || true; \
+		find infrastructure/ -name "*.tfstate*" -delete 2>/dev/null || true; \
+		find infrastructure/ -name "terraform.tfplan*" -delete 2>/dev/null || true; \
+		echo "$(YELLOW)4/6 Removing Lambda packages...$(NC)"; \
+		find infrastructure/ -name "*.zip" -delete 2>/dev/null || true; \
+		echo "$(YELLOW)5/6 Cleaning logs and temporary files...$(NC)"; \
+		rm -rf logs/*.log 2>/dev/null || true; \
+		find . -name ".DS_Store" -delete 2>/dev/null || true; \
+		find . -name "*.tmp" -delete 2>/dev/null || true; \
+		echo "$(YELLOW)6/6 Final cleanup...$(NC)"; \
+		rm -rf OPTIMIZATION_REPORT.md 2>/dev/null || true; \
+		echo ""; \
+		echo "$(BOLD)$(GREEN)🎉 Complete reset finished!$(NC)"; \
+		echo "$(BLUE)Project is now in pristine state$(NC)"; \
+		echo "$(BLUE)Run 'make setup' to begin again$(NC)"; \
 	else \
-		echo "$(BLUE)❌ Infrastructure destruction cancelled$(NC)"; \
+		echo "$(BLUE)❌ Reset cancelled$(NC)"; \
 	fi
 
-infrastructure-status: ## Show infrastructure status
-	@echo "$(YELLOW)Infrastructure Status:$(NC)"
-	@cd $(TERRAFORM_DIR) && $(TERRAFORM) output -json 2>/dev/null | python -m json.tool || echo "No outputs yet. Run 'make infrastructure-apply' first."
+fresh-start: ## 🌟 Complete workflow: reset → setup → deploy → run (perfect for testing!)
+	@echo "$(BOLD)$(GREEN)🌟 FRESH START - Complete Workflow$(NC)"
+	@echo "===================================="
+	@echo "$(BLUE)This will:$(NC)"
+	@echo "  1. Reset the entire project"
+	@echo "  2. Setup fresh environment"  
+	@echo "  3. Deploy infrastructure to AWS"
+	@echo "  4. Run the carbon-aware system"
+	@echo ""
+	@read -p "🚀 Start fresh workflow? [y/N] " -r && \
+	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
+		echo "$(BOLD)$(YELLOW)Phase 1: Resetting project...$(NC)"; \
+		$(MAKE) _silent-reset; \
+		echo ""; \
+		echo "$(BOLD)$(YELLOW)Phase 2: Setting up environment...$(NC)"; \
+		$(MAKE) setup; \
+		echo ""; \
+		echo "$(BOLD)$(YELLOW)Phase 3: Deploying infrastructure...$(NC)"; \
+		$(MAKE) deploy; \
+		echo ""; \
+		echo "$(BOLD)$(YELLOW)Phase 4: Running system...$(NC)"; \
+		$(MAKE) run; \
+		echo ""; \
+		echo "$(BOLD)$(GREEN)🎉 FRESH START COMPLETE!$(NC)"; \
+		echo "$(GREEN)Your Carbon-Aware FinOps system is ready!$(NC)"; \
+		echo ""; \
+		echo "$(BLUE)Next steps:$(NC)"; \
+		echo "  • View dashboard: make dashboard"; \
+		echo "  • Check status: make status"; \
+		echo "  • View logs: make logs"; \
+	else \
+		echo "$(BLUE)❌ Fresh start cancelled$(NC)"; \
+	fi
 
-# Secrets Management
-secrets-setup: ## Interactive setup of API keys and secrets
-	@echo "$(YELLOW)Setting up secrets...$(NC)"
-	./$(VENV)/bin/python $(SCRIPTS_DIR)/setup_secrets.py --aws-profile $(AWS_PROFILE)
-	@echo "$(GREEN)✅ Secrets setup complete$(NC)"
+# ☁️ DEPLOYMENT
+deploy: ## 🚀 Deploy complete infrastructure to AWS
+	@echo "$(BOLD)$(GREEN)🚀 Deploying Carbon-Aware FinOps$(NC)"
+	@echo "=================================="
+	@$(MAKE) _ensure-venv
+	@echo "$(YELLOW)1/4 Initializing Terraform...$(NC)"
+	@cd infrastructure/terraform && terraform init -upgrade
+	@echo "$(YELLOW)2/4 Building Lambda packages...$(NC)"
+	@cd infrastructure/terraform && ./build_lambda.sh
+	@echo "$(YELLOW)3/4 Deploying infrastructure...$(NC)"
+	@cd infrastructure/terraform && terraform apply -var="aws_profile=$(AWS_PROFILE)" -var="aws_region=$(AWS_REGION)" -auto-approve
+	@echo "$(YELLOW)4/4 Setting up secrets...$(NC)"
+	@./$(VENV)/bin/python scripts/setup_secrets.py --aws-profile $(AWS_PROFILE) || echo "$(YELLOW)⚠️  Configure API secrets manually$(NC)"
+	@echo ""
+	@echo "$(BOLD)$(GREEN)🎉 Deployment complete!$(NC)"
+	@echo "$(BLUE)Infrastructure deployed successfully$(NC)"
+	@$(MAKE) status
 
+destroy: ## ⚠️  Destroy AWS infrastructure
+	@echo "$(BOLD)$(RED)⚠️  WARNING: This will destroy all AWS infrastructure!$(NC)"
+	@read -p "Type 'yes' to confirm destruction: " confirm && \
+	if [ "$$confirm" = "yes" ]; then \
+		cd infrastructure/terraform && terraform destroy -var="aws_profile=$(AWS_PROFILE)" -var="aws_region=$(AWS_REGION)" -auto-approve && \
+		echo "$(GREEN)✅ Infrastructure destroyed$(NC)"; \
+	else \
+		echo "$(BLUE)❌ Destruction cancelled$(NC)"; \
+	fi
 
-# Data Collection and Analysis
-baseline: ## Collect baseline data from AWS
-	@echo "$(YELLOW)Collecting baseline data...$(NC)"
-	./$(VENV)/bin/python $(SCRIPTS_DIR)/collect_baseline.py --profile $(AWS_PROFILE)
-	@echo "$(GREEN)✅ Baseline data collection complete$(NC)"
-
-# Application Components
-scheduler: ## Run carbon-aware scheduler
-	@echo "$(YELLOW)Starting carbon-aware scheduler...$(NC)"
-	./$(VENV)/bin/python $(SRC_DIR)/automation/shutdown_scheduler.py
-	@echo "$(GREEN)✅ Scheduler execution complete$(NC)"
-
-rightsizing: ## Run rightsizing analysis
-	@echo "$(YELLOW)Running rightsizing analysis...$(NC)"
-	./$(VENV)/bin/python $(SRC_DIR)/lambda/rightsizing_handler.py
-	@echo "$(GREEN)✅ Rightsizing analysis complete$(NC)"
-
-dashboard: ## Launch real-time dashboard
-	@echo "$(YELLOW)Starting dashboard server...$(NC)"
-	@echo "$(BLUE)🌐 Dashboard will be available at: http://localhost:8050$(NC)"
-	./$(VENV)/bin/python $(SRC_DIR)/reporting/realtime_dashboard.py
-
-# Deployment and Operations
-deploy-full: infrastructure-apply secrets-setup baseline ## Full deployment: infrastructure + secrets + baseline
-	@echo "$(GREEN)🎉 Full deployment complete!$(NC)"
-	@echo "$(BLUE)Next steps:$(NC)"
-	@echo "  • Run scheduler: make scheduler"
-	@echo "  • Run rightsizing: make rightsizing"  
-	@echo "  • Launch dashboard: make dashboard"
-
-run-system: ## Run the complete carbon-aware system
-	@echo "$(YELLOW)Running complete carbon-aware system...$(NC)"
-	@echo "$(BLUE)📊 Running baseline collection...$(NC)"
-	$(MAKE) baseline
-	@echo "$(BLUE)⚡ Running scheduler...$(NC)"
-	$(MAKE) scheduler
-	@echo "$(BLUE)📈 Running rightsizing analysis...$(NC)"
-	$(MAKE) rightsizing
+# 🏃 OPERATIONS
+run: ## 🏃 Run the complete carbon-aware system
+	@echo "$(BOLD)$(YELLOW)🏃 Running Carbon-Aware System$(NC)"
+	@echo "==============================="
+	@$(MAKE) _ensure-venv
+	@echo "$(YELLOW)1/3 Collecting baseline data...$(NC)"
+	@./$(VENV)/bin/python scripts/collect_baseline.py --profile $(AWS_PROFILE) || echo "$(YELLOW)⚠️  Baseline collection partial$(NC)"
+	@echo "$(YELLOW)2/3 Running scheduler...$(NC)"
+	@./$(VENV)/bin/python src/automation/shutdown_scheduler.py || echo "$(YELLOW)⚠️  Scheduler issues detected$(NC)"
+	@echo "$(YELLOW)3/3 Running rightsizing analysis...$(NC)"
+	@./$(VENV)/bin/python src/lambda/rightsizing_handler.py || echo "$(YELLOW)⚠️  Rightsizing issues detected$(NC)"
 	@echo "$(GREEN)✅ System execution complete$(NC)"
 	@echo "$(BLUE)💡 Launch dashboard: make dashboard$(NC)"
 
-# System Status
-status: ## Show system status
-	@echo "$(YELLOW)System status check...$(NC)"
-	@echo "$(BLUE)AWS connectivity:$(NC)"
-	aws sts get-caller-identity --profile $(AWS_PROFILE) > /dev/null && echo "$(GREEN)✅ AWS connectivity OK$(NC)" || echo "$(RED)❌ AWS connectivity failed$(NC)"
-	@echo "$(BLUE)Infrastructure status:$(NC)"
-	cd $(TERRAFORM_DIR) && $(TERRAFORM) show -json 2>/dev/null | jq -r '.values.root_module.resources[]?.values.function_name // empty' | head -5 || echo "No infrastructure found"
+dashboard: ## 📊 Launch real-time dashboard
+	@echo "$(BOLD)$(BLUE)📊 Starting Carbon-Aware Dashboard$(NC)"
+	@echo "==================================="
+	@$(MAKE) _ensure-venv
+	@echo "$(BLUE)🌐 Dashboard will be available at: http://localhost:8050$(NC)"
+	@echo "$(YELLOW)Press Ctrl+C to stop the dashboard$(NC)"
+	@./$(VENV)/bin/python src/reporting/realtime_dashboard.py
 
-# Lambda Management
-enable-automation: ## Enable EventBridge schedules for automation
-	@echo "$(YELLOW)Enabling automation schedules...$(NC)"
-	aws events enable-rule --name carbon-aware-finops-scheduler-rule --region $(AWS_REGION) --profile $(AWS_PROFILE)
-	aws events enable-rule --name carbon-aware-finops-rightsizing-rule --region $(AWS_REGION) --profile $(AWS_PROFILE)
-	@echo "$(GREEN)✅ Automation enabled$(NC)"
+status: ## 📈 Show comprehensive system status
+	@echo "$(BOLD)$(BLUE)📈 System Status$(NC)"
+	@echo "================"
+	@echo "$(BOLD)AWS Connection:$(NC)"
+	@aws sts get-caller-identity --profile $(AWS_PROFILE) >/dev/null 2>&1 && \
+		echo "  $(GREEN)✅ Connected$(NC)" || echo "  $(RED)❌ Not connected$(NC)"
+	@echo "$(BOLD)Infrastructure:$(NC)"
+	@cd infrastructure/terraform && terraform output -json 2>/dev/null | python3 -m json.tool 2>/dev/null >/dev/null && \
+		echo "  $(GREEN)✅ Deployed$(NC)" || echo "  $(YELLOW)⚠️  Not deployed$(NC)"
+	@echo "$(BOLD)Managed EC2 Instances:$(NC)"
+	@aws ec2 describe-instances \
+		--filters "Name=tag:Project,Values=carbon-aware-finops" \
+		--query 'Reservations[*].Instances[*].[InstanceId,State.Name,InstanceType,Tags[?Key==`Name`].Value|[0]]' \
+		--output table \
+		--profile $(AWS_PROFILE) 2>/dev/null || echo "  $(YELLOW)⚠️  No instances found$(NC)"
 
-disable-automation: ## Disable EventBridge schedules
-	@echo "$(YELLOW)Disabling automation schedules...$(NC)"
-	aws events disable-rule --name carbon-aware-finops-scheduler-rule --region $(AWS_REGION) --profile $(AWS_PROFILE) || true
-	aws events disable-rule --name carbon-aware-finops-rightsizing-rule --region $(AWS_REGION) --profile $(AWS_PROFILE) || true
-	@echo "$(GREEN)✅ Automation disabled$(NC)"
+# 🔧 ADVANCED COMMANDS
+plan: ## 📋 Show Terraform deployment plan
+	@$(MAKE) _ensure-venv
+	@cd infrastructure/terraform && terraform init -upgrade
+	@cd infrastructure/terraform && ./build_lambda.sh
+	@cd infrastructure/terraform && terraform plan -var="aws_profile=$(AWS_PROFILE)" -var="aws_region=$(AWS_REGION)"
 
-logs: ## View recent Lambda logs
+baseline: ## 📊 Collect AWS baseline data
+	@$(MAKE) _ensure-venv
+	@./$(VENV)/bin/python scripts/collect_baseline.py --profile $(AWS_PROFILE)
+
+scheduler: ## ⏰ Run carbon-aware scheduler once
+	@$(MAKE) _ensure-venv
+	@./$(VENV)/bin/python src/automation/shutdown_scheduler.py
+
+rightsizing: ## 📐 Run rightsizing analysis
+	@$(MAKE) _ensure-venv
+	@./$(VENV)/bin/python src/lambda/rightsizing_handler.py
+
+logs: ## 📄 View recent Lambda logs
 	@echo "$(YELLOW)Recent Lambda logs:$(NC)"
-	@echo "$(BLUE)Scheduler logs:$(NC)"
-	aws logs tail /aws/lambda/carbon-aware-finops-scheduler --since 1h --region $(AWS_REGION) --profile $(AWS_PROFILE) 2>/dev/null || echo "No scheduler logs found"
-	@echo "$(BLUE)Rightsizing logs:$(NC)"
-	aws logs tail /aws/lambda/carbon-aware-finops-rightsizing --since 1h --region $(AWS_REGION) --profile $(AWS_PROFILE) 2>/dev/null || echo "No rightsizing logs found"
+	@aws logs tail /aws/lambda/carbon-aware-finops-scheduler --since 1h --region $(AWS_REGION) --profile $(AWS_PROFILE) 2>/dev/null || echo "$(YELLOW)No scheduler logs$(NC)"
+	@aws logs tail /aws/lambda/carbon-aware-finops-rightsizing --since 1h --region $(AWS_REGION) --profile $(AWS_PROFILE) 2>/dev/null || echo "$(YELLOW)No rightsizing logs$(NC)"
 
-instances: ## List managed EC2 instances
-	@echo "$(YELLOW)Managed EC2 instances:$(NC)"
-	aws ec2 describe-instances \
+instances: ## 💻 List managed EC2 instances
+	@aws ec2 describe-instances \
 		--filters "Name=tag:Project,Values=carbon-aware-finops" \
 		--query 'Reservations[*].Instances[*].[InstanceId,State.Name,InstanceType,Tags[?Key==`Schedule`].Value|[0],Tags[?Key==`Name`].Value|[0]]' \
 		--output table \
 		--profile $(AWS_PROFILE)
 
-	@echo "Approximate monthly costs ($(AWS_REGION)):"
-	@echo "  - 4x t3.micro instances (on-demand): ~$$30"
-	@echo "  - Lambda executions (96/day): ~$$0.50"
-	@echo "  - DynamoDB: ~$$1"
-	@echo "  - S3 storage: ~$$1"
-	@echo "  - CloudWatch Logs: ~$$2"
-	@echo "  $(GREEN)Total: ~$$35/month$(NC)"
-
-# Development and Maintenance
-clean: ## Clean temporary files and caches
-	@echo "$(YELLOW)Cleaning temporary files...$(NC)"
-	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
-	find . -type f -name "*.pyc" -delete 2>/dev/null || true
-	find . -type f -name "*.pyo" -delete 2>/dev/null || true
-	find . -type d -name ".pytest_cache" -exec rm -rf {} + 2>/dev/null || true
-	find . -type d -name "htmlcov" -exec rm -rf {} + 2>/dev/null || true
-	find . -type f -name ".coverage" -delete 2>/dev/null || true
-	rm -rf .mypy_cache 2>/dev/null || true
-	rm -rf carbon_aware_finops.egg-info 2>/dev/null || true
-	find infrastructure/ -name "*.tfstate.backup" -delete 2>/dev/null || true
-	find . -name "package-lock.json" -size -100c -delete 2>/dev/null || true
-	@echo "$(GREEN)✅ Cleanup complete$(NC)"
-
-clean-venv: ## Remove virtual environment
-	@echo "$(YELLOW)Removing virtual environment...$(NC)"
-	rm -rf $(VENV)
-	@echo "$(GREEN)✅ Virtual environment removed$(NC)"
-
-deep-clean: ## Deep clean including logs and terraform cache
-	@echo "$(YELLOW)Performing deep cleanup...$(NC)"
-	$(MAKE) clean
-	rm -rf logs/*.log 2>/dev/null || true
-	rm -rf infrastructure/terraform/.terraform 2>/dev/null || true
-	rm -rf infrastructure/terraform/*.zip 2>/dev/null || true
-	find . -name "*.DS_Store" -delete 2>/dev/null || true
-	@echo "$(GREEN)✅ Deep cleanup complete$(NC)"
-
-reset: clean clean-venv ## Full reset: clean files and remove venv
-	@echo "$(GREEN)✅ Full reset complete$(NC)"
-
-# Documentation
-docs: ## Generate documentation
-	@echo "$(YELLOW)Generating documentation...$(NC)"
-	@echo "$(BLUE)📚 Main documentation: README.md$(NC)"
-	@echo "$(BLUE)🏗️  Architecture: docs/architecture.md (if exists)$(NC)"
-	@echo "$(BLUE)🔧 Setup guide: Complete setup instructions in README$(NC)"
-	@echo "$(GREEN)✅ Documentation ready$(NC)"
-
-# Quick Start Workflows
-quick-start: ## Quick start: install dependencies and check status
-	@echo "$(GREEN)🚀 Quick Start - Carbon-Aware FinOps$(NC)"
-	$(MAKE) install
-	$(MAKE) status
-	@echo "$(GREEN)✅ Quick start complete!$(NC)"
-	@echo "$(BLUE)Next steps:$(NC)"
-	@echo "  • Setup infrastructure: make infrastructure-apply"
-	@echo "  • Configure secrets: make secrets-setup"
-	@echo "  • Collect baseline: make baseline"
-	@echo "  • Run system: make run-system"
-
-dev-setup: ## Development setup: install dev dependencies and run quality checks
-	@echo "$(GREEN)🛠️  Development Setup$(NC)"
-	$(MAKE) install-dev
-	$(MAKE) format
-	$(MAKE) lint
-	$(MAKE) test
-	@echo "$(GREEN)✅ Development environment ready!$(NC)"
-
-optimize: ## Run project optimization analysis
-	@echo "$(YELLOW)Running project optimization analysis...$(NC)"
-	./$(VENV)/bin/python $(SCRIPTS_DIR)/optimize_project.py
-	@echo "$(GREEN)✅ Optimization analysis complete$(NC)"
-	@echo "$(BLUE)📄 Check OPTIMIZATION_REPORT.md for details$(NC)"
-
-	@echo "  • Launch dashboard: make dashboard"
-
-version: ## Show version information
-	@echo "$(GREEN)Carbon-Aware FinOps Framework$(NC)"
-	@echo "Version: 1.0.0"
-	@echo "Python: $$($(PYTHON) --version 2>&1)"
-	@echo "Terraform: $$($(TERRAFORM) version -json 2>/dev/null | jq -r '.terraform_version' 2>/dev/null || echo 'Not available')"
-	@echo "AWS CLI: $$(aws --version 2>&1 | head -n1)"
-
-# Emergency Commands
-emergency-stop: ## Emergency stop: terminate all running instances
-	@echo "$(RED)🚨 EMERGENCY STOP - Terminating managed instances$(NC)"
-	@read -p "This will STOP all managed instances. Continue? [y/N] " -n 1 -r; \
+emergency-stop: ## 🚨 Emergency stop all managed instances
+	@echo "$(RED)🚨 EMERGENCY STOP$(NC)"
+	@read -p "Stop all managed instances? [y/N] " -r && \
 	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
 		aws ec2 describe-instances \
 			--filters "Name=tag:Project,Values=carbon-aware-finops" "Name=instance-state-name,Values=running" \
 			--query 'Reservations[*].Instances[*].InstanceId' \
-			--output text \
-			--profile $(AWS_PROFILE) | \
+			--output text --profile $(AWS_PROFILE) | \
 		xargs -r aws ec2 stop-instances --instance-ids --profile $(AWS_PROFILE) && \
 		echo "$(GREEN)✅ Emergency stop complete$(NC)"; \
-	else \
-		echo "$(BLUE)❌ Emergency stop cancelled$(NC)"; \
 	fi
 
+# Internal helper targets (not shown in help)
+_ensure-venv:
+	@test -d $(VENV) || (echo "$(RED)❌ Virtual environment not found. Run 'make setup' first.$(NC)" && exit 1)
+
+_quick-test:
+	@./$(VENV)/bin/flake8 src --max-line-length=120 --extend-ignore=E203,W503 --quiet || echo "$(YELLOW)⚠️  Linting issues$(NC)"
+	@./$(VENV)/bin/pytest tests/ -x --quiet --tb=no 2>/dev/null || echo "$(YELLOW)⚠️  Some tests failing$(NC)"
+
+_silent-reset:
+	@echo "$(YELLOW)Removing virtual environment...$(NC)"
+	@rm -rf $(VENV) 2>/dev/null || true
+	@echo "$(YELLOW)Cleaning Python artifacts...$(NC)"
+	@find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+	@find . -type f -name "*.pyc" -delete 2>/dev/null || true
+	@find . -type f -name "*.pyo" -delete 2>/dev/null || true
+	@rm -rf .mypy_cache .pytest_cache htmlcov carbon_aware_finops.egg-info 2>/dev/null || true
+	@echo "$(YELLOW)Cleaning Terraform artifacts...$(NC)"
+	@rm -rf infrastructure/terraform/.terraform 2>/dev/null || true
+	@rm -rf infrastructure/terraform/.terraform.lock.hcl 2>/dev/null || true
+	@find infrastructure/ -name "*.tfstate*" -delete 2>/dev/null || true
+	@find infrastructure/ -name "terraform.tfplan*" -delete 2>/dev/null || true
+	@echo "$(YELLOW)Removing Lambda packages...$(NC)"
+	@find infrastructure/ -name "*.zip" -delete 2>/dev/null || true
+	@echo "$(YELLOW)Final cleanup...$(NC)"
+	@rm -rf logs/*.log 2>/dev/null || true
+	@find . -name ".DS_Store" -delete 2>/dev/null || true
+	@find . -name "*.tmp" -delete 2>/dev/null || true
+	@rm -rf OPTIMIZATION_REPORT.md 2>/dev/null || true
