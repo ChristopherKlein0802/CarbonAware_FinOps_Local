@@ -5,17 +5,20 @@ Implements off-hours automation with carbon intensity consideration.
 """
 
 import boto3
-import logging
 from datetime import datetime, timezone
 from typing import List, Dict, Optional
 import yaml
 from dataclasses import dataclass
 import os
+import sys
 
-from ..carbon.carbon_api_client import CarbonIntensityClient
-from ..cost.aws_cost_client import AWSCostClient
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-logger = logging.getLogger(__name__)
+from src.carbon.carbon_api_client import CarbonIntensityClient
+from src.cost.aws_cost_client import AWSCostClient
+from src.utils.logging_config import get_logger, LoggerMixin
+from src.utils.retry_handler import AWSRetrySession, exponential_backoff, safe_aws_call
+from config.settings import settings
 
 
 @dataclass
@@ -29,43 +32,50 @@ class ScheduleRule:
     timezone: str = "Europe/Berlin"
 
 
-class ShutdownScheduler:
+class ShutdownScheduler(LoggerMixin):
     """Manages carbon-aware shutdown scheduling for EC2 instances."""
 
-    def __init__(self, region: str = 'eu-central-1'):
-        self.ec2_client = boto3.client('ec2', region_name=region)
+    def __init__(self, region: str = None, aws_profile: str = None):
+        self.region = region or settings.aws.region
+        self.aws_profile = aws_profile or settings.aws.profile
+        
+        # Use retry session for improved reliability
+        self.aws_session = AWSRetrySession(self.aws_profile, self.region)
+        self.ec2_client = self.aws_session.get_client('ec2')
         self.carbon_client = CarbonIntensityClient()
-        self.cost_client = AWSCostClient(region)
-        self.region = region
-        self.dynamodb = boto3.resource('dynamodb', region_name=region)
+        self.cost_client = AWSCostClient(self.region)
+        self.dynamodb = self.aws_session.get_resource('dynamodb')
+        
+        self.logger.info(f"ShutdownScheduler initialized for region {self.region}")
 
+    @exponential_backoff(max_retries=3)
     def get_tagged_instances(self, tag_key: str = 'Schedule') -> List[Dict]:
         """Get all instances with scheduling tags."""
-        try:
-            response = self.ec2_client.describe_instances(
-                Filters=[
-                    {'Name': 'tag-key', 'Values': [tag_key]},
-                    {'Name': 'instance-state-name', 'Values': ['running', 'stopped']}
-                ]
-            )
-
-            instances = []
-            for reservation in response['Reservations']:
-                for instance in reservation['Instances']:
-                    instances.append({
-                        'InstanceId': instance['InstanceId'],
-                        'State': instance['State']['Name'],
-                        'InstanceType': instance['InstanceType'],
-                        'LaunchTime': instance.get('LaunchTime'),
-                        'Tags': {tag['Key']: tag['Value'] for tag in instance.get('Tags', [])}
-                    })
-
-            logger.info(f"Found {len(instances)} instances with scheduling tags")
-            return instances
-
-        except Exception as e:
-            logger.error(f"Error fetching instances: {e}")
+        response = safe_aws_call(
+            self.ec2_client.describe_instances,
+            Filters=[
+                {'Name': 'tag-key', 'Values': [tag_key]},
+                {'Name': 'instance-state-name', 'Values': ['running', 'stopped']}
+            ]
+        )
+        
+        if not response:
+            self.logger.warning("Failed to fetch instances from AWS")
             return []
+
+        instances = []
+        for reservation in response['Reservations']:
+            for instance in reservation['Instances']:
+                instances.append({
+                    'InstanceId': instance['InstanceId'],
+                    'State': instance['State']['Name'],
+                    'InstanceType': instance['InstanceType'],
+                    'LaunchTime': instance.get('LaunchTime'),
+                    'Tags': {tag['Key']: tag['Value'] for tag in instance.get('Tags', [])}
+                })
+
+        self.logger.info(f"Found {len(instances)} instances with scheduling tags")
+        return instances
 
     def should_shutdown(self, instance: Dict, current_time: datetime) -> bool:
         """Determine if instance should be shut down based on schedule and carbon intensity."""
@@ -140,41 +150,39 @@ class ShutdownScheduler:
 
         return False
 
+    @exponential_backoff(max_retries=3)
     def shutdown_instance(self, instance_id: str) -> bool:
         """Shutdown a specific instance."""
-        try:
-            # Record metrics before shutdown
-            self._record_shutdown_metrics(instance_id)
+        # Record metrics before shutdown
+        self._record_shutdown_metrics(instance_id)
 
-            self.ec2_client.stop_instances(InstanceIds=[instance_id])
-            logger.info(f"Successfully initiated shutdown for instance {instance_id}")
-
-            # Log to DynamoDB
-            self._log_action(instance_id, 'shutdown')
-
-            return True
-
-        except Exception as e:
-            logger.error(f"Failed to shutdown instance {instance_id}: {e}")
+        response = safe_aws_call(self.ec2_client.stop_instances, InstanceIds=[instance_id])
+        if not response:
+            self.logger.error(f"Failed to shutdown instance {instance_id}")
             return False
 
+        self.logger.info(f"Successfully initiated shutdown for instance {instance_id}")
+
+        # Log to DynamoDB
+        self._log_action(instance_id, 'shutdown')
+        return True
+
+    @exponential_backoff(max_retries=3)
     def startup_instance(self, instance_id: str) -> bool:
         """Start up a specific instance."""
-        try:
-            self.ec2_client.start_instances(InstanceIds=[instance_id])
-            logger.info(f"Successfully started instance {instance_id}")
-
-            # Record startup metrics
-            self._record_startup_metrics(instance_id)
-
-            # Log to DynamoDB
-            self._log_action(instance_id, 'startup')
-
-            return True
-
-        except Exception as e:
-            logger.error(f"Failed to start instance {instance_id}: {e}")
+        response = safe_aws_call(self.ec2_client.start_instances, InstanceIds=[instance_id])
+        if not response:
+            self.logger.error(f"Failed to start instance {instance_id}")
             return False
+
+        self.logger.info(f"Successfully started instance {instance_id}")
+
+        # Record startup metrics
+        self._record_startup_metrics(instance_id)
+
+        # Log to DynamoDB
+        self._log_action(instance_id, 'startup')
+        return True
 
     def execute_schedule(self) -> Dict:
         """Main execution method for scheduling logic."""
@@ -211,7 +219,7 @@ class ShutdownScheduler:
             'execution_time': current_time.isoformat()
         }
 
-        logger.info(f"Schedule execution complete: {results}")
+        self.logger.info(f"Schedule execution complete: {results}")
         return results
 
     def _load_schedule_rule(self, schedule_name: str) -> Optional[ScheduleRule]:
@@ -238,7 +246,7 @@ class ShutdownScheduler:
                 return ScheduleRule(**rule_data)
 
         except Exception as e:
-            logger.error(f"Failed to load schedule rule {schedule_name}: {e}")
+            self.logger.error(f"Failed to load schedule rule {schedule_name}: {e}")
 
         return None
 
@@ -286,7 +294,7 @@ class ShutdownScheduler:
 
         # Check if today is a scheduled day
         if schedule_rule.days and current_day not in schedule_rule.days:
-            logger.debug(f"Current day {current_day} not in scheduled days {schedule_rule.days}")
+            self.logger.debug(f"Current day {current_day} not in scheduled days {schedule_rule.days}")
             return True  # Should be shut down on non-scheduled days
 
         # Parse shutdown and startup times
@@ -316,72 +324,66 @@ class ShutdownScheduler:
 
     def _record_shutdown_metrics(self, instance_id: str):
         """Record metrics when shutting down an instance."""
-        try:
-            # Would record to CloudWatch metrics
-            cloudwatch = boto3.client('cloudwatch', region_name=self.region)
-            cloudwatch.put_metric_data(
-                Namespace='CarbonAwareFinOps',
-                MetricData=[
-                    {
-                        'MetricName': 'InstanceShutdown',
-                        'Value': 1,
-                        'Unit': 'Count',
-                        'Dimensions': [
-                            {'Name': 'InstanceId', 'Value': instance_id}
-                        ]
-                    }
-                ]
-            )
-        except Exception as e:
-            logger.error(f"Failed to record shutdown metrics: {e}")
+        cloudwatch = self.aws_session.get_client('cloudwatch')
+        safe_aws_call(
+            cloudwatch.put_metric_data,
+            Namespace=settings.aws.cloudwatch_namespace,
+            MetricData=[
+                {
+                    'MetricName': 'InstanceShutdown',
+                    'Value': 1,
+                    'Unit': 'Count',
+                    'Dimensions': [
+                        {'Name': 'InstanceId', 'Value': instance_id}
+                    ]
+                }
+            ]
+        )
 
     def _record_startup_metrics(self, instance_id: str):
         """Record metrics when starting up an instance."""
-        try:
-            cloudwatch = boto3.client('cloudwatch', region_name=self.region)
-            cloudwatch.put_metric_data(
-                Namespace='CarbonAwareFinOps',
-                MetricData=[
-                    {
-                        'MetricName': 'InstanceStartup',
-                        'Value': 1,
-                        'Unit': 'Count',
-                        'Dimensions': [
-                            {'Name': 'InstanceId', 'Value': instance_id}
-                        ]
-                    }
-                ]
-            )
-        except Exception as e:
-            logger.error(f"Failed to record startup metrics: {e}")
+        cloudwatch = self.aws_session.get_client('cloudwatch')
+        safe_aws_call(
+            cloudwatch.put_metric_data,
+            Namespace=settings.aws.cloudwatch_namespace,
+            MetricData=[
+                {
+                    'MetricName': 'InstanceStartup',
+                    'Value': 1,
+                    'Unit': 'Count',
+                    'Dimensions': [
+                        {'Name': 'InstanceId', 'Value': instance_id}
+                    ]
+                }
+            ]
+        )
 
     def _log_action(self, instance_id: str, action: str):
         """Log action to DynamoDB."""
-        try:
-            table = self.dynamodb.Table('carbon-aware-finops-state')
-            table.put_item(
-                Item={
-                    'instance_id': instance_id,
-                    'timestamp': int(datetime.now().timestamp()),
-                    'action': action,
-                    'carbon_intensity': self.carbon_client.get_current_intensity(self.region),
-                    'region': self.region
-                }
-            )
-        except Exception as e:
-            logger.error(f"Failed to log action to DynamoDB: {e}")
+        table = self.dynamodb.Table(settings.aws.state_table)
+        current_carbon = self.carbon_client.get_current_intensity(self.region)
+        
+        safe_aws_call(
+            table.put_item,
+            Item={
+                'instance_id': instance_id,
+                'timestamp': int(datetime.now().timestamp()),
+                'action': action,
+                'carbon_intensity': current_carbon if current_carbon else 0,
+                'region': self.region
+            }
+        )
 
 
 
 def main():
     """Main entry point for scheduler."""
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
+    logger = get_logger('shutdown-scheduler')
+    logger.info("Starting Carbon-Aware Shutdown Scheduler")
 
     scheduler = ShutdownScheduler()
     results = scheduler.execute_schedule()
+    logger.info(f"Execution complete: {results}")
     print(f"Execution complete: {results}")
 
 

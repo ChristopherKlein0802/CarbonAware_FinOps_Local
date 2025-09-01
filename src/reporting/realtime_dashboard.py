@@ -7,72 +7,280 @@ from dash import dcc, html, dash_table
 from dash.dependencies import Input, Output
 import plotly.graph_objects as go
 import pandas as pd
-import numpy as np
-import boto3
+import os
+import sys
 from datetime import datetime, timedelta
-import logging
+from typing import Dict, List, Optional, Any
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
-logger = logging.getLogger(__name__)
+# Add src to path for direct execution
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from src.utils.logging_config import get_logger, LoggerMixin
+from src.utils.retry_handler import AWSRetrySession, exponential_backoff, safe_aws_call
+from config.settings import settings
 
 
-class CarbonFinOpsDashboard:
-    """Real-time dashboard for Carbon-Aware FinOps metrics."""
+class DataCache:
+    """Thread-safe data cache with TTL support."""
+    
+    def __init__(self, ttl_seconds: int = 300):  # 5 minutes default TTL
+        self.cache = {}
+        self.timestamps = {}
+        self.ttl = ttl_seconds
+        self.lock = threading.Lock()
+    
+    def get(self, key: str) -> Optional[Any]:
+        """Get cached value if not expired."""
+        with self.lock:
+            if key in self.cache:
+                if time.time() - self.timestamps[key] < self.ttl:
+                    return self.cache[key]
+                else:
+                    # Remove expired entry
+                    del self.cache[key]
+                    del self.timestamps[key]
+            return None
+    
+    def set(self, key: str, value: Any) -> None:
+        """Set cached value with current timestamp."""
+        with self.lock:
+            self.cache[key] = value
+            self.timestamps[key] = time.time()
+    
+    def clear(self) -> None:
+        """Clear all cached data."""
+        with self.lock:
+            self.cache.clear()
+            self.timestamps.clear()
 
-    def __init__(self):
+
+class CarbonFinOpsDashboard(LoggerMixin):
+    """Real-time dashboard for Carbon-Aware FinOps metrics with performance optimizations."""
+
+    def __init__(self, aws_profile=None):
         self.app = dash.Dash(__name__)
-
-        # FIX: Add CSS styling to the app instance
-        self.app.css.append_css({
-            'external_url': 'https://codepen.io/chriddyp/pen/bWLwgP.css'
-        })
-
-        # Custom CSS - inline style
-        self.custom_css = """
-        <style>
-        .kpi-card {
-            background: white;
-            border-radius: 8px;
-            padding: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            text-align: center;
-            margin: 10px;
-        }
-        .kpi-card h2 {
-            margin: 10px 0;
-            font-size: 2.5em;
-            font-weight: bold;
-        }
-        .kpi-card h3 {
-            margin: 10px 0;
-            font-size: 1.2em;
-        }
-        </style>
-        """
+        self.aws_profile = aws_profile or settings.aws.profile
+        
+        # Performance optimizations
+        self.cache = DataCache(ttl_seconds=settings.dashboard.refresh_interval // 1000)  # Convert to seconds
+        self.executor = ThreadPoolExecutor(max_workers=4)
 
         try:
-            self.dynamodb = boto3.resource('dynamodb')
-            self.cloudwatch = boto3.client('cloudwatch')
-            self.ce = boto3.client('ce')
-            self.ec2 = boto3.client('ec2')
+            # Use retry session for improved reliability
+            self.aws_session = AWSRetrySession(self.aws_profile, settings.aws.region)
+            self.dynamodb = self.aws_session.get_resource('dynamodb')
+            self.cloudwatch = self.aws_session.get_client('cloudwatch')
+            self.ce = self.aws_session.get_client('ce')
+            self.ec2 = self.aws_session.get_client('ec2')
+            
+            self.logger.info(f"AWS clients initialized successfully with profile: {self.aws_profile}")
         except Exception as e:
-            logger.warning(f"AWS clients initialization failed: {e}")
+            self.logger.warning(f"AWS clients initialization failed with profile '{self.aws_profile}': {e}")
+            self.logger.info("Please run: aws sso login --profile carbon-finops-sandbox")
             # Initialize as None to handle offline mode
+            self.aws_session = None
             self.dynamodb = None
             self.cloudwatch = None
             self.ce = None
             self.ec2 = None
 
-        # Initialize layou
+        # Initialize layout
         self.setup_layout()
         self.setup_callbacks()
+    
+    def parallel_data_fetch(self, tasks: List[tuple]) -> Dict[str, Any]:
+        """
+        Fetch data in parallel using ThreadPoolExecutor.
+        
+        Args:
+            tasks: List of (function, args) tuples to execute
+            
+        Returns:
+            Dictionary of results keyed by task index
+        """
+        results = {}
+        future_to_index = {}
+        
+        for i, (func, args) in enumerate(tasks):
+            future = self.executor.submit(func, *args)
+            future_to_index[future] = i
+        
+        for future in as_completed(future_to_index):
+            index = future_to_index[future]
+            try:
+                results[index] = future.result(timeout=10)  # 10 second timeout
+            except Exception as e:
+                self.logger.error(f"Task {index} failed: {e}")
+                results[index] = None
+        
+        return results
+    
+    @exponential_backoff(max_retries=2)
+    def get_dynamodb_data_cached(self, table_name: str, cache_key: str) -> Optional[List[Dict]]:
+        """Get DynamoDB data with caching."""
+        # Check cache first
+        cached_data = self.cache.get(cache_key)
+        if cached_data is not None:
+            return cached_data
+        
+        if not self.dynamodb:
+            return None
+        
+        try:
+            table = self.dynamodb.Table(table_name)
+            response = safe_aws_call(table.scan)
+            
+            if response:
+                data = response.get('Items', [])
+                # Cache the result
+                self.cache.set(cache_key, data)
+                return data
+            
+        except Exception as e:
+            self.logger.error(f"Failed to fetch data from {table_name}: {e}")
+        
+        return None
+    
+    def get_state_data(self) -> List[Dict]:
+        """Get instance state data from DynamoDB."""
+        return self.get_dynamodb_data_cached(
+            settings.aws.state_table,
+            'state_data'
+        ) or []
+    
+    def get_rightsizing_data(self) -> List[Dict]:
+        """Get rightsizing recommendations from DynamoDB."""
+        return self.get_dynamodb_data_cached(
+            settings.aws.rightsizing_table,
+            'rightsizing_data'
+        ) or []
+    
+    def get_cost_data(self) -> List[Dict]:
+        """Get cost data from DynamoDB."""
+        return self.get_dynamodb_data_cached(
+            settings.aws.costs_table,
+            'cost_data'
+        ) or []
+    
+    def calculate_kpis_parallel(self) -> Dict[str, Any]:
+        """Calculate KPIs using parallel data fetching."""
+        cache_key = 'dashboard_kpis'
+        cached_kpis = self.cache.get(cache_key)
+        if cached_kpis:
+            return cached_kpis
+        
+        # Define parallel tasks
+        tasks = [
+            (self.get_state_data, ()),
+            (self.get_rightsizing_data, ()),
+            (self.get_cost_data, ())
+        ]
+        
+        # Fetch data in parallel
+        results = self.parallel_data_fetch(tasks)
+        
+        state_data = results.get(0, [])
+        rightsizing_data = results.get(1, [])
+        cost_data = results.get(2, [])
+        
+        # Calculate KPIs
+        kpis = self._calculate_kpis_from_data(state_data, rightsizing_data, cost_data)
+        
+        # Cache results
+        self.cache.set(cache_key, kpis)
+        return kpis
+    
+    def _calculate_kpis_from_data(self, state_data: List, rightsizing_data: List, cost_data: List) -> Dict[str, Any]:
+        """Calculate KPIs from fetched data."""
+        try:
+            # Calculate cost savings
+            total_savings = 0
+            for item in rightsizing_data:
+                if 'recommendation' in item:
+                    rec = item['recommendation']
+                    if isinstance(rec, dict) and 'estimated_monthly_savings' in rec:
+                        total_savings += float(rec.get('estimated_monthly_savings', 0))
+            
+            # Calculate carbon reduction (simplified)
+            carbon_actions = len([item for item in state_data if item.get('action') == 'shutdown'])
+            carbon_reduction = carbon_actions * 2.5  # Approximate kg CO2 per shutdown
+            
+            # Count optimized instances
+            optimized_instances = len([item for item in rightsizing_data if item.get('recommendation', {}).get('action') != 'no_change'])
+            
+            return {
+                'cost_savings': f"${total_savings:.2f}",
+                'carbon_reduction': f"{carbon_reduction:.1f} kg",
+                'optimized_instances': str(optimized_instances)
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Error calculating KPIs: {e}")
+            return {
+                'cost_savings': "$0.00",
+                'carbon_reduction': "0.0 kg", 
+                'optimized_instances': "0"
+            }
+    
+    def create_timeline_chart_cached(self, data: List[Dict], title: str, y_field: str, cache_key: str) -> go.Figure:
+        """Create timeline chart with caching."""
+        cached_chart = self.cache.get(cache_key)
+        if cached_chart:
+            return cached_chart
+        
+        fig = go.Figure()
+        
+        if not data:
+            fig.add_trace(go.Scatter(
+                x=[datetime.now()],
+                y=[0],
+                mode='markers',
+                name='No Data',
+                text='No data available'
+            ))
+        else:
+            # Process data for timeline
+            df = pd.DataFrame(data)
+            if 'timestamp' in df.columns:
+                # Convert timestamp to datetime
+                df['datetime'] = pd.to_datetime(df['timestamp'], unit='s', errors='coerce')
+                df = df.dropna(subset=['datetime'])
+                
+                if not df.empty and y_field in df.columns:
+                    df = df.sort_values('datetime')
+                    
+                    # Limit data points for performance
+                    if len(df) > settings.dashboard.max_chart_points:
+                        df = df.tail(settings.dashboard.max_chart_points)
+                    
+                    fig.add_trace(go.Scatter(
+                        x=df['datetime'],
+                        y=df[y_field],
+                        mode='lines+markers',
+                        name=title,
+                        line=dict(width=2)
+                    ))
+        
+        fig.update_layout(
+            title=title,
+            xaxis_title='Time',
+            yaxis_title=title,
+            showlegend=False,
+            height=400,
+            margin=dict(l=40, r=40, t=40, b=40)
+        )
+        
+        # Cache the figure
+        self.cache.set(cache_key, fig)
+        return fig
 
     def setup_layout(self):
         """Setup dashboard layout."""
 
         self.app.layout = html.Div([
-            # Add custom CSS
-            html.Div(self.custom_css, dangerously_allow_html=True),
-
             html.Div([
                 html.H1("Carbon-Aware FinOps Dashboard",
                        style={'textAlign': 'center', 'color': '#2c3e50'}),
@@ -150,7 +358,7 @@ class CarbonFinOpsDashboard:
              Output('instance-status-chart', 'figure')],
             [Input('interval-component', 'n_intervals')]
         )
-        def update_dashboard(n):
+        def update_dashboard(_):
             # Get current metrics
             metrics = self.get_current_metrics()
 
@@ -226,25 +434,21 @@ class CarbonFinOpsDashboard:
         """Create cost timeline chart."""
 
         if not self.ce:
-            # Create sample data for offline mode
-            dates = pd.date_range(end=datetime.now(), periods=30, freq='D')
-            costs = np.random.uniform(10, 50, 30)
-
+            # Return empty chart if no AWS connection
             fig = go.Figure()
-            fig.add_trace(go.Scatter(
-                x=dates, y=costs,
-                mode='lines+markers',
-                name='Daily Cost (Sample)',
-                line=dict(color='#e74c3c', width=2)
-            ))
-
             fig.update_layout(
-                title='Cost Trend (Sample Data)',
+                title='Cost Data - AWS Connection Required',
                 xaxis_title='Date',
                 yaxis_title='Cost ($)',
-                hovermode='x unified'
+                annotations=[
+                    dict(
+                        text="Please ensure AWS SSO is logged in to view cost data",
+                        xref="paper", yref="paper",
+                        x=0.5, y=0.5, xanchor='center', yanchor='middle',
+                        showarrow=False, font=dict(size=16)
+                    )
+                ]
             )
-
             return fig
 
         # Get cost data from Cost Explorer
@@ -292,77 +496,218 @@ class CarbonFinOpsDashboard:
     def create_carbon_timeline(self):
         """Create carbon emissions timeline chart."""
 
-        # Generate data (would come from actual calculations)
-        dates = pd.date_range(end=datetime.now(), periods=30, freq='D')
-        carbon_baseline = pd.Series([50 + np.random.randn() * 5 for _ in range(30)])
-        carbon_optimized = pd.Series([35 + np.random.randn() * 3 for _ in range(30)])
+        if not self.dynamodb:
+            # Return empty chart if no AWS connection
+            fig = go.Figure()
+            fig.update_layout(
+                title='Carbon Emissions Data - AWS Connection Required',
+                xaxis_title='Date',
+                yaxis_title='CO₂ (kg)',
+                annotations=[
+                    dict(
+                        text="Please ensure AWS SSO is logged in to view carbon data",
+                        xref="paper", yref="paper",
+                        x=0.5, y=0.5, xanchor='center', yanchor='middle',
+                        showarrow=False, font=dict(size=16)
+                    )
+                ]
+            )
+            return fig
 
+        try:
+            # Get real carbon data from DynamoDB
+            table = self.dynamodb.Table('carbon-aware-finops-state')
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=30)
+
+            response = table.scan(
+                FilterExpression='#t >= :start',
+                ExpressionAttributeNames={'#t': 'timestamp'},
+                ExpressionAttributeValues={':start': int(start_date.timestamp())}
+            )
+
+            if not response.get('Items'):
+                # No data available
+                fig = go.Figure()
+                fig.update_layout(
+                    title='Carbon Emissions Data - No Data Available',
+                    xaxis_title='Date',
+                    yaxis_title='CO₂ (kg)',
+                    annotations=[
+                        dict(
+                            text="No carbon emissions data found. Run carbon-aware scheduling to collect data.",
+                            xref="paper", yref="paper",
+                            x=0.5, y=0.5, xanchor='center', yanchor='middle',
+                            showarrow=False, font=dict(size=14)
+                        )
+                    ]
+                )
+                return fig
+
+            # Process real data
+            carbon_data = []
+            for item in response['Items']:
+                if 'carbon_intensity' in item:
+                    carbon_data.append({
+                        'timestamp': datetime.fromtimestamp(int(item['timestamp'])),
+                        'carbon_intensity': float(item.get('carbon_intensity', 0))
+                    })
+
+            if carbon_data:
+                df = pd.DataFrame(carbon_data)
+                df = df.sort_values('timestamp')
+                
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(
+                    x=df['timestamp'], 
+                    y=df['carbon_intensity'],
+                    mode='lines+markers',
+                    name='Carbon Intensity',
+                    line=dict(color='#27ae60')
+                ))
+
+                fig.update_layout(
+                    title='Real Carbon Intensity Data',
+                    xaxis_title='Date',
+                    yaxis_title='Carbon Intensity (gCO₂/kWh)',
+                    hovermode='x unified'
+                )
+                return fig
+
+        except Exception as e:
+            logger.error(f"Error getting carbon timeline data: {e}")
+
+        # Fallback empty chart with specific error handling
         fig = go.Figure()
-
-        fig.add_trace(go.Scatter(
-            x=dates, y=carbon_baseline,
-            mode='lines',
-            name='Baseline',
-            fill='tonexty',
-            line=dict(color='#e74c3c')
-        ))
-
-        fig.add_trace(go.Scatter(
-            x=dates, y=carbon_optimized,
-            mode='lines',
-            name='Optimized',
-            fill='tozeroy',
-            line=dict(color='#27ae60')
-        ))
-
-        fig.update_layout(
-            title='Carbon Emissions Comparison',
-            xaxis_title='Date',
-            yaxis_title='CO₂ (kg)',
-            hovermode='x unified'
-        )
-
+        if "ResourceNotFoundException" in str(e):
+            fig.update_layout(
+                title='Carbon Data Setup Required',
+                xaxis_title='Date',
+                yaxis_title='CO₂ (kg)',
+                annotations=[
+                    dict(
+                        text="The carbon data table doesn't exist yet. Deploy DynamoDB tables or run carbon-aware scheduling first.",
+                        xref="paper", yref="paper",
+                        x=0.5, y=0.5, xanchor='center', yanchor='middle',
+                        showarrow=False, font=dict(size=14)
+                    )
+                ]
+            )
+        else:
+            fig.update_layout(
+                title='Carbon Emissions Data - Error Loading Data',
+                xaxis_title='Date',
+                yaxis_title='CO₂ (kg)',
+                annotations=[
+                    dict(
+                        text=f"Error loading data: {str(e)[:50]}...",
+                        xref="paper", yref="paper",
+                        x=0.5, y=0.5, xanchor='center', yanchor='middle',
+                        showarrow=False, font=dict(size=14)
+                    )
+                ]
+            )
         return fig
 
     def create_recommendations_table(self):
-        """Create recommendations table."""
+        """Create recommendations table from real AWS data."""
 
-        # Sample recommendations (would come from DynamoDB in production)
-        recommendations = [
-            {'Instance': 'i-0123456', 'Current': 't3.large', 'Recommended': 't3.medium',
-             'Savings': '$62.40/month', 'Action': 'Downsize'},
-            {'Instance': 'i-0789012', 'Current': 't3.small', 'Recommended': 't3.micro',
-             'Savings': '$7.80/month', 'Action': 'Downsize'},
-            {'Instance': 'i-0345678', 'Current': 'On-Demand', 'Recommended': 'Spot',
-             'Savings': '$45.00/month', 'Action': 'Convert to Spot'},
-        ]
+        if not self.dynamodb:
+            return html.Div([
+                html.H4("Recommendations - AWS Connection Required"),
+                html.P("Please ensure AWS SSO is logged in to view recommendations.")
+            ])
 
-        df = pd.DataFrame(recommendations)
+        try:
+            # Get real recommendations from DynamoDB
+            table = self.dynamodb.Table('carbon-aware-finops-rightsizing')
+            
+            response = table.scan()
+            
+            if not response.get('Items'):
+                return html.Div([
+                    html.H4("No Recommendations Available"),
+                    html.P("No rightsizing recommendations found. Run the rightsizing Lambda function to generate recommendations.")
+                ])
 
-        return dash_table.DataTable(
-            data=df.to_dict('records'),
-            columns=[{"name": i, "id": i} for i in df.columns],
-            style_cell={'textAlign': 'left'},
-            style_data_conditional=[
-                {
-                    'if': {'column_id': 'Action', 'filter_query': '{Action} = "Downsize"'},
-                    'backgroundColor': '#3498db',
-                    'color': 'white',
-                },
-                {
-                    'if': {'column_id': 'Action', 'filter_query': '{Action} = "Convert to Spot"'},
-                    'backgroundColor': '#9b59b6',
-                    'color': 'white',
-                }
-            ]
-        )
+            recommendations = []
+            for item in response['Items']:
+                if item.get('recommendation', {}).get('action') != 'no_change':
+                    rec = item.get('recommendation', {})
+                    recommendations.append({
+                        'Instance': item.get('instance_id', 'N/A'),
+                        'Current': item.get('current_type', 'N/A'),
+                        'Recommended': rec.get('recommended_type', 'N/A'),
+                        'Savings': f"${rec.get('estimated_monthly_savings', 0):.2f}/month",
+                        'Action': rec.get('action', 'N/A').title(),
+                        'Reason': ', '.join(rec.get('reason', []))
+                    })
+
+            if not recommendations:
+                return html.Div([
+                    html.H4("No Active Recommendations"),
+                    html.P("All instances are optimally sized based on current usage patterns.")
+                ])
+
+            df = pd.DataFrame(recommendations)
+
+            return dash_table.DataTable(
+                data=df.to_dict('records'),
+                columns=[{"name": i, "id": i} for i in df.columns],
+                style_cell={'textAlign': 'left'},
+                style_data_conditional=[
+                    {
+                        'if': {'column_id': 'Action', 'filter_query': '{Action} = "Downsize"'},
+                        'backgroundColor': '#3498db',
+                        'color': 'white',
+                    },
+                    {
+                        'if': {'column_id': 'Action', 'filter_query': '{Action} = "Upsize"'},
+                        'backgroundColor': '#e67e22',
+                        'color': 'white',
+                    },
+                    {
+                        'if': {'column_id': 'Action', 'filter_query': '{Action} = "Convert to spot"'},
+                        'backgroundColor': '#9b59b6',
+                        'color': 'white',
+                    }
+                ]
+            )
+
+        except Exception as e:
+            logger.error(f"Error getting recommendations: {e}")
+            
+            # Handle specific DynamoDB table not found error
+            if "ResourceNotFoundException" in str(e):
+                return html.Div([
+                    html.H4("Recommendations Setup Required"),
+                    html.P("The rightsizing recommendations table doesn't exist yet."),
+                    html.P("Please deploy the DynamoDB tables first or run the rightsizing Lambda function to create the table.")
+                ])
+            else:
+                return html.Div([
+                    html.H4("Error Loading Recommendations"),
+                    html.P(f"Failed to load recommendations: {str(e)}")
+                ])
 
     def create_instance_status_chart(self):
         """Create instance status pie chart."""
 
         if not self.ec2:
-            # Sample data for offline mode
-            status_counts = {'running': 2, 'stopped': 1, 'pending': 0, 'stopping': 0}
+            # Return empty chart with message
+            fig = go.Figure()
+            fig.update_layout(
+                title='Instance Status - AWS Connection Required',
+                annotations=[
+                    dict(
+                        text="Please ensure AWS SSO is logged in to view instance status",
+                        xref="paper", yref="paper",
+                        x=0.5, y=0.5, xanchor='center', yanchor='middle',
+                        showarrow=False, font=dict(size=16)
+                    )
+                ]
+            )
+            return fig
         else:
             try:
                 # Get current instance states

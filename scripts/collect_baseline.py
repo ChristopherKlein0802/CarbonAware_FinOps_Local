@@ -5,6 +5,7 @@ Collect baseline data for cost and carbon analysis.
 
 import click
 import boto3
+import os
 from datetime import datetime, timedelta
 import pandas as pd
 import json
@@ -21,15 +22,25 @@ from src.cost.aws_cost_client import AWSCostClient
 @click.option('--days', default=7, help='Number of days to collect baseline data')
 @click.option('--region', default='eu-central-1', help='AWS region')
 @click.option('--output', default='data/baseline/baseline_data.csv', help='Output file path')
-def collect_baseline(days: int, region: str, output: str):
+@click.option('--profile', default='carbon-finops-sandbox', help='AWS SSO profile name')
+def collect_baseline(days: int, region: str, output: str, profile: str):
     """Collect baseline data for specified number of days."""
     
     logger.info(f"Starting baseline data collection for {days} days in {region}")
+    logger.info(f"Using AWS profile: {profile}")
     
-    # Initialize clients
-    ec2 = boto3.client('ec2', region_name=region)
-    carbon_client = CarbonIntensityClient()
-    cost_client = AWSCostClient(region)
+    try:
+        # Initialize clients with SSO profile
+        session = boto3.Session(profile_name=profile)
+        ec2 = session.client('ec2', region_name=region)
+        carbon_client = CarbonIntensityClient()
+        cost_client = AWSCostClient(region)
+        
+        logger.info("AWS clients initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize AWS clients with profile '{profile}': {e}")
+        logger.info(f"Please run: aws sso login --profile {profile}")
+        return
     
     # Get all instances
     response = ec2.describe_instances(

@@ -200,6 +200,30 @@ resource "aws_iam_role_policy" "lambda_policy" {
           "ce:GetCostForecast"
         ]
         Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "dynamodb:PutItem",
+          "dynamodb:GetItem",
+          "dynamodb:Scan",
+          "dynamodb:Query",
+          "dynamodb:UpdateItem",
+          "dynamodb:DeleteItem"
+        ]
+        Resource = [
+          aws_dynamodb_table.state.arn,
+          aws_dynamodb_table.rightsizing.arn,
+          aws_dynamodb_table.costs.arn
+        ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "cloudwatch:PutMetricData",
+          "cloudwatch:GetMetricStatistics"
+        ]
+        Resource = "*"
       }
     ]
   })
@@ -256,6 +280,44 @@ resource "aws_dynamodb_table" "state" {
 
   tags = {
     Name = "${var.project_name}-state"
+  }
+}
+
+# DynamoDB table for rightsizing recommendations
+resource "aws_dynamodb_table" "rightsizing" {
+  name           = "${var.project_name}-rightsizing"
+  billing_mode   = "PAY_PER_REQUEST"
+  hash_key       = "instance_id"
+
+  attribute {
+    name = "instance_id"
+    type = "S"
+  }
+
+  tags = {
+    Name = "${var.project_name}-rightsizing"
+  }
+}
+
+# DynamoDB table for cost tracking
+resource "aws_dynamodb_table" "costs" {
+  name           = "${var.project_name}-costs"
+  billing_mode   = "PAY_PER_REQUEST"
+  hash_key       = "date"
+  range_key      = "instance_id"
+
+  attribute {
+    name = "date"
+    type = "S"
+  }
+
+  attribute {
+    name = "instance_id"
+    type = "S"
+  }
+
+  tags = {
+    Name = "${var.project_name}-costs"
   }
 }
 
@@ -339,6 +401,22 @@ output "s3_bucket_name" {
   value = aws_s3_bucket.data.id
 }
 
-output "dynamodb_table_name" {
+output "dynamodb_state_table" {
   value = aws_dynamodb_table.state.id
+}
+
+output "dynamodb_rightsizing_table" {
+  value = aws_dynamodb_table.rightsizing.id
+}
+
+output "dynamodb_costs_table" {
+  value = aws_dynamodb_table.costs.id
+}
+
+output "instance_ids" {
+  value = [for instance in aws_instance.scheduled_instances : instance.id]
+}
+
+output "lambda_role_arn" {
+  value = aws_iam_role.lambda_role.arn
 }
