@@ -1,11 +1,11 @@
 """Tests for AWS cost client."""
 
-import pytest
 from unittest.mock import Mock, patch
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from src.cost.aws_cost_client import AWSCostClient
+
 
 class TestAWSCostClient:
     """Test AWS cost client functionality."""

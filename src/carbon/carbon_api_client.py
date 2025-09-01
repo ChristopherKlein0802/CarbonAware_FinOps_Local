@@ -7,17 +7,18 @@ import os
 import requests
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional
+from typing import List
 import logging
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
+
 def parse_iso_datetime(datetime_str: str) -> datetime:
     """Parse ISO datetime string, handling 'Z' timezone indicator."""
     if datetime_str.endswith('Z'):
         datetime_str = datetime_str[:-1]
-    
+
     if '+' in datetime_str:
         datetime_str = datetime_str.split('+')[0]
     elif datetime_str.count('-') > 2:
@@ -25,7 +26,7 @@ def parse_iso_datetime(datetime_str: str) -> datetime:
             if datetime_str[i] in ['-', '+'] and i > 10:
                 datetime_str = datetime_str[:i]
                 break
-    
+
     try:
         if '.' in datetime_str:
             return datetime.strptime(datetime_str, '%Y-%m-%dT%H:%M:%S.%f')
@@ -41,15 +42,15 @@ class CarbonIntensity:
     timestamp: datetime
     region: str
     source: str
-    
+
 class CarbonAPIClient(ABC):
     """Abstract base class for carbon intensity API clients."""
-    
+
     @abstractmethod
     def get_current_intensity(self, region: str) -> CarbonIntensity:
         """Get current carbon intensity for a region."""
         pass
-    
+
     @abstractmethod
     def get_forecast(self, region: str, hours: int = 24) -> List[CarbonIntensity]:
         """Get carbon intensity forecast."""
@@ -57,16 +58,16 @@ class CarbonAPIClient(ABC):
 
 class WattTimeClient(CarbonAPIClient):
     """WattTime API client implementation."""
-    
+
     BASE_URL = "https://api2.watttime.org/v2"
-    
+
     def __init__(self, username: str = None, password: str = None):
         self.username = username or os.getenv('WATTTIME_USERNAME')
         self.password = password or os.getenv('WATTTIME_PASSWORD')
         self.token = None
         if self.username and self.password:
             self._authenticate()
-    
+
     def _authenticate(self):
         """Authenticate with WattTime API."""
         try:
@@ -79,15 +80,15 @@ class WattTimeClient(CarbonAPIClient):
         except Exception as e:
             logger.error(f"WattTime authentication failed: {e}")
             self.token = None
-    
+
     def get_current_intensity(self, region: str) -> CarbonIntensity:
         """Get current carbon intensity from WattTime."""
         if not self.token:
             logger.warning("WattTime token not available, using fallback")
             return self._get_fallback_intensity(region)
-            
+
         headers = {'Authorization': f'Bearer {self.token}'}
-        
+
         # Map AWS regions to WattTime balancing authorities
         region_mapping = {
             'eu-central-1': 'DE',  # Germany
@@ -98,9 +99,9 @@ class WattTimeClient(CarbonAPIClient):
             'us-east-1': 'PJM_NJ', # US East
             'us-west-2': 'CAISO',  # California
         }
-        
+
         ba = region_mapping.get(region, 'DE')
-        
+
         try:
             response = requests.get(
                 f"{self.BASE_URL}/data",
@@ -108,7 +109,7 @@ class WattTimeClient(CarbonAPIClient):
                 params={'ba': ba}
             )
             response.raise_for_status()
-            
+
             data = response.json()
             return CarbonIntensity(
                 value=data['value'],
@@ -119,15 +120,15 @@ class WattTimeClient(CarbonAPIClient):
         except Exception as e:
             logger.error(f"Error getting WattTime data: {e}")
             return self._get_fallback_intensity(region)
-    
+
     def get_forecast(self, region: str, hours: int = 24) -> List[CarbonIntensity]:
         """Get carbon intensity forecast from WattTime."""
         if not self.token:
             logger.warning("WattTime token not available, using fallback forecast")
             return self._get_fallback_forecast(region, hours)
-            
+
         headers = {'Authorization': f'Bearer {self.token}'}
-        
+
         # Map AWS regions to WattTime balancing authorities
         region_mapping = {
             'eu-central-1': 'DE',
@@ -138,9 +139,9 @@ class WattTimeClient(CarbonAPIClient):
             'us-east-1': 'PJM_NJ',
             'us-west-2': 'CAISO',
         }
-        
+
         ba = region_mapping.get(region, 'DE')
-        
+
         try:
             response = requests.get(
                 f"{self.BASE_URL}/forecast",
@@ -151,10 +152,10 @@ class WattTimeClient(CarbonAPIClient):
                 }
             )
             response.raise_for_status()
-            
+
             data = response.json()
             forecasts = []
-            
+
             for item in data.get('data', []):
                 forecasts.append(CarbonIntensity(
                     value=item['value'],
@@ -162,12 +163,12 @@ class WattTimeClient(CarbonAPIClient):
                     region=region,
                     source='watttime'
                 ))
-            
+
             return forecasts
         except Exception as e:
             logger.error(f"Error getting WattTime forecast: {e}")
             return self._get_fallback_forecast(region, hours)
-    
+
     def _get_fallback_intensity(self, region: str) -> CarbonIntensity:
         """Get fallback intensity when API fails."""
         # Average carbon intensities by region (gCO2/kWh)
@@ -180,49 +181,49 @@ class WattTimeClient(CarbonAPIClient):
             'us-east-1onnex': 450,   # US East
             'us-west-2': 350,     # US West
         }
-        
+
         return CarbonIntensity(
             value=fallback_values.get(region, 475),
             timestamp=datetime.now(),
             region=region,
             source='fallback'
         )
-    
+
     def _get_fallback_forecast(self, region: str, hours: int) -> List[CarbonIntensity]:
         """Generate fallback forecast when API fails."""
         base_value = self._get_fallback_intensity(region).value
         forecasts = []
-        
+
         for hour in range(hours):
             # Simple sine wave pattern to simulate daily variation
             import math
             variation = math.sin((hour / 24) * 2 * math.pi) * 50
-            
+
             forecasts.append(CarbonIntensity(
                 value=base_value + variation,
                 timestamp=datetime.now() + timedelta(hours=hour),
                 region=region,
                 source='fallback_forecast'
             ))
-        
+
         return forecasts
 
 class ElectricityMapClient(CarbonAPIClient):
     """electricityMap API client implementation."""
-    
+
     BASE_URL = "https://api.electricitymap.org/v3"
-    
+
     def __init__(self, api_key: str = None):
         self.api_key = api_key or os.getenv('ELECTRICITYMAP_API_KEY')
-    
+
     def get_current_intensity(self, region: str) -> CarbonIntensity:
         """Get current carbon intensity from electricityMap."""
         if not self.api_key:
             logger.warning("ElectricityMap API key not available, using fallback")
             return self._get_fallback_intensity(region)
-            
+
         headers = {'auth-token': self.api_key}
-        
+
         # Map AWS regions to electricityMap zones
         zone_mapping = {
             'eu-central-1': 'DE',  # Germany
@@ -233,9 +234,9 @@ class ElectricityMapClient(CarbonAPIClient):
             'us-east-1': 'US-NE-ISO',  # New England
             'us-west-2': 'US-NW-PACW', # Pacific Northwest
         }
-        
+
         zone = zone_mapping.get(region, 'DE')
-        
+
         try:
             response = requests.get(
                 f"{self.BASE_URL}/carbon-intensity/latest",
@@ -243,7 +244,7 @@ class ElectricityMapClient(CarbonAPIClient):
                 params={'zone': zone}
             )
             response.raise_for_status()
-            
+
             data = response.json()
             return CarbonIntensity(
                 value=data['carbonIntensity'],
@@ -254,15 +255,15 @@ class ElectricityMapClient(CarbonAPIClient):
         except Exception as e:
             logger.error(f"Error getting ElectricityMap data: {e}")
             return self._get_fallback_intensity(region)
-    
+
     def get_forecast(self, region: str, hours: int = 24) -> List[CarbonIntensity]:
         """Get carbon intensity forecast from electricityMap."""
         if not self.api_key:
             logger.warning("ElectricityMap API key not available, using fallback forecast")
             return self._get_fallback_forecast(region, hours)
-            
+
         headers = {'auth-token': self.api_key}
-        
+
         # Map AWS regions to electricityMap zones
         zone_mapping = {
             'eu-central-1': 'DE',
@@ -273,9 +274,9 @@ class ElectricityMapClient(CarbonAPIClient):
             'us-east-1': 'US-NE-ISO',
             'us-west-2': 'US-NW-PACW',
         }
-        
+
         zone = zone_mapping.get(region, 'DE')
-        
+
         try:
             # ElectricityMap forecast endpoint
             response = requests.get(
@@ -287,10 +288,10 @@ class ElectricityMapClient(CarbonAPIClient):
                 }
             )
             response.raise_for_status()
-            
+
             data = response.json()
             forecasts = []
-            
+
             for item in data.get('forecast', []):
                 forecasts.append(CarbonIntensity(
                     value=item['carbonIntensity'],
@@ -298,13 +299,13 @@ class ElectricityMapClient(CarbonAPIClient):
                     region=region,
                     source='electricitymap'
                 ))
-            
+
             return forecasts if forecasts else self._get_fallback_forecast(region, hours)
-            
+
         except Exception as e:
             logger.error(f"Error getting ElectricityMap forecast: {e}")
             return self._get_fallback_forecast(region, hours)
-    
+
     def _get_fallback_intensity(self, region: str) -> CarbonIntensity:
         """Get fallback intensity when API fails."""
         # Average carbon intensities by region (gCO2/kWh)
@@ -317,40 +318,40 @@ class ElectricityMapClient(CarbonAPIClient):
             'us-east-1': 450,     # US East
             'us-west-2': 350,     # US West
         }
-        
+
         return CarbonIntensity(
             value=fallback_values.get(region, 475),
             timestamp=datetime.now(),
             region=region,
             source='fallback'
         )
-    
+
     def _get_fallback_forecast(self, region: str, hours: int) -> List[CarbonIntensity]:
         """Generate fallback forecast when API fails."""
         base_value = self._get_fallback_intensity(region).value
         forecasts = []
-        
+
         for hour in range(hours):
             # Simple sine wave pattern to simulate daily variation
             import math
             # Peak during day (hour 12), low at night (hour 0 and 24)
             variation = math.sin((hour - 6) / 24 * 2 * math.pi) * 50
-            
+
             forecasts.append(CarbonIntensity(
                 value=max(0, base_value + variation),  # Ensure non-negative
                 timestamp=datetime.now() + timedelta(hours=hour),
                 region=region,
                 source='fallback_forecast'
             ))
-        
+
         return forecasts
 
 class CarbonIntensityClient:
     """Main client that abstracts different providers."""
-    
+
     def __init__(self, provider: str = None):
         provider = provider or os.getenv('CARBON_API_PROVIDER', 'electricitymap')
-        
+
         if provider == 'watttime':
             self.client = WattTimeClient()
         elif provider == 'electricitymap':
@@ -359,7 +360,7 @@ class CarbonIntensityClient:
             # Default to ElectricityMap
             logger.warning(f"Unknown provider: {provider}, defaulting to ElectricityMap")
             self.client = ElectricityMapClient()
-    
+
     def get_current_intensity(self, region: str) -> float:
         """Get current carbon intensity value."""
         try:
@@ -370,7 +371,7 @@ class CarbonIntensityClient:
             logger.error(f"Failed to get carbon intensity: {e}")
             # Return average EU grid intensity as fallback
             return 475.0
-    
+
     def get_forecast(self, region: str, hours: int = 24) -> List[float]:
         """Get carbon intensity forecast values."""
         try:
@@ -382,36 +383,36 @@ class CarbonIntensityClient:
             logger.error(f"Failed to get carbon forecast: {e}")
             # Return flat forecast as fallback
             return [475.0] * hours
-    
+
     def get_best_hours(self, region: str, hours_needed: int = 8, forecast_hours: int = 24) -> List[int]:
         """Get the best hours (lowest carbon intensity) within the forecast period."""
         try:
             forecasts = self.client.get_forecast(region, forecast_hours)
-            
+
             # Sort by carbon intensity value
             sorted_forecasts = sorted(enumerate(forecasts), key=lambda x: x[1].value)
-            
+
             # Get the hours with lowest intensity
             best_hours = [hour for hour, _ in sorted_forecasts[:hours_needed]]
             best_hours.sort()  # Return in chronological order
-            
+
             logger.info(f"Best {hours_needed} hours for {region}: {best_hours}")
             return best_hours
-            
+
         except Exception as e:
             logger.error(f"Failed to get best hours: {e}")
             # Return first hours as fallback
             return list(range(hours_needed))
-    
+
     def should_run_now(self, region: str, threshold: float = 400) -> bool:
         """Check if current carbon intensity is below threshold."""
         try:
             current_intensity = self.get_current_intensity(region)
             should_run = current_intensity < threshold
-            
+
             logger.info(f"Should run now in {region}? {should_run} (current: {current_intensity}, threshold: {threshold})")
             return should_run
-            
+
         except Exception as e:
             logger.error(f"Failed to check if should run: {e}")
             # Default to running if we can't determine
