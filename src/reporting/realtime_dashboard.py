@@ -7,28 +7,23 @@ from dash import dcc, html, dash_table
 from dash.dependencies import Input, Output
 import plotly.graph_objects as go
 import pandas as pd
-import os
-import sys
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# Add src to path for direct execution
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 from src.utils.logging_config import get_logger, LoggerMixin
 from src.utils.retry_handler import AWSRetrySession, exponential_backoff, safe_aws_call
-from config.settings import settings
+from src.config.settings import settings
 
 
 class DataCache:
     """Thread-safe data cache with TTL support."""
 
     def __init__(self, ttl_seconds: int = 300):  # 5 minutes default TTL
-        self.cache = {}
-        self.timestamps = {}
+        self.cache: Dict[str, Any] = {}
+        self.timestamps: Dict[str, float] = {}
         self.ttl = ttl_seconds
         self.lock = threading.Lock()
 
@@ -62,15 +57,19 @@ class CarbonFinOpsDashboard(LoggerMixin):
 
     def __init__(self, aws_profile=None):
         self.app = dash.Dash(__name__)
-        self.aws_profile = aws_profile or settings.aws.profile
+        self.aws_profile = aws_profile or (settings.aws.profile if settings.aws else None)
 
         # Performance optimizations
-        self.cache = DataCache(ttl_seconds=settings.dashboard.refresh_interval // 1000)  # Convert to seconds
+        self.cache = DataCache(
+            ttl_seconds=(settings.dashboard.refresh_interval if settings.dashboard else 60000) // 1000
+        )  # Convert to seconds
         self.executor = ThreadPoolExecutor(max_workers=4)
 
         try:
             # Use retry session for improved reliability
-            self.aws_session = AWSRetrySession(self.aws_profile, settings.aws.region)
+            self.aws_session = AWSRetrySession(
+                self.aws_profile, settings.aws.region if settings.aws else "eu-central-1"
+            )
             self.dynamodb = self.aws_session.get_resource("dynamodb")
             self.cloudwatch = self.aws_session.get_client("cloudwatch")
             self.ce = self.aws_session.get_client("ce")
@@ -116,7 +115,8 @@ class CarbonFinOpsDashboard(LoggerMixin):
                 self.logger.error(f"Task {index} failed: {e}")
                 results[index] = None
 
-        return results
+        # Convert integer keys to strings for consistent return type
+        return {str(k): v for k, v in results.items()}
 
     @exponential_backoff(max_retries=2)
     def get_dynamodb_data_cached(self, table_name: str, cache_key: str) -> Optional[List[Dict]]:
@@ -146,15 +146,30 @@ class CarbonFinOpsDashboard(LoggerMixin):
 
     def get_state_data(self) -> List[Dict]:
         """Get instance state data from DynamoDB."""
-        return self.get_dynamodb_data_cached(settings.aws.state_table, "state_data") or []
+        return (
+            self.get_dynamodb_data_cached(
+                settings.aws.state_table if settings.aws else "carbon-finops-state", "state_data"
+            )
+            or []
+        )
 
     def get_rightsizing_data(self) -> List[Dict]:
         """Get rightsizing recommendations from DynamoDB."""
-        return self.get_dynamodb_data_cached(settings.aws.rightsizing_table, "rightsizing_data") or []
+        return (
+            self.get_dynamodb_data_cached(
+                settings.aws.rightsizing_table if settings.aws else "carbon-finops-rightsizing", "rightsizing_data"
+            )
+            or []
+        )
 
     def get_cost_data(self) -> List[Dict]:
         """Get cost data from DynamoDB."""
-        return self.get_dynamodb_data_cached(settings.aws.costs_table, "cost_data") or []
+        return (
+            self.get_dynamodb_data_cached(
+                settings.aws.costs_table if settings.aws else "carbon-finops-costs", "cost_data"
+            )
+            or []
+        )
 
     def calculate_kpis_parallel(self) -> Dict[str, Any]:
         """Calculate KPIs using parallel data fetching."""
@@ -169,9 +184,9 @@ class CarbonFinOpsDashboard(LoggerMixin):
         # Fetch data in parallel
         results = self.parallel_data_fetch(tasks)
 
-        state_data = results.get(0, [])
-        rightsizing_data = results.get(1, [])
-        cost_data = results.get(2, [])
+        state_data = results.get("0", [])
+        rightsizing_data = results.get("1", [])
+        cost_data = results.get("2", [])
 
         # Calculate KPIs
         kpis = self._calculate_kpis_from_data(state_data, rightsizing_data, cost_data)
@@ -184,7 +199,7 @@ class CarbonFinOpsDashboard(LoggerMixin):
         """Calculate KPIs from fetched data."""
         try:
             # Calculate cost savings
-            total_savings = 0
+            total_savings = 0.0
             for item in rightsizing_data:
                 if "recommendation" in item:
                     rec = item["recommendation"]
@@ -193,7 +208,7 @@ class CarbonFinOpsDashboard(LoggerMixin):
 
             # Calculate carbon reduction (simplified)
             carbon_actions = len([item for item in state_data if item.get("action") == "shutdown"])
-            carbon_reduction = carbon_actions * 2.5  # Approximate kg CO2 per shutdown
+            carbon_reduction = int(carbon_actions * 2.5)  # Approximate kg CO2 per shutdown
 
             # Count optimized instances
             optimized_instances = len(
@@ -234,8 +249,9 @@ class CarbonFinOpsDashboard(LoggerMixin):
                     df = df.sort_values("datetime")
 
                     # Limit data points for performance
-                    if len(df) > settings.dashboard.max_chart_points:
-                        df = df.tail(settings.dashboard.max_chart_points)
+                    max_points = settings.dashboard.max_chart_points if settings.dashboard else 1000
+                    if len(df) > max_points:
+                        df = df.tail(max_points)
 
                     fig.add_trace(
                         go.Scatter(

@@ -5,7 +5,7 @@ Retry handler with exponential backoff for AWS API calls.
 import time
 import random
 from functools import wraps
-from typing import Callable
+from typing import Callable, Optional
 import logging
 
 import boto3
@@ -134,7 +134,7 @@ def exponential_backoff(
 class AWSRetrySession:
     """AWS session with built-in retry logic."""
 
-    def __init__(self, aws_profile: str = None, region: str = "eu-central-1"):
+    def __init__(self, aws_profile: Optional[str] = None, region: str = "eu-central-1"):
         self.aws_profile = aws_profile
         self.region = region
         self._session = None
@@ -151,6 +151,7 @@ class AWSRetrySession:
                     self._session = boto3.Session()
 
                 # Test the session
+                assert self._session is not None  # Type assertion for mypy
                 sts = self._session.client("sts", region_name=self.region)
                 identity = sts.get_caller_identity()
                 self.logger.info(f"AWS session established for account: {identity.get('Account')}")

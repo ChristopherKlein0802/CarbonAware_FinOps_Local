@@ -3,7 +3,7 @@ import boto3
 import logging
 import os
 from datetime import datetime, timedelta
-from typing import Dict, List
+from typing import Dict, List, Any, Optional
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -32,7 +32,7 @@ class RightSizingAnalyzer:
             "t3.2xlarge": {"vcpu": 8, "memory": 32.0, "baseline_cpu": 40},
         }
 
-    def analyze_instance(self, instance_id: str, days: int = 14) -> Dict:
+    def analyze_instance(self, instance_id: str, days: int = 14) -> Optional[Dict[str, Any]]:
         """Analyze a single instance for rightsizing."""
 
         # Get instance details
@@ -62,7 +62,7 @@ class RightSizingAnalyzer:
             "timestamp": datetime.now().isoformat(),
         }
 
-    def get_cpu_statistics(self, instance_id: str, days: int) -> Dict:
+    def get_cpu_statistics(self, instance_id: str, days: int) -> Dict[str, float]:
         """Get CPU utilization statistics."""
 
         end_time = datetime.now()
@@ -97,10 +97,13 @@ class RightSizingAnalyzer:
             "datapoints": len(datapoints),
         }
 
-    def calculate_recommendation(self, current_type: str, cpu_stats: Dict, memory_stats: Dict) -> Dict:
+    def calculate_recommendation(
+        self, current_type: str, cpu_stats: Dict[str, float], memory_stats: Dict[str, float]
+    ) -> Dict[str, Any]:
         """Calculate rightsizing recommendation."""
 
-        recommendation = {"action": "no_change", "recommended_type": current_type, "reason": []}
+        reason_list: List[str] = []
+        recommendation = {"action": "no_change", "recommended_type": current_type, "reason": reason_list}
 
         # Downsize if consistently low utilization
         if cpu_stats["p95"] < 40 and cpu_stats["max"] < 60:
@@ -108,7 +111,7 @@ class RightSizingAnalyzer:
             if smaller_types:
                 recommendation["action"] = "downsize"
                 recommendation["recommended_type"] = smaller_types[0]
-                recommendation["reason"].append(f"CPU P95 at {cpu_stats['p95']}% (threshold: 40%)")
+                reason_list.append(f"CPU P95 at {cpu_stats['p95']}% (threshold: 40%)")
 
         # Upsize if consistently high utilization
         elif cpu_stats["avg"] > 80 or cpu_stats["p95"] > 90:
@@ -116,7 +119,7 @@ class RightSizingAnalyzer:
             if larger_types:
                 recommendation["action"] = "upsize"
                 recommendation["recommended_type"] = larger_types[0]
-                recommendation["reason"].append(f"CPU P95 at {cpu_stats['p95']}% (threshold: 90%)")
+                reason_list.append(f"CPU P95 at {cpu_stats['p95']}% (threshold: 90%)")
 
         return recommendation
 
@@ -142,7 +145,7 @@ class RightSizingAnalyzer:
             return [f"{family}.{sizes[current_index+1]}"]
         return []
 
-    def get_instance_details(self, instance_id: str) -> Dict:
+    def get_instance_details(self, instance_id: str) -> Optional[Dict[str, Any]]:
         """Get EC2 instance details."""
         try:
             response = self.ec2.describe_instances(InstanceIds=[instance_id])
@@ -152,7 +155,7 @@ class RightSizingAnalyzer:
             logger.error(f"Error getting instance details: {e}")
         return None
 
-    def get_memory_statistics(self, instance_id: str, days: int) -> Dict:
+    def get_memory_statistics(self, instance_id: str, days: int) -> Dict[str, float]:
         """Get memory utilization if available."""
         # Placeholder - requires CloudWatch agent
         return {"avg": 0, "max": 0}

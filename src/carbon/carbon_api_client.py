@@ -7,7 +7,7 @@ import os
 import requests
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
-from typing import List
+from typing import List, Optional, Union
 import logging
 from dataclasses import dataclass
 
@@ -65,7 +65,7 @@ class WattTimeClient(CarbonAPIClient):
 
     BASE_URL = "https://api2.watttime.org/v2"
 
-    def __init__(self, username: str = None, password: str = None):
+    def __init__(self, username: Optional[str] = None, password: Optional[str] = None):
         self.username = username or os.getenv("WATTTIME_USERNAME")
         self.password = password or os.getenv("WATTTIME_PASSWORD")
         self.token = None
@@ -205,7 +205,7 @@ class ElectricityMapClient(CarbonAPIClient):
 
     BASE_URL = "https://api.electricitymap.org/v3"
 
-    def __init__(self, api_key: str = None):
+    def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key or os.getenv("ELECTRICITYMAP_API_KEY")
 
     def get_current_intensity(self, region: str) -> CarbonIntensity:
@@ -267,9 +267,8 @@ class ElectricityMapClient(CarbonAPIClient):
 
         try:
             # ElectricityMap forecast endpoint
-            response = requests.get(
-                f"{self.BASE_URL}/carbon-intensity/forecast", headers=headers, params={"zone": zone, "hours": hours}
-            )
+            params = {"zone": zone, "hours": str(hours)}
+            response = requests.get(f"{self.BASE_URL}/carbon-intensity/forecast", headers=headers, params=params)
             response.raise_for_status()
 
             data = response.json()
@@ -335,8 +334,10 @@ class ElectricityMapClient(CarbonAPIClient):
 class CarbonIntensityClient:
     """Main client that abstracts different providers."""
 
-    def __init__(self, provider: str = None):
+    def __init__(self, provider: Optional[str] = None):
         provider = provider or os.getenv("CARBON_API_PROVIDER", "electricitymap")
+
+        self.client: Union[WattTimeClient, ElectricityMapClient]
 
         if provider == "watttime":
             self.client = WattTimeClient()

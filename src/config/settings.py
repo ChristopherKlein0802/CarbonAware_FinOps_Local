@@ -29,7 +29,7 @@ class CarbonConfig:
     """Carbon intensity configuration."""
 
     # Carbon thresholds by region (gCO2/kWh)
-    thresholds: Dict[str, float] = None
+    thresholds: Optional[Dict[str, float]] = None
 
     # API providers
     primary_provider: str = "electricitymap"  # 'electricitymap' or 'watttime'
@@ -97,7 +97,7 @@ class SchedulingConfig:
     startup_buffer_minutes: int = 5  # Start instances 5 min before needed
 
     # Cost estimation (hourly rates in USD)
-    instance_pricing: Dict[str, float] = None
+    instance_pricing: Optional[Dict[str, float]] = None
 
     def __post_init__(self):
         if self.instance_pricing is None:
@@ -126,7 +126,7 @@ class RightsizingConfig:
     minimum_datapoints: int = 24  # Minimum hours of data needed
 
     # Power consumption estimates (kW) for carbon calculations
-    power_consumption: Dict[str, float] = None
+    power_consumption: Optional[Dict[str, float]] = None
 
     def __post_init__(self):
         if self.power_consumption is None:
@@ -161,11 +161,11 @@ class DashboardConfig:
 class Settings:
     """Main settings container."""
 
-    aws: AWSConfig = None
-    carbon: CarbonConfig = None
-    scheduling: SchedulingConfig = None
-    rightsizing: RightsizingConfig = None
-    dashboard: DashboardConfig = None
+    aws: Optional[AWSConfig] = None
+    carbon: Optional[CarbonConfig] = None
+    scheduling: Optional[SchedulingConfig] = None
+    rightsizing: Optional[RightsizingConfig] = None
+    dashboard: Optional[DashboardConfig] = None
 
     # Environment
     environment: str = "development"
@@ -197,14 +197,20 @@ settings = Settings()
 
 def get_carbon_threshold(region: str) -> float:
     """Get carbon threshold for a specific region."""
-    return settings.carbon.thresholds.get(region, 400.0)  # Default fallback
+    if settings.carbon and settings.carbon.thresholds:
+        return settings.carbon.thresholds.get(region, 400.0)
+    return 400.0  # Default fallback
 
 
 def get_instance_pricing(instance_type: str) -> float:
     """Get hourly pricing for an instance type."""
-    return settings.scheduling.instance_pricing.get(instance_type, 0.05)  # Default fallback
+    if settings.scheduling and settings.scheduling.instance_pricing:
+        return settings.scheduling.instance_pricing.get(instance_type, 0.05)
+    return 0.05  # Default fallback
 
 
 def get_power_consumption(instance_type: str) -> float:
     """Get power consumption estimate for an instance type."""
-    return settings.rightsizing.power_consumption.get(instance_type, 0.05)  # Default fallback
+    if settings.rightsizing and settings.rightsizing.power_consumption:
+        return settings.rightsizing.power_consumption.get(instance_type, 0.05)
+    return 0.05  # Default fallback

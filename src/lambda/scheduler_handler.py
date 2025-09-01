@@ -4,10 +4,13 @@ import sys
 import logging
 from datetime import datetime
 
-# Add parent directory to path for imports
-sys.path.insert(0, "/opt/python")
-
-from src.automation.shutdown_scheduler import ShutdownScheduler
+# Try importing directly first, then fall back to path manipulation if needed
+try:
+    from src.automation.shutdown_scheduler import ShutdownScheduler
+except ImportError:
+    # Lambda environment fallback
+    sys.path.insert(0, "/opt/python")
+    from src.automation.shutdown_scheduler import ShutdownScheduler
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)

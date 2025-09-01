@@ -4,20 +4,17 @@ Carbon-aware shutdown scheduler for EC2 instances.
 Implements off-hours automation with carbon intensity consideration.
 """
 
+import os
 from datetime import datetime, timezone
 from typing import List, Dict, Optional
 import yaml
-import os
-import sys
 from dataclasses import dataclass
-
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.carbon.carbon_api_client import CarbonIntensityClient
 from src.cost.aws_cost_client import AWSCostClient
 from src.utils.logging_config import get_logger, LoggerMixin
 from src.utils.retry_handler import AWSRetrySession, exponential_backoff, safe_aws_call
-from config.settings import settings
+from src.config.settings import settings
 
 
 @dataclass
@@ -35,9 +32,9 @@ class ScheduleRule:
 class ShutdownScheduler(LoggerMixin):
     """Manages carbon-aware shutdown scheduling for EC2 instances."""
 
-    def __init__(self, region: str = None, aws_profile: str = None):
-        self.region = region or settings.aws.region
-        self.aws_profile = aws_profile or settings.aws.profile
+    def __init__(self, region: Optional[str] = None, aws_profile: Optional[str] = None):
+        self.region = region or (settings.aws.region if settings.aws else "eu-central-1")
+        self.aws_profile = aws_profile or (settings.aws.profile if settings.aws else None)
 
         # Use retry session for improved reliability
         self.aws_session = AWSRetrySession(self.aws_profile, self.region)
@@ -334,7 +331,7 @@ class ShutdownScheduler(LoggerMixin):
         cloudwatch = self.aws_session.get_client("cloudwatch")
         safe_aws_call(
             cloudwatch.put_metric_data,
-            Namespace=settings.aws.cloudwatch_namespace,
+            Namespace=settings.aws.cloudwatch_namespace if settings.aws else "CarbonAware/FinOps",
             MetricData=[
                 {
                     "MetricName": "InstanceShutdown",
@@ -350,7 +347,7 @@ class ShutdownScheduler(LoggerMixin):
         cloudwatch = self.aws_session.get_client("cloudwatch")
         safe_aws_call(
             cloudwatch.put_metric_data,
-            Namespace=settings.aws.cloudwatch_namespace,
+            Namespace=settings.aws.cloudwatch_namespace if settings.aws else "CarbonAware/FinOps",
             MetricData=[
                 {
                     "MetricName": "InstanceStartup",
@@ -363,7 +360,7 @@ class ShutdownScheduler(LoggerMixin):
 
     def _log_action(self, instance_id: str, action: str):
         """Log action to DynamoDB."""
-        table = self.dynamodb.Table(settings.aws.state_table)
+        table = self.dynamodb.Table(settings.aws.state_table if settings.aws else "carbon-finops-state")
         current_carbon = self.carbon_client.get_current_intensity(self.region)
 
         safe_aws_call(

@@ -33,10 +33,10 @@ class SecretsManager(LoggerMixin):
     3. Default values
     """
 
-    def __init__(self, aws_profile: str = None, region: str = "eu-central-1"):
+    def __init__(self, aws_profile: Optional[str] = None, region: str = "eu-central-1"):
         self.aws_profile = aws_profile
         self.region = region
-        self._secrets_cache = {}
+        self._secrets_cache: Dict[str, str] = {}
         self._aws_session = None
 
         # Initialize AWS session if profile is provided
@@ -128,6 +128,8 @@ class SecretsManager(LoggerMixin):
     def _get_from_aws_secrets(self, secret_name: str, key: str) -> Optional[str]:
         """Get secret from AWS Secrets Manager."""
         try:
+            if not self._aws_session:
+                return None
             client = self._aws_session.get_client("secretsmanager")
             response = safe_aws_call(client.get_secret_value, SecretId=secret_name)
 
@@ -261,7 +263,7 @@ class SecretsManager(LoggerMixin):
 _secrets_manager = None
 
 
-def get_secrets_manager(aws_profile: str = None, region: str = "eu-central-1") -> SecretsManager:
+def get_secrets_manager(aws_profile: Optional[str] = None, region: str = "eu-central-1") -> SecretsManager:
     """Get or create the global secrets manager instance."""
     global _secrets_manager
     if _secrets_manager is None:
@@ -269,7 +271,7 @@ def get_secrets_manager(aws_profile: str = None, region: str = "eu-central-1") -
     return _secrets_manager
 
 
-def get_secret(key: str, aws_profile: str = None) -> Optional[str]:
+def get_secret(key: str, aws_profile: Optional[str] = None) -> Optional[str]:
     """
     Convenience function to get a secret.
 
