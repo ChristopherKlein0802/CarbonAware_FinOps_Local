@@ -7,9 +7,9 @@ Implements off-hours automation with carbon intensity consideration.
 from datetime import datetime, timezone
 from typing import List, Dict, Optional
 import yaml
-from dataclasses import dataclass
 import os
 import sys
+from dataclasses import dataclass
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -23,6 +23,7 @@ from config.settings import settings
 @dataclass
 class ScheduleRule:
     """Represents a scheduling rule for instances."""
+
     name: str
     shutdown_time: Optional[str]
     startup_time: Optional[str]
@@ -37,51 +38,53 @@ class ShutdownScheduler(LoggerMixin):
     def __init__(self, region: str = None, aws_profile: str = None):
         self.region = region or settings.aws.region
         self.aws_profile = aws_profile or settings.aws.profile
-        
+
         # Use retry session for improved reliability
         self.aws_session = AWSRetrySession(self.aws_profile, self.region)
-        self.ec2_client = self.aws_session.get_client('ec2')
+        self.ec2_client = self.aws_session.get_client("ec2")
         self.carbon_client = CarbonIntensityClient()
         self.cost_client = AWSCostClient(self.region)
-        self.dynamodb = self.aws_session.get_resource('dynamodb')
-        
+        self.dynamodb = self.aws_session.get_resource("dynamodb")
+
         self.logger.info(f"ShutdownScheduler initialized for region {self.region}")
 
     @exponential_backoff(max_retries=3)
-    def get_tagged_instances(self, tag_key: str = 'Schedule') -> List[Dict]:
+    def get_tagged_instances(self, tag_key: str = "Schedule") -> List[Dict]:
         """Get all instances with scheduling tags."""
         response = safe_aws_call(
             self.ec2_client.describe_instances,
             Filters=[
-                {'Name': 'tag-key', 'Values': [tag_key]},
-                {'Name': 'instance-state-name', 'Values': ['running', 'stopped']}
-            ]
+                {"Name": "tag-key", "Values": [tag_key]},
+                {"Name": "instance-state-name", "Values": ["running", "stopped"]},
+            ],
         )
-        
+
         if not response:
             self.logger.warning("Failed to fetch instances from AWS")
             return []
 
         instances = []
-        for reservation in response['Reservations']:
-            for instance in reservation['Instances']:
-                instances.append({
-                    'InstanceId': instance['InstanceId'],
-                    'State': instance['State']['Name'],
-                    'InstanceType': instance['InstanceType'],
-                    'LaunchTime': instance.get('LaunchTime'),
-                    'Tags': {tag['Key']: tag['Value'] for tag in instance.get('Tags', [])}
-                })
+        for reservation in response["Reservations"]:
+            for instance in reservation["Instances"]:
+                instances.append(
+                    {
+                        "InstanceId": instance["InstanceId"],
+                        "State": instance["State"]["Name"],
+                        "InstanceType": instance["InstanceType"],
+                        "LaunchTime": instance.get("LaunchTime"),
+                        "Tags": {tag["Key"]: tag["Value"] for tag in instance.get("Tags", [])},
+                    }
+                )
 
         self.logger.info(f"Found {len(instances)} instances with scheduling tags")
         return instances
 
     def should_shutdown(self, instance: Dict, current_time: datetime) -> bool:
         """Determine if instance should be shut down based on schedule and carbon intensity."""
-        schedule_tag = instance['Tags'].get('Schedule', 'always-on')
+        schedule_tag = instance["Tags"].get("Schedule", "always-on")
 
         # Special case: always-on instances
-        if schedule_tag.lower() == 'always-on' or schedule_tag == '24/7 Always Running':
+        if schedule_tag.lower() == "always-on" or schedule_tag == "24/7 Always Running":
             return False
 
         # Load schedule rules
@@ -96,7 +99,9 @@ class ShutdownScheduler(LoggerMixin):
             if schedule_rule.carbon_threshold:
                 current_carbon = self.carbon_client.get_current_intensity(self.region)
                 if current_carbon > schedule_rule.carbon_threshold:
-                    self.logger.info(f"Carbon intensity {current_carbon} above threshold {schedule_rule.carbon_threshold}")
+                    self.logger.info(
+                        f"Carbon intensity {current_carbon} above threshold {schedule_rule.carbon_threshold}"
+                    )
                     return True
             return False
 
@@ -108,16 +113,19 @@ class ShutdownScheduler(LoggerMixin):
         if schedule_rule.carbon_threshold:
             current_carbon = self.carbon_client.get_current_intensity(self.region)
             if current_carbon < schedule_rule.carbon_threshold:
-                self.logger.info(f"Carbon intensity {current_carbon} below threshold {schedule_rule.carbon_threshold} - keeping instance running")
+                self.logger.info(
+                    f"Carbon intensity {current_carbon} below threshold {schedule_rule.carbon_threshold} "
+                    "- keeping instance running"
+                )
                 return False
 
         return True
 
     def should_startup(self, instance: Dict, current_time: datetime) -> bool:
         """Determine if instance should be started up."""
-        schedule_tag = instance['Tags'].get('Schedule', 'always-on')
+        schedule_tag = instance["Tags"].get("Schedule", "always-on")
 
-        if schedule_tag.lower() == 'always-on' or schedule_tag == '24/7 Always Running':
+        if schedule_tag.lower() == "always-on" or schedule_tag == "24/7 Always Running":
             return False
 
         schedule_rule = self._load_schedule_rule(schedule_tag)
@@ -127,7 +135,7 @@ class ShutdownScheduler(LoggerMixin):
         # Check if we're in startup window
         current_hour = current_time.hour
         current_minute = current_time.minute
-        current_day = current_time.strftime('%A').lower()
+        current_day = current_time.strftime("%A").lower()
 
         # Check if today is a scheduled day
         if schedule_rule.days and current_day not in schedule_rule.days:
@@ -163,7 +171,7 @@ class ShutdownScheduler(LoggerMixin):
         self.logger.info(f"Successfully initiated shutdown for instance {instance_id}")
 
         # Log to DynamoDB
-        self._log_action(instance_id, 'shutdown')
+        self._log_action(instance_id, "shutdown")
         return True
 
     @exponential_backoff(max_retries=3)
@@ -180,7 +188,7 @@ class ShutdownScheduler(LoggerMixin):
         self._record_startup_metrics(instance_id)
 
         # Log to DynamoDB
-        self._log_action(instance_id, 'startup')
+        self._log_action(instance_id, "startup")
         return True
 
     def execute_schedule(self) -> Dict:
@@ -195,27 +203,27 @@ class ShutdownScheduler(LoggerMixin):
         self.logger.info(f"Executing schedule at {current_time}")
 
         for instance in instances:
-            instance_id = instance['InstanceId']
-            current_state = instance['State']
+            instance_id = instance["InstanceId"]
+            current_state = instance["State"]
 
             self.logger.debug(f"Processing instance {instance_id} (state: {current_state})")
 
-            if current_state == 'running' and self.should_shutdown(instance, current_time):
+            if current_state == "running" and self.should_shutdown(instance, current_time):
                 if self.shutdown_instance(instance_id):
                     shutdown_count += 1
 
-            elif current_state == 'stopped' and self.should_startup(instance, current_time):
+            elif current_state == "stopped" and self.should_startup(instance, current_time):
                 if self.startup_instance(instance_id):
                     startup_count += 1
             else:
                 skipped_count += 1
 
         results = {
-            'shutdowns': shutdown_count,
-            'startups': startup_count,
-            'skipped': skipped_count,
-            'total_instances': len(instances),
-            'execution_time': current_time.isoformat()
+            "shutdowns": shutdown_count,
+            "startups": startup_count,
+            "skipped": skipped_count,
+            "total_instances": len(instances),
+            "execution_time": current_time.isoformat(),
         }
 
         self.logger.info(f"Schedule execution complete: {results}")
@@ -225,10 +233,10 @@ class ShutdownScheduler(LoggerMixin):
         """Load schedule rule from configuration."""
         try:
             # Try to load from file
-            config_file = os.path.join(os.path.dirname(__file__), '../../config/scheduling_rules.yaml')
+            config_file = os.path.join(os.path.dirname(__file__), "../../config/scheduling_rules.yaml")
 
             if os.path.exists(config_file):
-                with open(config_file, 'r') as f:
+                with open(config_file, "r") as f:
                     rules = yaml.safe_load(f)
             else:
                 # Use default rules if config file doesn't exis
@@ -236,12 +244,12 @@ class ShutdownScheduler(LoggerMixin):
 
             # Find matching rule
             for _, rule_data in rules.items():
-                if rule_data.get('name') == schedule_name:
+                if rule_data.get("name") == schedule_name:
                     return ScheduleRule(**rule_data)
 
             # Check if schedule_name matches a rule key
-            if schedule_name.replace(' ', '-').lower() in rules:
-                rule_data = rules[schedule_name.replace(' ', '-').lower()]
+            if schedule_name.replace(" ", "-").lower() in rules:
+                rule_data = rules[schedule_name.replace(" ", "-").lower()]
                 return ScheduleRule(**rule_data)
 
         except Exception as e:
@@ -252,44 +260,44 @@ class ShutdownScheduler(LoggerMixin):
     def _get_default_rules(self) -> Dict:
         """Get default scheduling rules."""
         return {
-            'always-on': {
-                'name': '24/7 Always Running',
-                'shutdown_time': None,
-                'startup_time': None,
-                'days': [],
-                'carbon_threshold': None,
-                'timezone': 'Europe/Berlin'
+            "always-on": {
+                "name": "24/7 Always Running",
+                "shutdown_time": None,
+                "startup_time": None,
+                "days": [],
+                "carbon_threshold": None,
+                "timezone": "Europe/Berlin",
             },
-            'office-hours-weekdays': {
-                'name': 'Office Hours + Weekend Shutdown',
-                'shutdown_time': '18:00',
-                'startup_time': '08:00',
-                'days': ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
-                'carbon_threshold': None,
-                'timezone': 'Europe/Berlin'
+            "office-hours-weekdays": {
+                "name": "Office Hours + Weekend Shutdown",
+                "shutdown_time": "18:00",
+                "startup_time": "08:00",
+                "days": ["monday", "tuesday", "wednesday", "thursday", "friday"],
+                "carbon_threshold": None,
+                "timezone": "Europe/Berlin",
             },
-            'development-extended': {
-                'name': 'Extended Development Hours',
-                'shutdown_time': '20:00',
-                'startup_time': '07:00',
-                'days': ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
-                'carbon_threshold': 500,
-                'timezone': 'Europe/Berlin'
+            "development-extended": {
+                "name": "Extended Development Hours",
+                "shutdown_time": "20:00",
+                "startup_time": "07:00",
+                "days": ["monday", "tuesday", "wednesday", "thursday", "friday"],
+                "carbon_threshold": 500,
+                "timezone": "Europe/Berlin",
             },
-            'carbon-optimized': {
-                'name': 'Carbon-Aware 24/7',
-                'shutdown_time': None,
-                'startup_time': None,
-                'days': [],
-                'carbon_threshold': 300,
-                'timezone': 'Europe/Berlin'
-            }
+            "carbon-optimized": {
+                "name": "Carbon-Aware 24/7",
+                "shutdown_time": None,
+                "startup_time": None,
+                "days": [],
+                "carbon_threshold": 300,
+                "timezone": "Europe/Berlin",
+            },
         }
 
     def _is_within_shutdown_window(self, schedule_rule: ScheduleRule, current_time: datetime) -> bool:
         """Check if current time is within shutdown window."""
         current_hour = current_time.hour
-        current_day = current_time.strftime('%A').lower()
+        current_day = current_time.strftime("%A").lower()
 
         # Check if today is a scheduled day
         if schedule_rule.days and current_day not in schedule_rule.days:
@@ -315,76 +323,70 @@ class ShutdownScheduler(LoggerMixin):
 
     def _parse_time(self, time_str: str) -> tuple:
         """Parse time string to hour and minute."""
-        if ':' in time_str:
-            parts = time_str.split(':')
+        if ":" in time_str:
+            parts = time_str.split(":")
             return int(parts[0]), int(parts[1])
         else:
             return int(time_str), 0
 
     def _record_shutdown_metrics(self, instance_id: str):
         """Record metrics when shutting down an instance."""
-        cloudwatch = self.aws_session.get_client('cloudwatch')
+        cloudwatch = self.aws_session.get_client("cloudwatch")
         safe_aws_call(
             cloudwatch.put_metric_data,
             Namespace=settings.aws.cloudwatch_namespace,
             MetricData=[
                 {
-                    'MetricName': 'InstanceShutdown',
-                    'Value': 1,
-                    'Unit': 'Count',
-                    'Dimensions': [
-                        {'Name': 'InstanceId', 'Value': instance_id}
-                    ]
+                    "MetricName": "InstanceShutdown",
+                    "Value": 1,
+                    "Unit": "Count",
+                    "Dimensions": [{"Name": "InstanceId", "Value": instance_id}],
                 }
-            ]
+            ],
         )
 
     def _record_startup_metrics(self, instance_id: str):
         """Record metrics when starting up an instance."""
-        cloudwatch = self.aws_session.get_client('cloudwatch')
+        cloudwatch = self.aws_session.get_client("cloudwatch")
         safe_aws_call(
             cloudwatch.put_metric_data,
             Namespace=settings.aws.cloudwatch_namespace,
             MetricData=[
                 {
-                    'MetricName': 'InstanceStartup',
-                    'Value': 1,
-                    'Unit': 'Count',
-                    'Dimensions': [
-                        {'Name': 'InstanceId', 'Value': instance_id}
-                    ]
+                    "MetricName": "InstanceStartup",
+                    "Value": 1,
+                    "Unit": "Count",
+                    "Dimensions": [{"Name": "InstanceId", "Value": instance_id}],
                 }
-            ]
+            ],
         )
 
     def _log_action(self, instance_id: str, action: str):
         """Log action to DynamoDB."""
         table = self.dynamodb.Table(settings.aws.state_table)
         current_carbon = self.carbon_client.get_current_intensity(self.region)
-        
+
         safe_aws_call(
             table.put_item,
             Item={
-                'instance_id': instance_id,
-                'timestamp': int(datetime.now().timestamp()),
-                'action': action,
-                'carbon_intensity': current_carbon if current_carbon else 0,
-                'region': self.region
-            }
+                "instance_id": instance_id,
+                "timestamp": int(datetime.now().timestamp()),
+                "action": action,
+                "carbon_intensity": current_carbon if current_carbon else 0,
+                "region": self.region,
+            },
         )
-
 
 
 def main():
     """Main entry point for scheduler."""
-    logger = get_logger('shutdown-scheduler')
+    logger = get_logger("shutdown-scheduler")
     logger.info("Starting Carbon-Aware Shutdown Scheduler")
 
     scheduler = ShutdownScheduler()
     results = scheduler.execute_schedule()
     logger.info(f"Execution complete: {results}")
     print(f"Execution complete: {results}")
-
 
 
 if __name__ == "__main__":

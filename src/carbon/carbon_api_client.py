@@ -16,32 +16,35 @@ logger = logging.getLogger(__name__)
 
 def parse_iso_datetime(datetime_str: str) -> datetime:
     """Parse ISO datetime string, handling 'Z' timezone indicator."""
-    if datetime_str.endswith('Z'):
+    if datetime_str.endswith("Z"):
         datetime_str = datetime_str[:-1]
 
-    if '+' in datetime_str:
-        datetime_str = datetime_str.split('+')[0]
-    elif datetime_str.count('-') > 2:
+    if "+" in datetime_str:
+        datetime_str = datetime_str.split("+")[0]
+    elif datetime_str.count("-") > 2:
         for i in range(len(datetime_str) - 1, -1, -1):
-            if datetime_str[i] in ['-', '+'] and i > 10:
+            if datetime_str[i] in ["-", "+"] and i > 10:
                 datetime_str = datetime_str[:i]
                 break
 
     try:
-        if '.' in datetime_str:
-            return datetime.strptime(datetime_str, '%Y-%m-%dT%H:%M:%S.%f')
+        if "." in datetime_str:
+            return datetime.strptime(datetime_str, "%Y-%m-%dT%H:%M:%S.%f")
         else:
-            return datetime.strptime(datetime_str, '%Y-%m-%dT%H:%M:%S')
+            return datetime.strptime(datetime_str, "%Y-%m-%dT%H:%M:%S")
     except ValueError:
         return parse_iso_datetime(datetime_str)
+
 
 @dataclass
 class CarbonIntensity:
     """Carbon intensity data structure."""
+
     value: float  # gCO2/kWh
     timestamp: datetime
     region: str
     source: str
+
 
 class CarbonAPIClient(ABC):
     """Abstract base class for carbon intensity API clients."""
@@ -56,14 +59,15 @@ class CarbonAPIClient(ABC):
         """Get carbon intensity forecast."""
         pass
 
+
 class WattTimeClient(CarbonAPIClient):
     """WattTime API client implementation."""
 
     BASE_URL = "https://api2.watttime.org/v2"
 
     def __init__(self, username: str = None, password: str = None):
-        self.username = username or os.getenv('WATTTIME_USERNAME')
-        self.password = password or os.getenv('WATTTIME_PASSWORD')
+        self.username = username or os.getenv("WATTTIME_USERNAME")
+        self.password = password or os.getenv("WATTTIME_PASSWORD")
         self.token = None
         if self.username and self.password:
             self._authenticate()
@@ -71,12 +75,9 @@ class WattTimeClient(CarbonAPIClient):
     def _authenticate(self):
         """Authenticate with WattTime API."""
         try:
-            response = requests.get(
-                f"{self.BASE_URL}/login",
-                auth=(self.username, self.password)
-            )
+            response = requests.get(f"{self.BASE_URL}/login", auth=(self.username, self.password))
             response.raise_for_status()
-            self.token = response.json()['token']
+            self.token = response.json()["token"]
         except Exception as e:
             logger.error(f"WattTime authentication failed: {e}")
             self.token = None
@@ -87,35 +88,28 @@ class WattTimeClient(CarbonAPIClient):
             logger.warning("WattTime token not available, using fallback")
             return self._get_fallback_intensity(region)
 
-        headers = {'Authorization': f'Bearer {self.token}'}
+        headers = {"Authorization": f"Bearer {self.token}"}
 
         # Map AWS regions to WattTime balancing authorities
         region_mapping = {
-            'eu-central-1': 'DE',  # Germany
-            'eu-west-1': 'IE',     # Ireland
-            'eu-west-2': 'GB',     # United Kingdom
-            'eu-west-3': 'FR',     # France
-            'eu-north-1': 'SE',    # Sweden
-            'us-east-1': 'PJM_NJ', # US East
-            'us-west-2': 'CAISO',  # California
+            "eu-central-1": "DE",  # Germany
+            "eu-west-1": "IE",  # Ireland
+            "eu-west-2": "GB",  # United Kingdom
+            "eu-west-3": "FR",  # France
+            "eu-north-1": "SE",  # Sweden
+            "us-east-1": "PJM_NJ",  # US East
+            "us-west-2": "CAISO",  # California
         }
 
-        ba = region_mapping.get(region, 'DE')
+        ba = region_mapping.get(region, "DE")
 
         try:
-            response = requests.get(
-                f"{self.BASE_URL}/data",
-                headers=headers,
-                params={'ba': ba}
-            )
+            response = requests.get(f"{self.BASE_URL}/data", headers=headers, params={"ba": ba})
             response.raise_for_status()
 
             data = response.json()
             return CarbonIntensity(
-                value=data['value'],
-                timestamp=parse_iso_datetime(data['point_time']),
-                region=region,
-                source='watttime'
+                value=data["value"], timestamp=parse_iso_datetime(data["point_time"]), region=region, source="watttime"
             )
         except Exception as e:
             logger.error(f"Error getting WattTime data: {e}")
@@ -127,42 +121,39 @@ class WattTimeClient(CarbonAPIClient):
             logger.warning("WattTime token not available, using fallback forecast")
             return self._get_fallback_forecast(region, hours)
 
-        headers = {'Authorization': f'Bearer {self.token}'}
+        headers = {"Authorization": f"Bearer {self.token}"}
 
         # Map AWS regions to WattTime balancing authorities
         region_mapping = {
-            'eu-central-1': 'DE',
-            'eu-west-1': 'IE',
-            'eu-west-2': 'GB',
-            'eu-west-3': 'FR',
-            'eu-north-1': 'SE',
-            'us-east-1': 'PJM_NJ',
-            'us-west-2': 'CAISO',
+            "eu-central-1": "DE",
+            "eu-west-1": "IE",
+            "eu-west-2": "GB",
+            "eu-west-3": "FR",
+            "eu-north-1": "SE",
+            "us-east-1": "PJM_NJ",
+            "us-west-2": "CAISO",
         }
 
-        ba = region_mapping.get(region, 'DE')
+        ba = region_mapping.get(region, "DE")
 
         try:
             response = requests.get(
-                f"{self.BASE_URL}/forecast",
-                headers=headers,
-                params={
-                    'ba': ba,
-                    'horizon_hours': hours
-                }
+                f"{self.BASE_URL}/forecast", headers=headers, params={"ba": ba, "horizon_hours": hours}
             )
             response.raise_for_status()
 
             data = response.json()
             forecasts = []
 
-            for item in data.get('data', []):
-                forecasts.append(CarbonIntensity(
-                    value=item['value'],
-                    timestamp=parse_iso_datetime(item['point_time']),
-                    region=region,
-                    source='watttime'
-                ))
+            for item in data.get("data", []):
+                forecasts.append(
+                    CarbonIntensity(
+                        value=item["value"],
+                        timestamp=parse_iso_datetime(item["point_time"]),
+                        region=region,
+                        source="watttime",
+                    )
+                )
 
             return forecasts
         except Exception as e:
@@ -173,20 +164,17 @@ class WattTimeClient(CarbonAPIClient):
         """Get fallback intensity when API fails."""
         # Average carbon intensities by region (gCO2/kWh)
         fallback_values = {
-            'eu-central-1': 380,  # Germany
-            'eu-west-1': 300,     # Ireland
-            'eu-west-2': 250,     # UK
-            'eu-west-3': 90,      # France (nuclear)
-            'eu-north-1': 40,     # Sweden (hydro)
-            'us-east-1onnex': 450,   # US East
-            'us-west-2': 350,     # US West
+            "eu-central-1": 380,  # Germany
+            "eu-west-1": 300,  # Ireland
+            "eu-west-2": 250,  # UK
+            "eu-west-3": 90,  # France (nuclear)
+            "eu-north-1": 40,  # Sweden (hydro)
+            "us-east-1onnex": 450,  # US East
+            "us-west-2": 350,  # US West
         }
 
         return CarbonIntensity(
-            value=fallback_values.get(region, 475),
-            timestamp=datetime.now(),
-            region=region,
-            source='fallback'
+            value=fallback_values.get(region, 475), timestamp=datetime.now(), region=region, source="fallback"
         )
 
     def _get_fallback_forecast(self, region: str, hours: int) -> List[CarbonIntensity]:
@@ -197,16 +185,20 @@ class WattTimeClient(CarbonAPIClient):
         for hour in range(hours):
             # Simple sine wave pattern to simulate daily variation
             import math
+
             variation = math.sin((hour / 24) * 2 * math.pi) * 50
 
-            forecasts.append(CarbonIntensity(
-                value=base_value + variation,
-                timestamp=datetime.now() + timedelta(hours=hour),
-                region=region,
-                source='fallback_forecast'
-            ))
+            forecasts.append(
+                CarbonIntensity(
+                    value=base_value + variation,
+                    timestamp=datetime.now() + timedelta(hours=hour),
+                    region=region,
+                    source="fallback_forecast",
+                )
+            )
 
         return forecasts
+
 
 class ElectricityMapClient(CarbonAPIClient):
     """electricityMap API client implementation."""
@@ -214,7 +206,7 @@ class ElectricityMapClient(CarbonAPIClient):
     BASE_URL = "https://api.electricitymap.org/v3"
 
     def __init__(self, api_key: str = None):
-        self.api_key = api_key or os.getenv('ELECTRICITYMAP_API_KEY')
+        self.api_key = api_key or os.getenv("ELECTRICITYMAP_API_KEY")
 
     def get_current_intensity(self, region: str) -> CarbonIntensity:
         """Get current carbon intensity from electricityMap."""
@@ -222,35 +214,31 @@ class ElectricityMapClient(CarbonAPIClient):
             logger.warning("ElectricityMap API key not available, using fallback")
             return self._get_fallback_intensity(region)
 
-        headers = {'auth-token': self.api_key}
+        headers = {"auth-token": self.api_key}
 
         # Map AWS regions to electricityMap zones
         zone_mapping = {
-            'eu-central-1': 'DE',  # Germany
-            'eu-west-1': 'IE',     # Ireland
-            'eu-west-2': 'GB',     # United Kingdom
-            'eu-west-3': 'FR',     # France
-            'eu-north-1': 'SE',    # Sweden
-            'us-east-1': 'US-NE-ISO',  # New England
-            'us-west-2': 'US-NW-PACW', # Pacific Northwest
+            "eu-central-1": "DE",  # Germany
+            "eu-west-1": "IE",  # Ireland
+            "eu-west-2": "GB",  # United Kingdom
+            "eu-west-3": "FR",  # France
+            "eu-north-1": "SE",  # Sweden
+            "us-east-1": "US-NE-ISO",  # New England
+            "us-west-2": "US-NW-PACW",  # Pacific Northwest
         }
 
-        zone = zone_mapping.get(region, 'DE')
+        zone = zone_mapping.get(region, "DE")
 
         try:
-            response = requests.get(
-                f"{self.BASE_URL}/carbon-intensity/latest",
-                headers=headers,
-                params={'zone': zone}
-            )
+            response = requests.get(f"{self.BASE_URL}/carbon-intensity/latest", headers=headers, params={"zone": zone})
             response.raise_for_status()
 
             data = response.json()
             return CarbonIntensity(
-                value=data['carbonIntensity'],
-                timestamp=parse_iso_datetime(data['datetime']),
+                value=data["carbonIntensity"],
+                timestamp=parse_iso_datetime(data["datetime"]),
                 region=region,
-                source='electricitymap'
+                source="electricitymap",
             )
         except Exception as e:
             logger.error(f"Error getting ElectricityMap data: {e}")
@@ -262,43 +250,40 @@ class ElectricityMapClient(CarbonAPIClient):
             logger.warning("ElectricityMap API key not available, using fallback forecast")
             return self._get_fallback_forecast(region, hours)
 
-        headers = {'auth-token': self.api_key}
+        headers = {"auth-token": self.api_key}
 
         # Map AWS regions to electricityMap zones
         zone_mapping = {
-            'eu-central-1': 'DE',
-            'eu-west-1': 'IE',
-            'eu-west-2': 'GB',
-            'eu-west-3': 'FR',
-            'eu-north-1': 'SE',
-            'us-east-1': 'US-NE-ISO',
-            'us-west-2': 'US-NW-PACW',
+            "eu-central-1": "DE",
+            "eu-west-1": "IE",
+            "eu-west-2": "GB",
+            "eu-west-3": "FR",
+            "eu-north-1": "SE",
+            "us-east-1": "US-NE-ISO",
+            "us-west-2": "US-NW-PACW",
         }
 
-        zone = zone_mapping.get(region, 'DE')
+        zone = zone_mapping.get(region, "DE")
 
         try:
             # ElectricityMap forecast endpoint
             response = requests.get(
-                f"{self.BASE_URL}/carbon-intensity/forecast",
-                headers=headers,
-                params={
-                    'zone': zone,
-                    'hours': hours
-                }
+                f"{self.BASE_URL}/carbon-intensity/forecast", headers=headers, params={"zone": zone, "hours": hours}
             )
             response.raise_for_status()
 
             data = response.json()
             forecasts = []
 
-            for item in data.get('forecast', []):
-                forecasts.append(CarbonIntensity(
-                    value=item['carbonIntensity'],
-                    timestamp=parse_iso_datetime(item['datetime']),
-                    region=region,
-                    source='electricitymap'
-                ))
+            for item in data.get("forecast", []):
+                forecasts.append(
+                    CarbonIntensity(
+                        value=item["carbonIntensity"],
+                        timestamp=parse_iso_datetime(item["datetime"]),
+                        region=region,
+                        source="electricitymap",
+                    )
+                )
 
             return forecasts if forecasts else self._get_fallback_forecast(region, hours)
 
@@ -310,20 +295,17 @@ class ElectricityMapClient(CarbonAPIClient):
         """Get fallback intensity when API fails."""
         # Average carbon intensities by region (gCO2/kWh)
         fallback_values = {
-            'eu-central-1': 380,  # Germany
-            'eu-west-1': 300,     # Ireland
-            'eu-west-2': 250,     # UK
-            'eu-west-3': 90,      # France (nuclear)
-            'eu-north-1': 40,     # Sweden (hydro)
-            'us-east-1': 450,     # US East
-            'us-west-2': 350,     # US West
+            "eu-central-1": 380,  # Germany
+            "eu-west-1": 300,  # Ireland
+            "eu-west-2": 250,  # UK
+            "eu-west-3": 90,  # France (nuclear)
+            "eu-north-1": 40,  # Sweden (hydro)
+            "us-east-1": 450,  # US East
+            "us-west-2": 350,  # US West
         }
 
         return CarbonIntensity(
-            value=fallback_values.get(region, 475),
-            timestamp=datetime.now(),
-            region=region,
-            source='fallback'
+            value=fallback_values.get(region, 475), timestamp=datetime.now(), region=region, source="fallback"
         )
 
     def _get_fallback_forecast(self, region: str, hours: int) -> List[CarbonIntensity]:
@@ -334,27 +316,31 @@ class ElectricityMapClient(CarbonAPIClient):
         for hour in range(hours):
             # Simple sine wave pattern to simulate daily variation
             import math
+
             # Peak during day (hour 12), low at night (hour 0 and 24)
             variation = math.sin((hour - 6) / 24 * 2 * math.pi) * 50
 
-            forecasts.append(CarbonIntensity(
-                value=max(0, base_value + variation),  # Ensure non-negative
-                timestamp=datetime.now() + timedelta(hours=hour),
-                region=region,
-                source='fallback_forecast'
-            ))
+            forecasts.append(
+                CarbonIntensity(
+                    value=max(0, base_value + variation),  # Ensure non-negative
+                    timestamp=datetime.now() + timedelta(hours=hour),
+                    region=region,
+                    source="fallback_forecast",
+                )
+            )
 
         return forecasts
+
 
 class CarbonIntensityClient:
     """Main client that abstracts different providers."""
 
     def __init__(self, provider: str = None):
-        provider = provider or os.getenv('CARBON_API_PROVIDER', 'electricitymap')
+        provider = provider or os.getenv("CARBON_API_PROVIDER", "electricitymap")
 
-        if provider == 'watttime':
+        if provider == "watttime":
             self.client = WattTimeClient()
-        elif provider == 'electricitymap':
+        elif provider == "electricitymap":
             self.client = ElectricityMapClient()
         else:
             # Default to ElectricityMap
@@ -410,7 +396,9 @@ class CarbonIntensityClient:
             current_intensity = self.get_current_intensity(region)
             should_run = current_intensity < threshold
 
-            logger.info(f"Should run now in {region}? {should_run} (current: {current_intensity}, threshold: {threshold})")
+            logger.info(
+                f"Should run now in {region}? {should_run} (current: {current_intensity}, threshold: {threshold})"
+            )
             return should_run
 
         except Exception as e:

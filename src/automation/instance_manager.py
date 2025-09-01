@@ -12,8 +12,8 @@ logger = logging.getLogger(__name__)
 class InstanceManager:
     """Manages EC2 instance lifecycle operations."""
 
-    def __init__(self, region: str = 'eu-central-1'):
-        self.ec2_client = boto3.client('ec2', region_name=region)
+    def __init__(self, region: str = "eu-central-1"):
+        self.ec2_client = boto3.client("ec2", region_name=region)
         self.region = region
 
     def get_instances_by_tag(self, tag_key: str, tag_value: str) -> List[Dict]:
@@ -21,21 +21,23 @@ class InstanceManager:
         try:
             response = self.ec2_client.describe_instances(
                 Filters=[
-                    {'Name': f'tag:{tag_key}', 'Values': [tag_value]},
-                    {'Name': 'instance-state-name', 'Values': ['running', 'stopped']}
+                    {"Name": f"tag:{tag_key}", "Values": [tag_value]},
+                    {"Name": "instance-state-name", "Values": ["running", "stopped"]},
                 ]
             )
 
             instances = []
-            for reservation in response['Reservations']:
-                for instance in reservation['Instances']:
-                    instances.append({
-                        'instance_id': instance['InstanceId'],
-                        'state': instance['State']['Name'],
-                        'type': instance['InstanceType'],
-                        'launch_time': instance.get('LaunchTime'),
-                        'tags': {tag['Key']: tag['Value'] for tag in instance.get('Tags', [])}
-                    })
+            for reservation in response["Reservations"]:
+                for instance in reservation["Instances"]:
+                    instances.append(
+                        {
+                            "instance_id": instance["InstanceId"],
+                            "state": instance["State"]["Name"],
+                            "type": instance["InstanceType"],
+                            "launch_time": instance.get("LaunchTime"),
+                            "tags": {tag["Key"]: tag["Value"] for tag in instance.get("Tags", [])},
+                        }
+                    )
 
             return instances
         except Exception as e:
@@ -76,9 +78,9 @@ class InstanceManager:
         """Get current state of an instance."""
         try:
             response = self.ec2_client.describe_instances(InstanceIds=[instance_id])
-            if response['Reservations']:
-                instance = response['Reservations'][0]['Instances'][0]
-                return instance['State']['Name']
+            if response["Reservations"]:
+                instance = response["Reservations"][0]["Instances"][0]
+                return instance["State"]["Name"]
         except Exception as e:
             logger.error(f"Error getting instance state: {e}")
         return None
