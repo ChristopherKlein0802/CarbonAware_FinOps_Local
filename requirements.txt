@@ -32,3 +32,4 @@ dataclasses-json>=0.6.0
 
 # Monitoring and Logging
 structlog>=23.2.0
+loguru>=0.7.0

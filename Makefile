@@ -76,14 +76,14 @@ test-coverage: ## Run tests with coverage report
 infrastructure-plan: ## Plan Terraform deployment
 	@echo "$(YELLOW)Planning infrastructure deployment...$(NC)"
 	cd $(TERRAFORM_DIR) && $(TERRAFORM) init
-	cd $(TERRAFORM_DIR) && $(MAKE) build-lambda
+	cd $(TERRAFORM_DIR) && ./build_lambda.sh
 	cd $(TERRAFORM_DIR) && $(TERRAFORM) plan -var="aws_profile=$(AWS_PROFILE)" -var="aws_region=$(AWS_REGION)"
 	@echo "$(GREEN)✅ Infrastructure plan complete$(NC)"
 
 infrastructure-apply: ## Deploy infrastructure with Terraform  
 	@echo "$(YELLOW)Deploying infrastructure...$(NC)"
 	cd $(TERRAFORM_DIR) && $(TERRAFORM) init
-	cd $(TERRAFORM_DIR) && $(MAKE) build-lambda
+	cd $(TERRAFORM_DIR) && ./build_lambda.sh
 	cd $(TERRAFORM_DIR) && $(TERRAFORM) apply -var="aws_profile=$(AWS_PROFILE)" -var="aws_region=$(AWS_REGION)" -auto-approve
 	@echo "$(GREEN)✅ Infrastructure deployed successfully$(NC)"
 

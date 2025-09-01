@@ -74,6 +74,11 @@ class WattTimeClient(CarbonAPIClient):
 
     def _authenticate(self):
         """Authenticate with WattTime API."""
+        if not self.username or not self.password:
+            logger.error("WattTime username or password not provided")
+            self.token = None
+            return
+
         try:
             response = requests.get(f"{self.BASE_URL}/login", auth=(self.username, self.password))
             response.raise_for_status()

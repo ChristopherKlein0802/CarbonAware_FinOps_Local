@@ -15,6 +15,7 @@ class TestAWSCostClient:
         """Test cost client initialization."""
         client = AWSCostClient(region='eu-central-1')
         mock_boto.assert_called_with('ce', region_name='eu-central-1')
+        assert client.region == 'eu-central-1'
     
     @patch('boto3.client')
     def test_get_instance_costs(self, mock_boto):
