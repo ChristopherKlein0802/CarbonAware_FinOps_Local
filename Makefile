@@ -202,12 +202,25 @@ clean: ## Clean temporary files and caches
 	find . -type d -name ".pytest_cache" -exec rm -rf {} + 2>/dev/null || true
 	find . -type d -name "htmlcov" -exec rm -rf {} + 2>/dev/null || true
 	find . -type f -name ".coverage" -delete 2>/dev/null || true
+	rm -rf .mypy_cache 2>/dev/null || true
+	rm -rf carbon_aware_finops.egg-info 2>/dev/null || true
+	find infrastructure/ -name "*.tfstate.backup" -delete 2>/dev/null || true
+	find . -name "package-lock.json" -size -100c -delete 2>/dev/null || true
 	@echo "$(GREEN)✅ Cleanup complete$(NC)"
 
 clean-venv: ## Remove virtual environment
 	@echo "$(YELLOW)Removing virtual environment...$(NC)"
 	rm -rf $(VENV)
 	@echo "$(GREEN)✅ Virtual environment removed$(NC)"
+
+deep-clean: ## Deep clean including logs and terraform cache
+	@echo "$(YELLOW)Performing deep cleanup...$(NC)"
+	$(MAKE) clean
+	rm -rf logs/*.log 2>/dev/null || true
+	rm -rf infrastructure/terraform/.terraform 2>/dev/null || true
+	rm -rf infrastructure/terraform/*.zip 2>/dev/null || true
+	find . -name "*.DS_Store" -delete 2>/dev/null || true
+	@echo "$(GREEN)✅ Deep cleanup complete$(NC)"
 
 reset: clean clean-venv ## Full reset: clean files and remove venv
 	@echo "$(GREEN)✅ Full reset complete$(NC)"

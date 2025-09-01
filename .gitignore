@@ -177,6 +177,8 @@ dash_assets/
 OPTIMIZATION_REPORT.md
 optimization_report.html
 performance_report.json
+carbon_aware_finops.egg-info/
+package-lock.json
 
 # AWS CLI and SDK cache
 .aws/cli/cache/
