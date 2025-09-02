@@ -803,7 +803,7 @@ class CarbonFinOpsDashboard(LoggerMixin):
         """Run the dashboard."""
         print(f"🚀 Starting dashboard at http://{host}:{port}")
         print("Press Ctrl+C to stop")
-        self.app.run_server(debug=debug, port=port, host=host)
+        self.app.run(debug=debug, port=port, host=host)
 
 
 def main():

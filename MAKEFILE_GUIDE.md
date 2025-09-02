@@ -1,25 +1,51 @@
-# 🌱 Carbon-Aware FinOps - Makefile Usage Guide
+# 🌱 Carbon-Aware FinOps - Makefile Commands Guide
 
-This guide explains how to use the streamlined Makefile for efficient development and deployment of your Carbon-Aware FinOps project.
+This guide provides complete documentation for all Makefile commands in your Carbon-Aware FinOps project.
 
-## 🚀 Quick Start
+## 🚀 Quick Reference
 
-### First Time Setup
+| Category | Command | Description |
+|----------|---------|-------------|
+| **Getting Started** | `make setup` | Complete project setup (run this first!) |
+| | `make dev` | Setup development environment |
+| | `make fresh-start` | Complete reset + setup + deploy + run (testing) |
+| **Development** | `make test` | Run all tests and quality checks |
+| | `make clean` | Clean temporary files and caches |
+| | `make reset` | Complete project cleanup (⚠️ removes everything!) |
+| **Deployment** | `make deploy` | Deploy complete infrastructure to AWS |
+| | `make destroy` | Destroy AWS infrastructure (⚠️ careful!) |
+| | `make plan` | Show Terraform deployment plan |
+| **Operations** | `make run` | Run the complete carbon-aware system |
+| | `make dashboard` | Launch real-time dashboard |
+| | `make status` | Show system and infrastructure status |
+| **Advanced** | `make baseline` | Collect AWS baseline data |
+| | `make scheduler` | Run carbon-aware scheduler once |
+| | `make rightsizing` | Run rightsizing analysis |
+| | `make logs` | View recent Lambda logs |
+| | `make instances` | List managed EC2 instances |
+| | `make emergency-stop` | Emergency stop all managed instances |
+| | `make cleanup-all` | Delete ALL orphaned AWS resources (saves $40+/month!) |
+
+---
+
+## 📋 Essential Commands (Organized by Use Case)
+
+### 🚀 **First Time Setup**
 ```bash
-# 1. Clone the repository and navigate to it
-cd CarbonAware_FinOps_Local
-
-# 2. Run complete project setup
+# 1. Complete project setup
 make setup
 
-# 3. Deploy infrastructure to AWS
+# 2. Deploy to AWS
 make deploy
 
-# 4. Run the carbon-aware system
+# 3. Run the system
 make run
+
+# 4. View dashboard
+make dashboard
 ```
 
-### Daily Development Workflow
+### 🔄 **Daily Development Workflow**
 ```bash
 # Start development session
 make dev
@@ -27,97 +53,215 @@ make dev
 # Run tests before committing
 make test
 
-# Clean up temporary files
+# Clean workspace
 make clean
 ```
 
-### Complete Testing Workflow
+### 🧪 **Testing Complete Workflow**
 ```bash
-# Test everything from scratch (perfect for thorough testing!)
+# Perfect for testing everything from scratch
 make fresh-start
-
-# Or step-by-step:
-make reset    # Complete cleanup
-make setup    # Fresh setup  
-make deploy   # Deploy infrastructure
-make run      # Run system
+# This runs: reset → setup → deploy → run
 ```
 
-## 📋 Essential Commands
-
-### 🔧 **Setup & Installation**
-
-| Command | Description | When to Use |
-|---------|-------------|-------------|
-| `make setup` | Complete project setup | ✅ **First time** running the project |
-| `make dev` | Development environment | 🔄 Setting up for development |
-| `make fresh-start` | Complete reset + setup + deploy + run | 🧪 **Perfect for testing everything from scratch** |
-
-**Example:**
+### ☁️ **AWS Infrastructure Management**
 ```bash
-# First time setup
-make setup
-# ✅ Creates virtual environment
-# ✅ Installs all dependencies  
-# ✅ Runs basic health checks
-# ✅ Verifies AWS connectivity
-```
+# Preview deployment changes
+make plan
 
-### 💻 **Development**
-
-| Command | Description | When to Use |
-|---------|-------------|-------------|
-| `make test` | Run all quality checks | 🧪 Before committing code |
-| `make clean` | Clean temporary files | 🧹 When workspace feels cluttered |
-
-**Example:**
-```bash
-# Before committing changes
-make test
-# ✅ Runs linting (flake8)
-# ✅ Runs type checking (mypy)  
-# ✅ Runs unit tests (pytest)
-# ✅ Runs security scan (bandit)
-```
-
-### ☁️ **Deployment**
-
-| Command | Description | When to Use |
-|---------|-------------|-------------|
-| `make deploy` | Deploy to AWS | 🚀 Deploy infrastructure |
-| `make destroy` | Destroy AWS resources | ⚠️ Clean up (CAREFUL!) |
-| `make plan` | Show deployment plan | 👀 Preview changes |
-
-**Example:**
-```bash
-# Deploy complete infrastructure
+# Deploy infrastructure
 make deploy
-# ✅ Initializes Terraform
-# ✅ Builds Lambda packages
-# ✅ Deploys infrastructure
-# ✅ Sets up secrets
+
+# Check system status
+make status
+
+# Destroy infrastructure
+make destroy
 ```
 
-### 🏃 **Operations**
-
-| Command | Description | When to Use |
-|---------|-------------|-------------|
-| `make run` | Run complete system | 🏃 Execute carbon-aware logic |
-| `make dashboard` | Launch dashboard | 📊 View real-time metrics |
-| `make status` | Show system status | 📈 Check system health |
-
-**Example:**
+### 🏃 **Running Carbon-Aware Operations**
 ```bash
-# Run the carbon-aware system
+# Run complete system
 make run
-# ✅ Collects baseline AWS data
-# ✅ Runs scheduling logic
-# ✅ Performs rightsizing analysis
 
-# View real-time dashboard
+# Run individual components
+make baseline      # Collect AWS data
+make scheduler     # Run scheduling logic
+make rightsizing   # Run rightsizing analysis
+
+# Launch monitoring dashboard
 make dashboard
-# 🌐 Opens dashboard at http://localhost:8050
 ```
+
+---
+
+## 🔧 Detailed Command Reference
+
+### **Setup & Installation**
+
+#### `make setup`
+- **Purpose**: Complete project setup for first-time users
+- **What it does**:
+  - Creates Python virtual environment
+  - Installs all dependencies from requirements.txt
+  - Installs project in development mode
+  - Runs basic health checks
+  - Verifies AWS connectivity
+- **When to use**: First time running the project
+- **Example output**: ✅ Virtual environment created, dependencies installed
+
+#### `make dev`
+- **Purpose**: Setup optimized development environment
+- **What it does**: Same as setup but optimized for daily development
+- **When to use**: Setting up for development work
+
+#### `make fresh-start`
+- **Purpose**: Complete workflow testing from clean state
+- **What it does**: reset → setup → deploy → run
+- **When to use**: Testing complete project workflow
+- **⚠️ Warning**: Removes all existing project state
+
+---
+
+### **Development & Testing**
+
+#### `make test`
+- **Purpose**: Comprehensive quality checks
+- **What it does**:
+  - Runs linting (flake8)
+  - Runs type checking (mypy)
+  - Runs unit tests (pytest)
+  - Runs security scan (bandit)
+- **When to use**: Before committing code
+- **Requirements**: Virtual environment must exist
+
+#### `make clean`
+- **Purpose**: Clean temporary files and caches
+- **What it does**: Removes __pycache__, .pyc files, test artifacts
+- **When to use**: When workspace feels cluttered
+
+#### `make reset`
+- **Purpose**: Complete project cleanup
+- **What it does**:
+  - Removes virtual environment
+  - Cleans all Python caches and artifacts
+  - Removes Terraform state and cache
+  - Removes Lambda deployment files
+  - Removes logs and build artifacts
+- **⚠️ Warning**: This removes EVERYTHING, requires confirmation
+
+---
+
+### **AWS Infrastructure**
+
+#### `make plan`
+- **Purpose**: Preview Terraform deployment changes
+- **What it does**: Shows what resources will be created/modified/destroyed
+- **When to use**: Before deploying to review changes
+- **Output**: Terraform plan showing resource changes
+
+#### `make deploy`
+- **Purpose**: Deploy complete infrastructure to AWS
+- **What it does**:
+  - Initializes Terraform
+  - Builds Lambda deployment packages
+  - Deploys all AWS resources
+  - Sets up secrets in AWS Secrets Manager
+- **Resources created**: 40+ AWS resources (~$35/month cost)
+- **Time**: ~5-10 minutes
+
+#### `make destroy`
+- **Purpose**: Destroy all Terraform-managed AWS resources
+- **What it does**: Removes all infrastructure created by Terraform
+- **⚠️ Warning**: Permanent deletion, requires 'yes' confirmation
+- **Note**: May not remove manually created resources
+
+#### `make status`
+- **Purpose**: Show comprehensive system status
+- **What it does**:
+  - Checks AWS connectivity
+  - Shows infrastructure deployment status
+  - Lists managed EC2 instances
+- **Output**: Status report with ✅/❌/⚠️ indicators
+
+---
+
+### **Operations & Monitoring**
+
+#### `make run`
+- **Purpose**: Execute complete carbon-aware system
+- **What it does**:
+  1. Collects baseline AWS data
+  2. Runs scheduling logic
+  3. Performs rightsizing analysis
+- **When to use**: Execute carbon-aware logic
+- **Duration**: ~2-5 minutes depending on instance count
+
+#### `make baseline`
+- **Purpose**: Collect AWS baseline data only
+- **What it does**: Gathers cost and usage data for 7 days
+- **Output**: Saves data to `data/baseline/baseline_data.csv`
+
+#### `make scheduler`
+- **Purpose**: Run carbon-aware scheduler once
+- **What it does**: 
+  - Checks carbon intensity
+  - Starts/stops instances based on carbon thresholds
+  - Updates DynamoDB state
+- **Logic**: Stops instances when carbon intensity > 300 gCO2/kWh
+
+#### `make rightsizing`
+- **Purpose**: Run rightsizing analysis
+- **What it does**:
+  - Analyzes instance utilization
+  - Generates rightsizing recommendations
+  - Stores recommendations in DynamoDB
+
+#### `make dashboard`
+- **Purpose**: Launch real-time monitoring dashboard
+- **What it does**: Starts Dash web application
+- **Access**: http://localhost:8050
+- **Features**: Real-time carbon intensity, cost tracking, instance status
+
+---
+
+### **Monitoring & Debugging**
+
+#### `make logs`
+- **Purpose**: View recent Lambda execution logs
+- **What it does**: Shows last 1 hour of logs from both Lambda functions
+- **Output**: Scheduler and rightsizing Lambda logs
+
+#### `make instances`
+- **Purpose**: List all managed EC2 instances
+- **What it does**: Shows instance IDs, states, types, schedules, and names
+- **Filters**: Only instances tagged with `Project=carbon-aware-finops`
+
+---
+
+### **Emergency Operations**
+
+#### `make emergency-stop`
+- **Purpose**: Emergency stop of all managed instances
+- **What it does**: Stops (doesn't terminate) all running managed instances
+- **Safety**: Requires y/N confirmation
+- **When to use**: Emergency situations, high costs, testing
+
+#### `make cleanup-all`
+- **Purpose**: Remove ALL orphaned Carbon-Aware FinOps AWS resources
+- **💰 Savings**: ~$40-45 per month
+- **What it removes**:
+  1. Terminates all EC2 instances
+  2. Deletes Lambda functions
+  3. Deletes DynamoDB tables
+  4. Empties and deletes S3 buckets
+  5. Deletes CloudWatch log groups
+  6. Deletes Secrets Manager secrets
+  7. Cleans up IAM roles and security groups
+- **⚠️ Warning**: PERMANENT deletion, requires typing 'CLEANUP'
+- **When to use**: Clean slate, cost reduction, project cleanup
+
+---
 
 ## 🎯 Common Workflows
 
@@ -134,6 +278,9 @@ make deploy
 
 # 4. Run system once to verify
 make run
+
+# 5. View dashboard
+make dashboard
 ```
 
 ### **Daily Development**
@@ -168,140 +315,120 @@ make deploy
 make status
 ```
 
-### **Troubleshooting**
+### **Complete System Testing**
 ```bash
-# Check system health
+# One command to test everything from scratch
+make fresh-start
+
+# Manual step-by-step alternative:
+make reset    # Complete cleanup
+make setup    # Fresh setup  
+make deploy   # Deploy infrastructure
+make run      # Run system
+```
+
+### **Cost Optimization**
+```bash
+# Check current costs and usage
 make status
-
-# View recent logs
-make logs
-
-# List managed instances
 make instances
 
-# Emergency stop (if needed)
-make emergency-stop
+# Clean up orphaned resources (saves $40+/month)
+make cleanup-all
 ```
 
-## 🔧 Advanced Commands
-
-### **Individual Components**
-```bash
-make baseline     # Collect AWS baseline data only
-make scheduler    # Run scheduler logic once
-make rightsizing  # Run rightsizing analysis once
-```
-
-### **Monitoring & Debugging**
-```bash
-make logs         # View Lambda logs
-make instances    # List managed EC2 instances
-make status       # Comprehensive status check
-```
-
-### **Emergency Operations**
-```bash
-make emergency-stop  # Stop all managed instances
-make destroy        # Destroy all infrastructure
-```
-
-## ⚙️ Configuration
-
-### **AWS Profile Configuration**
-The Makefile uses the `carbon-finops-sandbox` AWS profile by default. To configure:
-
-```bash
-# Configure AWS profile
-aws configure --profile carbon-finops-sandbox
-
-# Or set different profile in Makefile
-# Change: AWS_PROFILE := your-profile-name
-```
-
-### **Region Configuration**
-Default region is `eu-central-1`. To change:
-```bash
-# Edit Makefile line:
-# AWS_REGION := your-preferred-region
-```
+---
 
 ## 🚨 Important Notes
 
-### **Before Running `make destroy`**
-- ⚠️ **This permanently deletes all AWS resources**
-- ⚠️ **This cannot be undone**  
-- ⚠️ **Make sure you have backups of important data**
+### **Before Running Destructive Commands**
+
+**`make reset`:**
+- Removes ALL local project state
+- Virtual environment will be deleted
+- All caches and artifacts will be removed
+
+**`make destroy`:**
+- Permanently deletes AWS infrastructure
+- Cannot be undone
+- Make sure you have backups
+
+**`make cleanup-all`:**
+- Permanently deletes ALL project AWS resources
+- Will save ~$40-45/month in AWS costs
+- Only removes resources tagged with the project
 
 ### **AWS Costs**
-The infrastructure deployment creates AWS resources that incur costs:
-- 4x t3.micro instances: ~$30/month
-- Lambda executions: ~$0.50/month
-- DynamoDB + S3 + CloudWatch: ~$4/month
-- **Total: ~$35/month**
+Current infrastructure deployment creates:
+- **EC2 Instances**: ~$30/month (4x t3.micro)
+- **Lambda Functions**: ~$0.50/month
+- **DynamoDB**: ~$1/month
+- **S3 + CloudWatch**: ~$3/month
+- **Total**: ~$35/month
 
-### **Security**
-- Never commit AWS credentials
-- Use AWS profiles for authentication
-- Regularly rotate API keys
-- Monitor AWS usage and costs
+### **Configuration**
+- **AWS Profile**: `carbon-finops-sandbox` (configurable in Makefile)
+- **Region**: `eu-central-1` (configurable in Makefile)
+- **Python**: Requires Python 3.9+
+
+---
 
 ## 🐛 Troubleshooting
 
-### **Common Issues**
+### **Common Issues & Solutions**
 
 **"Virtual environment not found"**
 ```bash
-# Solution: Run setup first
-make setup
+make setup  # Creates new virtual environment
 ```
 
 **"AWS connectivity failed"**
 ```bash
-# Solution: Configure AWS profile
 aws configure --profile carbon-finops-sandbox
 ```
 
 **"Terraform initialization failed"**
 ```bash
-# Solution: Clean and retry
 make clean
 make deploy
 ```
 
 **"Tests failing"**
 ```bash
-# Solution: Check specific failures
-make test
-# Then fix reported issues
+make test  # Check specific failures and fix reported issues
 ```
 
-### **Getting Help**
+**"High AWS costs"**
 ```bash
-# Show all available commands
-make help
-
-# Show detailed command descriptions  
-make
+make cleanup-all  # Type 'CLEANUP' when prompted (saves $40+/month)
 ```
 
-## 📚 Next Steps
+**"Infrastructure stuck during destroy"**
+```bash
+# Some AWS resources (like EventBridge rules) may need manual cleanup
+# Check AWS console and manually delete stuck resources
+```
 
-After successfully running the Makefile commands:
+---
 
-1. **Explore the Dashboard**: `make dashboard` - View real-time carbon intensity data
-2. **Monitor Logs**: `make logs` - Check Lambda execution logs  
-3. **Review Costs**: Check AWS billing dashboard
-4. **Customize Scheduling**: Edit `config/scheduling_rules.yaml`
-5. **Add More Instances**: Tag EC2 instances with `Project=carbon-aware-finops`
+## 📚 Additional Resources
+
+- **Show all commands**: `make help`
+- **AWS Console**: Monitor resources and costs
+- **Dashboard**: http://localhost:8050 (after `make dashboard`)
+- **Log Files**: `logs/` directory (after operations)
+- **Data Files**: `data/baseline/` and `data/results/`
+
+---
 
 ## 🎉 Success Indicators
 
-You'll know everything is working when:
+You know everything is working when:
 - ✅ `make setup` completes without errors
-- ✅ `make test` shows all quality checks passing
-- ✅ `make deploy` successfully creates AWS resources
+- ✅ `make test` shows all quality checks passing  
+- ✅ `make deploy` successfully creates 40+ AWS resources
 - ✅ `make status` shows infrastructure as deployed
 - ✅ `make dashboard` opens the web interface
 - ✅ `make run` executes without critical errors
 
-Happy carbon-aware computing! 🌱
+**Happy carbon-aware computing!** 🌱

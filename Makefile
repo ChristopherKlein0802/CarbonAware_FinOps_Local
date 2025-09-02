@@ -238,7 +238,7 @@ status: ## 📈 Show comprehensive system status
 	@aws sts get-caller-identity --profile $(AWS_PROFILE) >/dev/null 2>&1 && \
 		echo "  $(GREEN)✅ Connected$(NC)" || echo "  $(RED)❌ Not connected$(NC)"
 	@echo "$(BOLD)Infrastructure:$(NC)"
-	@cd infrastructure/terraform && terraform output -json 2>/dev/null | python3 -m json.tool 2>/dev/null >/dev/null && \
+	@cd infrastructure/terraform && terraform output -json 2>/dev/null | jq -e 'keys | length > 0' >/dev/null 2>&1 && \
 		echo "  $(GREEN)✅ Deployed$(NC)" || echo "  $(YELLOW)⚠️  Not deployed$(NC)"
 	@echo "$(BOLD)Managed EC2 Instances:$(NC)"
 	@aws ec2 describe-instances \
@@ -288,6 +288,67 @@ emergency-stop: ## 🚨 Emergency stop all managed instances
 			--output text --profile $(AWS_PROFILE) | \
 		xargs -r aws ec2 stop-instances --instance-ids --profile $(AWS_PROFILE) && \
 		echo "$(GREEN)✅ Emergency stop complete$(NC)"; \
+	fi
+
+cleanup-all: ## 🧹 Complete cleanup of ALL orphaned AWS resources (⚠️ SAVES $40+/month!)
+	@echo "$(BOLD)$(RED)🧹 COMPREHENSIVE AWS CLEANUP$(NC)"
+	@echo "$(YELLOW)This will PERMANENTLY DELETE all Carbon-Aware FinOps resources$(NC)"
+	@echo ""
+	@echo "$(BOLD)Resources to be deleted:$(NC)"
+	@echo "$(BLUE)EC2 Instances:$(NC)"
+	@aws ec2 describe-instances \
+		--filters "Name=tag:Project,Values=carbon-aware-finops" \
+		--query 'Reservations[*].Instances[*].[InstanceId,State.Name,Tags[?Key==`Name`].Value|[0]]' \
+		--output table --profile $(AWS_PROFILE) 2>/dev/null || echo "  None found"
+	@echo "$(BLUE)DynamoDB Tables:$(NC)"
+	@aws dynamodb list-tables --region $(AWS_REGION) --profile $(AWS_PROFILE) \
+		--query 'TableNames[?contains(@, `carbon`) || contains(@, `finops`)]' --output text || echo "  None found"
+	@echo "$(BLUE)Lambda Functions:$(NC)"
+	@aws lambda list-functions --region $(AWS_REGION) --profile $(AWS_PROFILE) \
+		--query 'Functions[?contains(FunctionName, `carbon`) || contains(FunctionName, `finops`)].FunctionName' --output text || echo "  None found"
+	@echo "$(BLUE)S3 Buckets:$(NC)"
+	@aws s3 ls --profile $(AWS_PROFILE) | grep -i "carbon\|finops" | awk '{print $$3}' || echo "  None found"
+	@echo ""
+	@echo "$(RED)💰 Estimated monthly savings: ~$$40-45$(NC)"
+	@echo ""
+	@read -p "$(RED)Type 'CLEANUP' to permanently delete ALL resources: $(NC)" confirm && \
+	if [ "$$confirm" = "CLEANUP" ]; then \
+		echo "$(YELLOW)1/7 Terminating EC2 instances...$(NC)"; \
+		aws ec2 describe-instances \
+			--filters "Name=tag:Project,Values=carbon-aware-finops" \
+			--query 'Reservations[*].Instances[*].InstanceId' \
+			--output text --profile $(AWS_PROFILE) | \
+		xargs -r aws ec2 terminate-instances --instance-ids --profile $(AWS_PROFILE) 2>/dev/null || true; \
+		echo "$(YELLOW)2/7 Deleting Lambda functions...$(NC)"; \
+		aws lambda list-functions --region $(AWS_REGION) --profile $(AWS_PROFILE) \
+			--query 'Functions[?contains(FunctionName, `carbon`) || contains(FunctionName, `finops`)].FunctionName' \
+			--output text | xargs -r -n1 aws lambda delete-function --region $(AWS_REGION) --profile $(AWS_PROFILE) --function-name 2>/dev/null || true; \
+		echo "$(YELLOW)3/7 Deleting DynamoDB tables...$(NC)"; \
+		aws dynamodb list-tables --region $(AWS_REGION) --profile $(AWS_PROFILE) \
+			--query 'TableNames[?contains(@, `carbon`) || contains(@, `finops`)]' --output text | \
+		xargs -r -n1 aws dynamodb delete-table --region $(AWS_REGION) --profile $(AWS_PROFILE) --table-name 2>/dev/null || true; \
+		echo "$(YELLOW)4/7 Emptying and deleting S3 buckets...$(NC)"; \
+		aws s3 ls --profile $(AWS_PROFILE) | grep -i "carbon\|finops" | awk '{print $$3}' | \
+		xargs -r -I{} sh -c 'aws s3 rm s3://{} --recursive --profile $(AWS_PROFILE) 2>/dev/null || true; aws s3 rb s3://{} --profile $(AWS_PROFILE) 2>/dev/null || true'; \
+		echo "$(YELLOW)5/7 Deleting CloudWatch log groups...$(NC)"; \
+		aws logs describe-log-groups --region $(AWS_REGION) --profile $(AWS_PROFILE) \
+			--query 'logGroups[?contains(logGroupName, `carbon`) || contains(logGroupName, `finops`)].logGroupName' --output text | \
+		xargs -r -n1 aws logs delete-log-group --region $(AWS_REGION) --profile $(AWS_PROFILE) --log-group-name 2>/dev/null || true; \
+		echo "$(YELLOW)6/7 Deleting Secrets Manager secrets...$(NC)"; \
+		aws secretsmanager list-secrets --region $(AWS_REGION) --profile $(AWS_PROFILE) \
+			--query 'SecretList[?contains(Name, `carbon`) || contains(Name, `finops`)].Name' --output text | \
+		xargs -r -n1 aws secretsmanager delete-secret --region $(AWS_REGION) --profile $(AWS_PROFILE) --secret-id --force-delete-without-recovery 2>/dev/null || true; \
+		echo "$(YELLOW)7/7 Cleaning up IAM roles and security groups...$(NC)"; \
+		aws iam list-roles --profile $(AWS_PROFILE) --query 'Roles[?contains(RoleName, `carbon`) || contains(RoleName, `finops`)].RoleName' --output text | \
+		xargs -r -n1 sh -c 'aws iam list-attached-role-policies --role-name $$1 --profile $(AWS_PROFILE) --query "AttachedPolicies[].PolicyArn" --output text | xargs -r -n1 aws iam detach-role-policy --role-name $$1 --profile $(AWS_PROFILE) --policy-arn 2>/dev/null || true; aws iam list-role-policies --role-name $$1 --profile $(AWS_PROFILE) --query "PolicyNames[]" --output text | xargs -r -n1 aws iam delete-role-policy --role-name $$1 --profile $(AWS_PROFILE) --policy-name 2>/dev/null || true; aws iam delete-role --role-name $$1 --profile $(AWS_PROFILE) 2>/dev/null || true' _; \
+		aws ec2 describe-security-groups --region $(AWS_REGION) --profile $(AWS_PROFILE) \
+			--query 'SecurityGroups[?contains(GroupName, `carbon`) || contains(GroupName, `finops`) && GroupName != `default`].GroupId' --output text | \
+		xargs -r -n1 aws ec2 delete-security-group --region $(AWS_REGION) --profile $(AWS_PROFILE) --group-id 2>/dev/null || true; \
+		echo "$(GREEN)✅ Complete cleanup finished!$(NC)"; \
+		echo "$(GREEN)💰 Estimated monthly savings: ~$$40-45$(NC)"; \
+		echo "$(BLUE)All Carbon-Aware FinOps resources have been removed$(NC)"; \
+	else \
+		echo "$(BLUE)❌ Cleanup cancelled$(NC)"; \
 	fi
 
 # Internal helper targets (not shown in help)
