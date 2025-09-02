@@ -1,7 +1,6 @@
 """Tests for carbon API client."""
 
-import pytest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 from datetime import datetime, timedelta
 
 from src.carbon.carbon_api_client import (

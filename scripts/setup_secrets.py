@@ -7,12 +7,12 @@ import os
 import sys
 import argparse
 import getpass
-from typing import Dict, Optional
+from typing import Dict
 
 # Add src to path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
-from src.utils.secrets_manager import SecretsManager, setup_secrets_from_env
+from src.utils.secrets_manager import SecretsManager
 from src.utils.logging_config import get_logger
 
 logger = get_logger('secrets-setup')

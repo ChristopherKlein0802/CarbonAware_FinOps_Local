@@ -5,6 +5,8 @@ import os
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional
 
+# Type annotations for boto3 resources (ignore missing stubs)
+
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
@@ -98,7 +100,7 @@ class RightSizingAnalyzer:
         }
 
     def calculate_recommendation(
-        self, current_type: str, cpu_stats: Dict[str, float], memory_stats: Dict[str, float]
+        self, current_type: str, cpu_stats: Dict[str, float], _memory_stats: Dict[str, float]
     ) -> Dict[str, Any]:
         """Calculate rightsizing recommendation."""
 
@@ -155,7 +157,7 @@ class RightSizingAnalyzer:
             logger.error(f"Error getting instance details: {e}")
         return None
 
-    def get_memory_statistics(self, instance_id: str, days: int) -> Dict[str, float]:
+    def get_memory_statistics(self, _instance_id: str, _days: int) -> Dict[str, float]:
         """Get memory utilization if available."""
         # Placeholder - requires CloudWatch agent
         return {"avg": 0, "max": 0}
@@ -181,7 +183,7 @@ class RightSizingAnalyzer:
         return round(monthly_savings, 2)
 
 
-def lambda_handler(event, context):
+def lambda_handler(_event, _context):
     """Lambda handler for rightsizing analysis."""
 
     analyzer = RightSizingAnalyzer()
@@ -200,10 +202,10 @@ def lambda_handler(event, context):
 
     # Initialize DynamoDB for storing results
     session = boto3.Session(profile_name=analyzer.aws_profile)
-    dynamodb = session.resource("dynamodb", region_name="eu-central-1")
+    dynamodb = session.resource("dynamodb", region_name="eu-central-1")  # type: ignore[misc]
 
     try:
-        table = dynamodb.Table("carbon-aware-finops-rightsizing")
+        table = dynamodb.Table("carbon-aware-finops-rightsizing")  # type: ignore[misc]
     except Exception as e:
         logger.error(f"DynamoDB table not found, creating in-memory results only: {e}")
         table = None

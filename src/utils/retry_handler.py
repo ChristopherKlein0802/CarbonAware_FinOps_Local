@@ -94,7 +94,7 @@ def exponential_backoff(
     def decorator(func: Callable) -> Callable:
         @wraps(func)
         def wrapper(*args, **kwargs):
-            last_exception = None
+            last_exception: Optional[Exception] = None
 
             for attempt in range(max_retries + 1):
                 try:
@@ -124,7 +124,10 @@ def exponential_backoff(
                     time.sleep(delay)
 
             # Should never reach here, but just in case
-            raise last_exception
+            if last_exception is not None:
+                raise last_exception
+            else:
+                raise RuntimeError(f"Function {func.__name__} failed without raising an exception")
 
         return wrapper
 

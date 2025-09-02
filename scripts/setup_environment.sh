@@ -38,7 +38,7 @@ echo "✅ AWS CLI found"
 
 # Check AWS credentials
 if ! aws sts get-caller-identity &> /dev/null; then
-    echo "❌ AWS credentials not configured. Run 'aws configure' first."
+    echo "❌ AWS credentials not configured. Run 'aws sso login --sso-session carbon-finops-sandbox' first."
     exit 1
 fi
 

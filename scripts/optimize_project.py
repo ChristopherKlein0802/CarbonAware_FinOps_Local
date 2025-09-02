@@ -9,7 +9,7 @@ import sys
 import subprocess
 import ast
 from pathlib import Path
-from typing import Set, List, Dict
+from typing import List, Dict, Any
 
 # Add src to path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
@@ -166,7 +166,7 @@ class ProjectOptimizer:
         
         return issues
     
-    def optimize_project(self) -> Dict[str, any]:
+    def optimize_project(self) -> Dict[str, Any]:
         """Run all optimization checks."""
         logger.info("Starting project optimization analysis...")
         

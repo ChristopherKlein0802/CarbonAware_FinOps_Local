@@ -372,7 +372,7 @@ class CarbonFinOpsDashboard(LoggerMixin):
             ],
             [Input("interval-component", "n_intervals")],
         )
-        def update_dashboard(_n_intervals):
+        def update_dashboard(_n_intervals):  # Callback function for Dash - n_intervals is required by Dash but unused
             # Get current metrics
             metrics = self.get_current_metrics()
 
@@ -706,11 +706,21 @@ class CarbonFinOpsDashboard(LoggerMixin):
 
             df = pd.DataFrame(recommendations)
 
+            # Convert DataFrame to proper types for Dash DataTable
+            table_data = []
+            for record in df.to_dict("records"):
+                # Ensure all keys are strings and values are proper types
+                table_record = {}
+                for key, value in record.items():
+                    table_record[str(key)] = str(value) if value is not None else ""
+                table_data.append(table_record)
+            
+            # Type ignore for Dash DataTable style properties that aren't properly typed
             return dash_table.DataTable(
-                data=df.to_dict("records"),
-                columns=[{"name": i, "id": i} for i in df.columns],
+                data=table_data,  # type: ignore
+                columns=[{"name": str(i), "id": str(i)} for i in df.columns],
                 style_cell={"textAlign": "left"},
-                style_data_conditional=[
+                style_data_conditional=[  # type: ignore
                     {
                         "if": {"column_id": "Action", "filter_query": '{Action} = "Downsize"'},
                         "backgroundColor": "#3498db",
@@ -726,7 +736,7 @@ class CarbonFinOpsDashboard(LoggerMixin):
                         "backgroundColor": "#9b59b6",
                         "color": "white",
                     },
-                ],
+                ]
             )
 
         except Exception as e:

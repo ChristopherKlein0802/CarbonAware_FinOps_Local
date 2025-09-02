@@ -60,7 +60,7 @@ setup: ## 🔧 Complete project setup (run this first!)
 	@echo "$(YELLOW)4/4 Checking AWS connectivity...$(NC)"
 	@aws sts get-caller-identity --profile $(AWS_PROFILE) >/dev/null 2>&1 && \
 		echo "$(GREEN)✅ AWS connection successful$(NC)" || \
-		echo "$(RED)⚠️  AWS not configured. Run: aws configure --profile $(AWS_PROFILE)$(NC)"
+		echo "$(RED)⚠️  AWS not configured. Run: aws sso login --sso-session $(AWS_PROFILE)$(NC)"
 	@echo ""
 	@echo "$(BOLD)$(GREEN)🎉 Setup complete!$(NC)"
 	@echo "$(BLUE)Next steps:$(NC)"

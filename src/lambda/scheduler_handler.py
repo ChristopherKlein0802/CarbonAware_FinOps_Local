@@ -2,7 +2,11 @@ import json
 import os
 import sys
 import logging
+import boto3
 from datetime import datetime
+from typing import Dict, Any
+
+# Type annotations for boto3 resources (ignore missing stubs)
 
 # Try importing directly first, then fall back to path manipulation if needed
 try:
@@ -16,7 +20,7 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 
-def lambda_handler(event, context):
+def lambda_handler(_event, _context):
     """
     Main Lambda handler for carbon-aware scheduling.
     Triggered every 15 minutes by EventBridge.
@@ -54,12 +58,10 @@ def lambda_handler(event, context):
         return {"statusCode": 500, "body": json.dumps({"error": str(e), "timestamp": datetime.now().isoformat()})}
 
 
-def store_execution_results(results):
+def store_execution_results(results: Dict[str, Any]) -> None:
     """Store execution results in DynamoDB for tracking."""
-    import boto3
-
-    dynamodb = boto3.resource("dynamodb")
-    table = dynamodb.Table("carbon-aware-finops-state")
+    dynamodb = boto3.resource("dynamodb")  # type: ignore[misc]
+    table = dynamodb.Table("carbon-aware-finops-state")  # type: ignore[misc]
 
     table.put_item(
         Item={
