@@ -360,18 +360,6 @@ class CarbonFinOpsDashboard(LoggerMixin):
     def setup_callbacks(self):
         """Setup dashboard callbacks."""
 
-        @self.app.callback(
-            [
-                Output("cost-savings", "children"),
-                Output("carbon-reduction", "children"),
-                Output("optimized-instances", "children"),
-                Output("cost-timeline", "figure"),
-                Output("carbon-timeline", "figure"),
-                Output("recommendations-table", "children"),
-                Output("instance-status-chart", "figure"),
-            ],
-            [Input("interval-component", "n_intervals")],
-        )
         def update_dashboard(_n_intervals):  # Callback function for Dash - n_intervals is required by Dash but unused
             # Get current metrics
             metrics = self.get_current_metrics()
@@ -400,6 +388,20 @@ class CarbonFinOpsDashboard(LoggerMixin):
                 recommendations_table,
                 status_fig,
             )
+        
+        # Register the callback with Dash
+        self.app.callback(
+            [
+                Output("cost-savings", "children"),
+                Output("carbon-reduction", "children"),
+                Output("optimized-instances", "children"),
+                Output("cost-timeline", "figure"),
+                Output("carbon-timeline", "figure"),
+                Output("recommendations-table", "children"),
+                Output("instance-status-chart", "figure"),
+            ],
+            [Input("interval-component", "n_intervals")],
+        )(update_dashboard)
 
     def get_current_metrics(self):
         """Get current metrics from DynamoDB and CloudWatch."""
