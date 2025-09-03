@@ -80,7 +80,8 @@ class InstanceManager:
             response = self.ec2_client.describe_instances(InstanceIds=[instance_id])
             if response["Reservations"]:
                 instance = response["Reservations"][0]["Instances"][0]
-                return instance["State"]["Name"]
+                state_name = instance["State"]["Name"]
+                return str(state_name) if state_name else None
         except Exception as e:
             logger.error(f"Error getting instance state: {e}")
         return None

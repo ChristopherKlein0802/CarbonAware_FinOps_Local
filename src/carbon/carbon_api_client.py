@@ -114,7 +114,7 @@ class WattTimeClient(CarbonAPIClient):
             return
 
         try:
-            response = requests.get(f"{self.BASE_URL}/login", auth=(self.username, self.password))
+            response = requests.get(f"{self.BASE_URL}/login", auth=(self.username, self.password), timeout=30)
             response.raise_for_status()
             self.token = response.json()["token"]
         except Exception as e:
@@ -131,7 +131,7 @@ class WattTimeClient(CarbonAPIClient):
         ba = WATTTIME_REGION_MAPPINGS.get(region, "DE")
 
         try:
-            response = requests.get(f"{self.BASE_URL}/data", headers=headers, params={"ba": ba})
+            response = requests.get(f"{self.BASE_URL}/data", headers=headers, params={"ba": ba}, timeout=30)
             response.raise_for_status()
 
             data = response.json()
@@ -153,7 +153,7 @@ class WattTimeClient(CarbonAPIClient):
 
         try:
             response = requests.get(
-                f"{self.BASE_URL}/forecast", headers=headers, params={"ba": ba, "horizon_hours": hours}
+                f"{self.BASE_URL}/forecast", headers=headers, params={"ba": ba, "horizon_hours": hours}, timeout=30
             )
             response.raise_for_status()
 
@@ -220,7 +220,9 @@ class ElectricityMapClient(CarbonAPIClient):
         zone = REGION_MAPPINGS.get(region, "DE")
 
         try:
-            response = requests.get(f"{self.BASE_URL}/carbon-intensity/latest", headers=headers, params={"zone": zone})
+            response = requests.get(
+                f"{self.BASE_URL}/carbon-intensity/latest", headers=headers, params={"zone": zone}, timeout=30
+            )
             response.raise_for_status()
 
             data = response.json()
@@ -246,7 +248,9 @@ class ElectricityMapClient(CarbonAPIClient):
         try:
             # ElectricityMap forecast endpoint
             params = {"zone": zone, "hours": str(hours)}
-            response = requests.get(f"{self.BASE_URL}/carbon-intensity/forecast", headers=headers, params=params)
+            response = requests.get(
+                f"{self.BASE_URL}/carbon-intensity/forecast", headers=headers, params=params, timeout=30
+            )
             response.raise_for_status()
 
             data = response.json()

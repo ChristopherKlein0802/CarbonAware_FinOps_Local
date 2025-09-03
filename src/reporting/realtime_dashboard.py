@@ -124,7 +124,7 @@ class CarbonFinOpsDashboard(LoggerMixin):
         # Check cache first
         cached_data = self.cache.get(cache_key)
         if cached_data is not None:
-            return cached_data
+            return list(cached_data) if isinstance(cached_data, list) else []
 
         if not self.dynamodb:
             return None
@@ -137,7 +137,7 @@ class CarbonFinOpsDashboard(LoggerMixin):
                 data = response.get("Items", [])
                 # Cache the result
                 self.cache.set(cache_key, data)
-                return data
+                return list(data) if data else []
 
         except Exception as e:
             self.logger.error(f"Failed to fetch data from {table_name}: {e}")
@@ -176,7 +176,7 @@ class CarbonFinOpsDashboard(LoggerMixin):
         cache_key = "dashboard_kpis"
         cached_kpis = self.cache.get(cache_key)
         if cached_kpis:
-            return cached_kpis
+            return dict(cached_kpis) if isinstance(cached_kpis, dict) else {}
 
         # Define parallel tasks
         tasks = [(self.get_state_data, ()), (self.get_rightsizing_data, ()), (self.get_cost_data, ())]

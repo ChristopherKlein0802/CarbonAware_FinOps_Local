@@ -3,7 +3,6 @@ Retry handler with exponential backoff for AWS API calls.
 """
 
 import time
-import random
 from functools import wraps
 from typing import Any, Callable, Optional
 import logging
@@ -115,7 +114,10 @@ def exponential_backoff(
                     delay = min(base_delay * (2**attempt), max_delay)
 
                     if jitter:
-                        delay *= 0.5 + random.random() * 0.5  # Add 0-50% jitter
+                        # Use deterministic jitter based on function name and attempt
+                        jitter_seed = hash(f"{func.__name__}_{attempt}") % 1000
+                        jitter_factor = 0.5 + (jitter_seed / 1000.0) * 0.5
+                        delay *= jitter_factor
 
                     logger.warning(
                         f"Attempt {attempt + 1} of {func.__name__} failed: {e}. " f"Retrying in {delay:.2f} seconds..."
@@ -154,7 +156,8 @@ class AWSRetrySession:
                     self._session = boto3.Session()
 
                 # Test the session
-                assert self._session is not None  # Type assertion for mypy
+                if self._session is None:
+                    raise RuntimeError("Failed to create AWS session")
                 sts = self._session.client("sts", region_name=self.region)
                 identity = sts.get_caller_identity()
                 self.logger.info(f"AWS session established for account: {identity.get('Account')}")

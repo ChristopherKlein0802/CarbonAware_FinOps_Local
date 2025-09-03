@@ -49,28 +49,29 @@ class SecretsManager(LoggerMixin):
                 self._aws_session = None
 
         # Define secret configurations
+        # These are AWS Secrets Manager path names, not hardcoded passwords
         self.secret_configs = {
             "electricitymap_api_key": SecretConfig(
                 key="electricitymap_api_key",
-                secret_name="carbon-finops/electricitymap-api-key",
+                secret_name="carbon-finops/electricitymap-api-key",  # nosec B106
                 env_var="ELECTRICITYMAP_API_KEY",
                 required=False,
             ),
             "watttime_username": SecretConfig(
                 key="watttime_username",
-                secret_name="carbon-finops/watttime-credentials",
+                secret_name="carbon-finops/watttime-credentials",  # nosec B106
                 env_var="WATTTIME_USERNAME",
                 required=False,
             ),
             "watttime_password": SecretConfig(
                 key="watttime_password",
-                secret_name="carbon-finops/watttime-credentials",
+                secret_name="carbon-finops/watttime-credentials",  # nosec B106
                 env_var="WATTTIME_PASSWORD",
                 required=False,
             ),
             "dashboard_secret_key": SecretConfig(
                 key="dashboard_secret_key",
-                secret_name="carbon-finops/dashboard-secret",
+                secret_name="carbon-finops/dashboard-secret",  # nosec B106
                 env_var="DASHBOARD_SECRET_KEY",
                 default="dev-secret-key-change-in-production",
                 required=True,
@@ -144,11 +145,12 @@ class SecretsManager(LoggerMixin):
             try:
                 secrets = json.loads(secret_data)
                 if isinstance(secrets, dict):
-                    return secrets.get(key)
+                    value = secrets.get(key)
+                    return str(value) if value is not None else None
                 return secret_data if key in secret_name else None
             except json.JSONDecodeError:
                 # Plain text secret
-                return secret_data
+                return str(secret_data) if secret_data else None
 
         except Exception as e:
             self.logger.warning(f"Failed to retrieve secret '{secret_name}' from AWS: {e}")

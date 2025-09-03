@@ -49,7 +49,8 @@ class TestCarbonAPIClient:
         mock_get.assert_called_with(
             'https://api.electricitymap.org/v3/carbon-intensity/latest',
             headers={'auth-token': 'test-key'},
-            params={'zone': 'DE'}
+            params={'zone': 'DE'},
+            timeout=30
         )
     
     @patch('requests.get')

@@ -152,7 +152,8 @@ class RightSizingAnalyzer:
         try:
             response = self.ec2.describe_instances(InstanceIds=[instance_id])
             if response["Reservations"]:
-                return response["Reservations"][0]["Instances"][0]
+                instance_data = response["Reservations"][0]["Instances"][0]
+                return dict(instance_data) if instance_data else None
         except Exception as e:
             logger.error(f"Error getting instance details: {e}")
         return None

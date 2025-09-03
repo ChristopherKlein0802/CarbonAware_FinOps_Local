@@ -50,9 +50,9 @@ class CarbonConfig:
             }
 
         # Load API keys from secrets manager (lazy loading)
-        self._electricitymap_api_key = None
-        self._watttime_username = None
-        self._watttime_password = None
+        self._electricitymap_api_key: Optional[str] = None
+        self._watttime_username: Optional[str] = None
+        self._watttime_password: Optional[str] = None
 
     @property
     def electricitymap_api_key(self) -> Optional[str]:
@@ -60,7 +60,8 @@ class CarbonConfig:
         if self._electricitymap_api_key is None:
             from src.utils.secrets_manager import get_secret
 
-            self._electricitymap_api_key = get_secret("electricitymap_api_key")
+            secret_value = get_secret("electricitymap_api_key")
+            self._electricitymap_api_key = str(secret_value) if secret_value else None
         return self._electricitymap_api_key
 
     @property
@@ -69,7 +70,8 @@ class CarbonConfig:
         if self._watttime_username is None:
             from src.utils.secrets_manager import get_secret
 
-            self._watttime_username = get_secret("watttime_username")
+            secret_value = get_secret("watttime_username")
+            self._watttime_username = str(secret_value) if secret_value else None
         return self._watttime_username
 
     @property
@@ -78,7 +80,8 @@ class CarbonConfig:
         if self._watttime_password is None:
             from src.utils.secrets_manager import get_secret
 
-            self._watttime_password = get_secret("watttime_password")
+            secret_value = get_secret("watttime_password")
+            self._watttime_password = str(secret_value) if secret_value else None
         return self._watttime_password
 
 
