@@ -5,6 +5,7 @@ Supports multiple providers: WattTime, electricityMap
 
 import os
 import requests
+import math
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
 from typing import List, Optional, Union
@@ -12,6 +13,39 @@ import logging
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
+
+# AWS region to API provider zone mappings
+REGION_MAPPINGS = {
+    "eu-central-1": "DE",       # Germany
+    "eu-west-1": "IE",         # Ireland
+    "eu-west-2": "GB",         # United Kingdom
+    "eu-west-3": "FR",         # France
+    "eu-north-1": "SE",        # Sweden
+    "us-east-1": "US-NE-ISO",  # US East (ElectricityMap) / PJM_NJ (WattTime)
+    "us-west-2": "US-NW-PACW"  # US West (ElectricityMap) / CAISO (WattTime)
+}
+
+# WattTime specific mappings (override for different balancing authorities)
+WATTTIME_REGION_MAPPINGS = {
+    "eu-central-1": "DE",
+    "eu-west-1": "IE",
+    "eu-west-2": "GB",
+    "eu-west-3": "FR",
+    "eu-north-1": "SE",
+    "us-east-1": "PJM_NJ",
+    "us-west-2": "CAISO"
+}
+
+# Average carbon intensities by region (gCO2/kWh)
+FALLBACK_CARBON_VALUES = {
+    "eu-central-1": 380,    # Germany
+    "eu-west-1": 300,      # Ireland
+    "eu-west-2": 250,      # UK
+    "eu-west-3": 90,       # France (nuclear)
+    "eu-north-1": 40,      # Sweden (hydro)
+    "us-east-1": 450,      # US East
+    "us-west-2": 350,      # US West
+}
 
 
 def parse_iso_datetime(datetime_str: str) -> datetime:
@@ -94,19 +128,7 @@ class WattTimeClient(CarbonAPIClient):
             return self._get_fallback_intensity(region)
 
         headers = {"Authorization": f"Bearer {self.token}"}
-
-        # Map AWS regions to WattTime balancing authorities
-        region_mapping = {
-            "eu-central-1": "DE",  # Germany
-            "eu-west-1": "IE",  # Ireland
-            "eu-west-2": "GB",  # United Kingdom
-            "eu-west-3": "FR",  # France
-            "eu-north-1": "SE",  # Sweden
-            "us-east-1": "PJM_NJ",  # US East
-            "us-west-2": "CAISO",  # California
-        }
-
-        ba = region_mapping.get(region, "DE")
+        ba = WATTTIME_REGION_MAPPINGS.get(region, "DE")
 
         try:
             response = requests.get(f"{self.BASE_URL}/data", headers=headers, params={"ba": ba})
@@ -127,19 +149,7 @@ class WattTimeClient(CarbonAPIClient):
             return self._get_fallback_forecast(region, hours)
 
         headers = {"Authorization": f"Bearer {self.token}"}
-
-        # Map AWS regions to WattTime balancing authorities
-        region_mapping = {
-            "eu-central-1": "DE",
-            "eu-west-1": "IE",
-            "eu-west-2": "GB",
-            "eu-west-3": "FR",
-            "eu-north-1": "SE",
-            "us-east-1": "PJM_NJ",
-            "us-west-2": "CAISO",
-        }
-
-        ba = region_mapping.get(region, "DE")
+        ba = WATTTIME_REGION_MAPPINGS.get(region, "DE")
 
         try:
             response = requests.get(
@@ -167,19 +177,8 @@ class WattTimeClient(CarbonAPIClient):
 
     def _get_fallback_intensity(self, region: str) -> CarbonIntensity:
         """Get fallback intensity when API fails."""
-        # Average carbon intensities by region (gCO2/kWh)
-        fallback_values = {
-            "eu-central-1": 380,  # Germany
-            "eu-west-1": 300,  # Ireland
-            "eu-west-2": 250,  # UK
-            "eu-west-3": 90,  # France (nuclear)
-            "eu-north-1": 40,  # Sweden (hydro)
-            "us-east-1onnex": 450,  # US East
-            "us-west-2": 350,  # US West
-        }
-
         return CarbonIntensity(
-            value=fallback_values.get(region, 475), timestamp=datetime.now(), region=region, source="fallback"
+            value=FALLBACK_CARBON_VALUES.get(region, 475), timestamp=datetime.now(), region=region, source="fallback"
         )
 
     def _get_fallback_forecast(self, region: str, hours: int) -> List[CarbonIntensity]:
@@ -189,8 +188,6 @@ class WattTimeClient(CarbonAPIClient):
 
         for hour in range(hours):
             # Simple sine wave pattern to simulate daily variation
-            import math
-
             variation = math.sin((hour / 24) * 2 * math.pi) * 50
 
             forecasts.append(
@@ -220,19 +217,7 @@ class ElectricityMapClient(CarbonAPIClient):
             return self._get_fallback_intensity(region)
 
         headers = {"auth-token": self.api_key}
-
-        # Map AWS regions to electricityMap zones
-        zone_mapping = {
-            "eu-central-1": "DE",  # Germany
-            "eu-west-1": "IE",  # Ireland
-            "eu-west-2": "GB",  # United Kingdom
-            "eu-west-3": "FR",  # France
-            "eu-north-1": "SE",  # Sweden
-            "us-east-1": "US-NE-ISO",  # New England
-            "us-west-2": "US-NW-PACW",  # Pacific Northwest
-        }
-
-        zone = zone_mapping.get(region, "DE")
+        zone = REGION_MAPPINGS.get(region, "DE")
 
         try:
             response = requests.get(f"{self.BASE_URL}/carbon-intensity/latest", headers=headers, params={"zone": zone})
@@ -256,19 +241,7 @@ class ElectricityMapClient(CarbonAPIClient):
             return self._get_fallback_forecast(region, hours)
 
         headers = {"auth-token": self.api_key}
-
-        # Map AWS regions to electricityMap zones
-        zone_mapping = {
-            "eu-central-1": "DE",
-            "eu-west-1": "IE",
-            "eu-west-2": "GB",
-            "eu-west-3": "FR",
-            "eu-north-1": "SE",
-            "us-east-1": "US-NE-ISO",
-            "us-west-2": "US-NW-PACW",
-        }
-
-        zone = zone_mapping.get(region, "DE")
+        zone = REGION_MAPPINGS.get(region, "DE")
 
         try:
             # ElectricityMap forecast endpoint
@@ -297,19 +270,8 @@ class ElectricityMapClient(CarbonAPIClient):
 
     def _get_fallback_intensity(self, region: str) -> CarbonIntensity:
         """Get fallback intensity when API fails."""
-        # Average carbon intensities by region (gCO2/kWh)
-        fallback_values = {
-            "eu-central-1": 380,  # Germany
-            "eu-west-1": 300,  # Ireland
-            "eu-west-2": 250,  # UK
-            "eu-west-3": 90,  # France (nuclear)
-            "eu-north-1": 40,  # Sweden (hydro)
-            "us-east-1": 450,  # US East
-            "us-west-2": 350,  # US West
-        }
-
         return CarbonIntensity(
-            value=fallback_values.get(region, 475), timestamp=datetime.now(), region=region, source="fallback"
+            value=FALLBACK_CARBON_VALUES.get(region, 475), timestamp=datetime.now(), region=region, source="fallback"
         )
 
     def _get_fallback_forecast(self, region: str, hours: int) -> List[CarbonIntensity]:
@@ -319,8 +281,6 @@ class ElectricityMapClient(CarbonAPIClient):
 
         for hour in range(hours):
             # Simple sine wave pattern to simulate daily variation
-            import math
-
             # Peak during day (hour 12), low at night (hour 0 and 24)
             variation = math.sin((hour - 6) / 24 * 2 * math.pi) * 50
 

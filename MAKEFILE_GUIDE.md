@@ -9,7 +9,7 @@ This guide provides complete documentation for all Makefile commands in your Car
 | **Getting Started** | `make setup` | Complete project setup (run this first!) |
 | | `make dev` | Setup development environment |
 | | `make fresh-start` | Complete reset + setup + deploy + run (testing) |
-| **Development** | `make test` | Run all tests and quality checks |
+| **Development** | `make test` | Run comprehensive tests and quality checks |
 | | `make clean` | Clean temporary files and caches |
 | | `make reset` | Complete project cleanup (⚠️ removes everything!) |
 | **Deployment** | `make deploy` | Deploy complete infrastructure to AWS |
@@ -17,7 +17,7 @@ This guide provides complete documentation for all Makefile commands in your Car
 | | `make plan` | Show Terraform deployment plan |
 | **Operations** | `make run` | Run the complete carbon-aware system |
 | | `make dashboard` | Launch real-time dashboard |
-| | `make status` | Show system and infrastructure status |
+| | `make status` | Show comprehensive system status |
 | **Advanced** | `make baseline` | Collect AWS baseline data |
 | | `make scheduler` | Run carbon-aware scheduler once |
 | | `make rightsizing` | Run rightsizing analysis |
@@ -384,7 +384,7 @@ make setup  # Creates new virtual environment
 
 **"AWS connectivity failed"**
 ```bash
-aws configure --profile carbon-finops-sandbox
+aws sso login --sso-session carbon-finops-sandbox
 ```
 
 **"Terraform initialization failed"**

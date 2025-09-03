@@ -388,7 +388,7 @@ class CarbonFinOpsDashboard(LoggerMixin):
                 recommendations_table,
                 status_fig,
             )
-        
+
         # Register the callback with Dash
         self.app.callback(
             [
@@ -716,7 +716,7 @@ class CarbonFinOpsDashboard(LoggerMixin):
                 for key, value in record.items():
                     table_record[str(key)] = str(value) if value is not None else ""
                 table_data.append(table_record)
-            
+
             # Type ignore for Dash DataTable style properties that aren't properly typed
             return dash_table.DataTable(
                 data=table_data,  # type: ignore
