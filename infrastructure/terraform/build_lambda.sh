@@ -33,7 +33,7 @@ echo -e "${YELLOW}📦 Building Lambda Layer (dependencies)...${NC}"
 LAYER_DIR="$BUILD_DIR/lambda_layer"
 mkdir -p $LAYER_DIR/python
 
-# Install only essential packages for Lambda (smaller size)
+# Install required packages for Lambda (lightweight)
 pip install --target $LAYER_DIR/python \
     boto3 \
     botocore \

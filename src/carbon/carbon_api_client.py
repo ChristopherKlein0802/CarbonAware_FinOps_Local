@@ -100,8 +100,24 @@ class WattTimeClient(CarbonAPIClient):
     BASE_URL = "https://api2.watttime.org/v2"
 
     def __init__(self, username: Optional[str] = None, password: Optional[str] = None):
-        self.username = username or os.getenv("WATTTIME_USERNAME")
-        self.password = password or os.getenv("WATTTIME_PASSWORD")
+        if username and password:
+            self.username = username
+            self.password = password
+        else:
+            # Try environment variables first, then secrets manager
+            self.username = username or os.getenv("WATTTIME_USERNAME")
+            self.password = password or os.getenv("WATTTIME_PASSWORD")
+            
+            if not self.username or not self.password:
+                try:
+                    from ..utils.secrets_manager import get_secrets_manager
+                    aws_profile = os.getenv("AWS_PROFILE")
+                    manager = get_secrets_manager(aws_profile)
+                    self.username = self.username or manager.get_secret("watttime_username")
+                    self.password = self.password or manager.get_secret("watttime_password")
+                except Exception as e:
+                    logger.debug(f"Could not retrieve WattTime credentials from secrets manager: {e}")
+        
         self.token = None
         if self.username and self.password:
             self._authenticate()
@@ -208,7 +224,20 @@ class ElectricityMapClient(CarbonAPIClient):
     BASE_URL = "https://api.electricitymap.org/v3"
 
     def __init__(self, api_key: Optional[str] = None):
-        self.api_key = api_key or os.getenv("ELECTRICITYMAP_API_KEY")
+        if api_key:
+            self.api_key = api_key
+        else:
+            # Try environment variable first, then secrets manager
+            self.api_key = os.getenv("ELECTRICITYMAP_API_KEY")
+            if not self.api_key:
+                try:
+                    from ..utils.secrets_manager import get_secrets_manager
+                    aws_profile = os.getenv("AWS_PROFILE")
+                    manager = get_secrets_manager(aws_profile)
+                    self.api_key = manager.get_secret("electricitymap_api_key")
+                except Exception as e:
+                    logger.debug(f"Could not retrieve API key from secrets manager: {e}")
+                    self.api_key = None
 
     def get_current_intensity(self, region: str) -> CarbonIntensity:
         """Get current carbon intensity from electricityMap."""

@@ -1,120 +1,120 @@
 {
   "metadata": {
-    "start_date": "2025-08-25T17:25:07.398830",
-    "end_date": "2025-09-01T17:25:07.398830",
+    "start_date": "2025-08-27T14:07:32.548449",
+    "end_date": "2025-09-03T14:07:32.548449",
     "region": "eu-central-1",
     "instance_count": 8,
     "total_days": 7
   },
   "instances": [
     {
-      "instance_id": "i-00f557195a35635d9",
+      "instance_id": "i-0d7683d6135d39287",
       "instance_type": "t3.micro",
-      "state": "running",
-      "launch_time": "2025-09-01 15:18:18+00:00",
+      "state": "stopped",
+      "launch_time": "2025-09-03 11:56:10+00:00",
       "tags": {
-        "ManagedBy": "Terraform",
-        "Environment": "development",
-        "Name": "carbon-aware-finops-db-server",
-        "Schedule": "Extended Development Hours",
-        "Project": "carbon-aware-finops"
-      }
-    },
-    {
-      "instance_id": "i-0a10970987b0ffb31",
-      "instance_type": "t3.micro",
-      "state": "running",
-      "launch_time": "2025-09-01 15:18:18+00:00",
-      "tags": {
-        "Environment": "development",
         "Project": "carbon-aware-finops",
-        "Name": "carbon-aware-finops-instance-4",
-        "Owner": "carbon-aware-finops",
+        "Name": "carbon-aware-finops-batch-server",
+        "Environment": "development",
+        "Schedule": "Carbon-Aware 24/7",
         "ManagedBy": "Terraform"
       }
     },
     {
-      "instance_id": "i-04532b8a999ed9f8c",
+      "instance_id": "i-0d9ddf2b47f76755b",
       "instance_type": "t3.micro",
       "state": "running",
-      "launch_time": "2025-09-01 15:18:18+00:00",
+      "launch_time": "2025-09-03 11:56:10+00:00",
+      "tags": {
+        "ManagedBy": "Terraform",
+        "Owner": "carbon-aware-finops",
+        "Environment": "development",
+        "Project": "carbon-aware-finops",
+        "Name": "carbon-aware-finops-instance-4"
+      }
+    },
+    {
+      "instance_id": "i-019d0f56fdc947b11",
+      "instance_type": "t3.micro",
+      "state": "running",
+      "launch_time": "2025-09-03 11:56:10+00:00",
       "tags": {
         "Project": "carbon-aware-finops",
-        "ManagedBy": "Terraform",
         "Environment": "development",
-        "Name": "carbon-aware-finops-instance-1",
+        "Name": "carbon-aware-finops-instance-2",
+        "ManagedBy": "Terraform",
         "Owner": "carbon-aware-finops"
       }
     },
     {
-      "instance_id": "i-007f8bdd5a6c480b7",
+      "instance_id": "i-0b6f823a24728b331",
       "instance_type": "t3.micro",
       "state": "running",
-      "launch_time": "2025-09-01 15:18:18+00:00",
+      "launch_time": "2025-09-03 11:56:10+00:00",
+      "tags": {
+        "Environment": "development",
+        "Owner": "carbon-aware-finops",
+        "ManagedBy": "Terraform",
+        "Project": "carbon-aware-finops",
+        "Name": "carbon-aware-finops-instance-1"
+      }
+    },
+    {
+      "instance_id": "i-0e20297e3e2b8711a",
+      "instance_type": "t3.micro",
+      "state": "running",
+      "launch_time": "2025-09-03 11:56:10+00:00",
       "tags": {
         "ManagedBy": "Terraform",
-        "Owner": "carbon-aware-finops",
-        "Environment": "development",
-        "Project": "carbon-aware-finops",
-        "Name": "carbon-aware-finops-instance-2"
-      }
-    },
-    {
-      "instance_id": "i-093652e5e112445c4",
-      "instance_type": "t3.micro",
-      "state": "running",
-      "launch_time": "2025-09-01 15:18:18+00:00",
-      "tags": {
-        "Project": "carbon-aware-finops",
-        "Environment": "development",
-        "Name": "carbon-aware-finops-instance-3",
-        "Owner": "carbon-aware-finops",
-        "ManagedBy": "Terraform"
-      }
-    },
-    {
-      "instance_id": "i-056605a69fd3c4ed4",
-      "instance_type": "t3.micro",
-      "state": "running",
-      "launch_time": "2025-09-01 15:18:18+00:00",
-      "tags": {
-        "Schedule": "Office Hours + Weekend Shutdown",
-        "Project": "carbon-aware-finops",
         "Name": "carbon-aware-finops-app-server",
-        "Environment": "development",
-        "ManagedBy": "Terraform"
-      }
-    },
-    {
-      "instance_id": "i-073ff28b323b11ff2",
-      "instance_type": "t3.micro",
-      "state": "stopped",
-      "launch_time": "2025-09-01 15:18:18+00:00",
-      "tags": {
         "Project": "carbon-aware-finops",
-        "Name": "carbon-aware-finops-batch-server",
-        "ManagedBy": "Terraform",
-        "Environment": "development",
-        "Schedule": "Carbon-Aware 24/7"
+        "Schedule": "Office Hours + Weekend Shutdown",
+        "Environment": "development"
       }
     },
     {
-      "instance_id": "i-0f26c8e2304fddf6e",
+      "instance_id": "i-096c31b79d066c938",
       "instance_type": "t3.micro",
       "state": "running",
-      "launch_time": "2025-09-01 15:18:18+00:00",
+      "launch_time": "2025-09-03 11:56:10+00:00",
       "tags": {
+        "Project": "carbon-aware-finops",
+        "ManagedBy": "Terraform",
+        "Environment": "development",
+        "Name": "carbon-aware-finops-web-server",
+        "Schedule": "24/7 Always Running"
+      }
+    },
+    {
+      "instance_id": "i-03ef73a81d912941a",
+      "instance_type": "t3.micro",
+      "state": "running",
+      "launch_time": "2025-09-03 11:56:10+00:00",
+      "tags": {
+        "Environment": "development",
+        "Owner": "carbon-aware-finops",
         "ManagedBy": "Terraform",
         "Project": "carbon-aware-finops",
-        "Name": "carbon-aware-finops-web-server",
-        "Schedule": "24/7 Always Running",
+        "Name": "carbon-aware-finops-instance-3"
+      }
+    },
+    {
+      "instance_id": "i-0369cb41b16e05e05",
+      "instance_type": "t3.micro",
+      "state": "running",
+      "launch_time": "2025-09-03 11:56:10+00:00",
+      "tags": {
+        "Project": "carbon-aware-finops",
+        "Schedule": "Extended Development Hours",
+        "ManagedBy": "Terraform",
+        "Name": "carbon-aware-finops-db-server",
         "Environment": "development"
       }
     }
   ],
   "cost_summary": {
-    "total_cost": 0,
-    "average_daily_cost": 0
+    "total_cost": 2.44553e-05,
+    "average_daily_cost": 2.44553e-05
   },
   "carbon_summary": {
     "average_intensity": 380.0,

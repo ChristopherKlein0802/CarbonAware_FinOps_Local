@@ -192,13 +192,13 @@ class SecretsManager(LoggerMixin):
 
     def create_aws_secrets(self, secrets: Dict[str, str]) -> bool:
         """
-        Create secrets in AWS Secrets Manager.
+        Create or update secrets in AWS Secrets Manager.
 
         Args:
             secrets: Dictionary of secret_name -> secret_value
 
         Returns:
-            True if all secrets were created successfully
+            True if all secrets were created or updated successfully
         """
         if not self._aws_session:
             self.logger.error("AWS session not available for creating secrets")
@@ -209,6 +209,7 @@ class SecretsManager(LoggerMixin):
 
         for secret_name, secret_value in secrets.items():
             try:
+                # Try to create the secret first
                 response = safe_aws_call(
                     client.create_secret,
                     Name=secret_name,
@@ -220,10 +221,38 @@ class SecretsManager(LoggerMixin):
                     self.logger.info(f"Created secret: {secret_name}")
                     success_count += 1
                 else:
-                    self.logger.error(f"Failed to create secret: {secret_name}")
+                    # If creation failed, try to update existing secret
+                    self.logger.info(f"Secret '{secret_name}' may already exist, attempting to update...")
+                    update_response = safe_aws_call(
+                        client.update_secret,
+                        SecretId=secret_name,
+                        SecretString=secret_value,
+                    )
+                    
+                    if update_response:
+                        self.logger.info(f"Updated existing secret: {secret_name}")
+                        success_count += 1
+                    else:
+                        self.logger.error(f"Failed to create or update secret: {secret_name}")
 
             except Exception as e:
-                self.logger.error(f"Error creating secret '{secret_name}': {e}")
+                # Try to update if create failed
+                self.logger.warning(f"Create failed for '{secret_name}': {e}. Attempting update...")
+                try:
+                    update_response = safe_aws_call(
+                        client.update_secret,
+                        SecretId=secret_name,
+                        SecretString=secret_value,
+                    )
+                    
+                    if update_response:
+                        self.logger.info(f"Updated existing secret: {secret_name}")
+                        success_count += 1
+                    else:
+                        self.logger.error(f"Failed to update secret: {secret_name}")
+                        
+                except Exception as update_e:
+                    self.logger.error(f"Failed to create or update secret '{secret_name}': {update_e}")
 
         return success_count == len(secrets)
 

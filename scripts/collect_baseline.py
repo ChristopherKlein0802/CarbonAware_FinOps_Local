@@ -33,7 +33,7 @@ def collect_baseline(days: int, region: str, output: str, profile: str):
         session = boto3.Session(profile_name=profile)
         ec2 = session.client('ec2', region_name=region)
         carbon_client = CarbonIntensityClient()
-        cost_client = AWSCostClient(region)
+        cost_client = AWSCostClient(region, session)
         
         logger.info("AWS clients initialized successfully")
     except Exception as e:
