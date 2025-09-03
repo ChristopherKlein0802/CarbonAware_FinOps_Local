@@ -44,7 +44,33 @@ data "aws_ami" "amazon_linux" {
   }
 }
 
-# EC2 Instances
+# Descriptive names and purposes for research instances
+locals {
+  instance_configs = [
+    {
+      name        = "research-baseline"
+      purpose     = "Baseline workload for cost analysis"
+      description = "Standard instance for establishing baseline costs and performance metrics"
+    },
+    {
+      name        = "research-variable"
+      purpose     = "Variable workload testing"
+      description = "Instance with varying CPU/memory usage patterns for rightsizing analysis"
+    },
+    {
+      name        = "research-peak"
+      purpose     = "Peak usage simulation"
+      description = "High-utilization instance to test optimization recommendations"
+    },
+    {
+      name        = "research-idle"
+      purpose     = "Idle resource detection"
+      description = "Low-utilization instance to demonstrate cost optimization opportunities"
+    }
+  ]
+}
+
+# EC2 Instances with descriptive purposes
 resource "aws_instance" "test" {
   count = var.instance_count
 
@@ -78,7 +104,10 @@ resource "aws_instance" "test" {
   tags = merge(
     var.tags,
     {
-      Name = format("%s-%d", lookup(var.tags, "Name", "instance"), count.index + 1)
+      Name = "${lookup(var.tags, "Name", "instance")}-${local.instance_configs[count.index].name}"
+      Purpose = local.instance_configs[count.index].purpose
+      Description = local.instance_configs[count.index].description
+      InstanceRole = "Research"
     }
   )
 }

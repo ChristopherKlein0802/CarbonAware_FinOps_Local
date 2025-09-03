@@ -349,13 +349,29 @@ module "test_instances" {
   }
 }
 
-# Create instances with different schedules
+# Create instances with different scheduling patterns for demonstration
 resource "aws_instance" "scheduled_instances" {
   for_each = {
-    "web-server"    = "24/7 Always Running"
-    "app-server"    = "Office Hours + Weekend Shutdown"
-    "db-server"     = "Extended Development Hours"
-    "batch-server"  = "Carbon-Aware 24/7"
+    "web-server" = {
+      schedule    = "24/7 Always Running"
+      purpose     = "Production web server"
+      description = "Always-on web server demonstrating 24/7 operational requirements"
+    }
+    "app-server" = {
+      schedule    = "Office Hours + Weekend Shutdown"
+      purpose     = "Application server with time-based scheduling"
+      description = "Business application server with office hours scheduling pattern"
+    }
+    "db-server" = {
+      schedule    = "Extended Development Hours"
+      purpose     = "Database server for development"
+      description = "Development database with extended hours for global team collaboration"
+    }
+    "batch-server" = {
+      schedule    = "Carbon-Aware 24/7"
+      purpose     = "Carbon-aware batch processing"
+      description = "Batch processing server that responds to carbon intensity levels"
+    }
   }
 
   ami                    = data.aws_ami.amazon_linux.id
@@ -366,10 +382,13 @@ resource "aws_instance" "scheduled_instances" {
   monitoring             = true
 
   tags = {
-    Name        = "${var.project_name}-${each.key}"
-    Project     = var.project_name
-    Environment = var.environment
-    Schedule    = each.value
+    Name         = "${var.project_name}-${each.key}"
+    Project      = var.project_name
+    Environment  = var.environment
+    Schedule     = each.value.schedule
+    Purpose      = each.value.purpose
+    Description  = each.value.description
+    InstanceRole = "Scheduled"
   }
 }
 
