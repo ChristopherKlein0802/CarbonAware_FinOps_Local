@@ -8,7 +8,7 @@ import requests
 import math
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Dict, Any, Tuple
 import logging
 from dataclasses import dataclass
 
@@ -45,6 +45,48 @@ FALLBACK_CARBON_VALUES = {
     "eu-north-1": 40,      # Sweden (hydro)
     "us-east-1": 450,      # US East
     "us-west-2": 350,      # US West
+}
+
+# EC2 Instance Power Consumption Estimates (Watts)
+# Based on research studies and CPU/memory specifications
+EC2_POWER_CONSUMPTION = {
+    # T3 instances (Burstable Performance)
+    "t3.nano": 1.5,      # 2 vCPU, 0.5 GiB RAM
+    "t3.micro": 2.5,     # 2 vCPU, 1 GiB RAM
+    "t3.small": 5.0,     # 2 vCPU, 2 GiB RAM
+    "t3.medium": 10.0,   # 2 vCPU, 4 GiB RAM
+    "t3.large": 20.0,    # 2 vCPU, 8 GiB RAM
+    "t3.xlarge": 40.0,   # 4 vCPU, 16 GiB RAM
+    "t3.2xlarge": 80.0,  # 8 vCPU, 32 GiB RAM
+    
+    # M5 instances (General Purpose)
+    "m5.large": 25.0,    # 2 vCPU, 8 GiB RAM
+    "m5.xlarge": 50.0,   # 4 vCPU, 16 GiB RAM
+    "m5.2xlarge": 100.0, # 8 vCPU, 32 GiB RAM
+    "m5.4xlarge": 200.0, # 16 vCPU, 64 GiB RAM
+    
+    # C5 instances (Compute Optimized)
+    "c5.large": 30.0,    # 2 vCPU, 4 GiB RAM
+    "c5.xlarge": 60.0,   # 4 vCPU, 8 GiB RAM
+    "c5.2xlarge": 120.0, # 8 vCPU, 16 GiB RAM
+    "c5.4xlarge": 240.0, # 16 vCPU, 32 GiB RAM
+    
+    # R5 instances (Memory Optimized)
+    "r5.large": 35.0,    # 2 vCPU, 16 GiB RAM
+    "r5.xlarge": 70.0,   # 4 vCPU, 32 GiB RAM
+    "r5.2xlarge": 140.0, # 8 vCPU, 64 GiB RAM
+}
+
+# CPU Utilization factors for realistic power consumption
+# T3 instances have baseline performance levels
+T3_CPU_BASELINE_UTILIZATION = {
+    "t3.nano": 0.05,     # 5% baseline
+    "t3.micro": 0.10,    # 10% baseline  
+    "t3.small": 0.20,    # 20% baseline
+    "t3.medium": 0.20,   # 20% baseline
+    "t3.large": 0.30,    # 30% baseline
+    "t3.xlarge": 0.40,   # 40% baseline
+    "t3.2xlarge": 0.54,  # 54% baseline
 }
 
 
@@ -404,3 +446,199 @@ class CarbonIntensityClient:
             logger.error(f"Failed to check if should run: {e}")
             # Default to running if we can't determine
             return True
+
+
+@dataclass
+class InstanceEnergyData:
+    """Complete energy and carbon data for an EC2 instance"""
+    instance_id: str
+    instance_type: str
+    power_consumption_watts: float
+    energy_consumption_kwh: float
+    carbon_emissions_grams: float
+    carbon_emissions_kg: float
+    carbon_intensity_gco2_kwh: float
+    runtime_hours: float
+    cost_usd: float
+    region: str
+    timestamp: datetime
+
+
+class EC2EnergyCalculator:
+    """Calculate energy consumption and carbon emissions for EC2 instances"""
+    
+    def __init__(self, carbon_client: Optional[CarbonIntensityClient] = None):
+        self.carbon_client = carbon_client or CarbonIntensityClient()
+    
+    def get_instance_power_consumption(self, instance_type: str, cpu_utilization: Optional[float] = None) -> float:
+        """Get power consumption for instance type in watts"""
+        
+        base_power = EC2_POWER_CONSUMPTION.get(instance_type, 10.0)
+        
+        # Apply CPU utilization factor for T3 instances if provided
+        if cpu_utilization is not None and instance_type.startswith('t3.'):
+            baseline_utilization = T3_CPU_BASELINE_UTILIZATION.get(instance_type, 0.2)
+            
+            # Power scales with utilization above baseline
+            if cpu_utilization > baseline_utilization:
+                utilization_factor = 1.0 + (cpu_utilization - baseline_utilization) * 2
+                return base_power * utilization_factor
+            else:
+                return base_power * 0.7  # Idle power is lower
+        
+        return base_power
+    
+    def calculate_energy_consumption(self, instance_type: str, runtime_hours: float, 
+                                   cpu_utilization: Optional[float] = None) -> float:
+        """Calculate energy consumption in kWh"""
+        
+        power_watts = self.get_instance_power_consumption(instance_type, cpu_utilization)
+        energy_kwh = (power_watts * runtime_hours) / 1000  # Convert watts*hours to kWh
+        
+        return energy_kwh
+    
+    def calculate_carbon_emissions(self, energy_kwh: float, carbon_intensity: float) -> Tuple[float, float]:
+        """Calculate carbon emissions in grams and kg"""
+        
+        emissions_grams = energy_kwh * carbon_intensity
+        emissions_kg = emissions_grams / 1000
+        
+        return emissions_grams, emissions_kg
+    
+    def get_complete_instance_analysis(self, instance_id: str, instance_type: str, 
+                                     runtime_hours: float, region: str,
+                                     cost_usd: Optional[float] = None,
+                                     cpu_utilization: Optional[float] = None) -> InstanceEnergyData:
+        """Get complete energy and carbon analysis for an instance"""
+        
+        # Get current carbon intensity
+        carbon_intensity = self.carbon_client.get_current_intensity(region)
+        
+        # Calculate power consumption
+        power_watts = self.get_instance_power_consumption(instance_type, cpu_utilization)
+        
+        # Calculate energy consumption
+        energy_kwh = self.calculate_energy_consumption(instance_type, runtime_hours, cpu_utilization)
+        
+        # Calculate carbon emissions
+        emissions_grams, emissions_kg = self.calculate_carbon_emissions(energy_kwh, carbon_intensity)
+        
+        # Estimate cost if not provided
+        if cost_usd is None:
+            # Rough AWS pricing estimates per hour
+            pricing = {
+                't3.micro': 0.0104, 't3.small': 0.0208, 't3.medium': 0.0416,
+                't3.large': 0.0832, 't3.xlarge': 0.1664, 't3.2xlarge': 0.3328
+            }
+            hourly_rate = pricing.get(instance_type, 0.05)
+            cost_usd = runtime_hours * hourly_rate
+        
+        return InstanceEnergyData(
+            instance_id=instance_id,
+            instance_type=instance_type,
+            power_consumption_watts=power_watts,
+            energy_consumption_kwh=energy_kwh,
+            carbon_emissions_grams=emissions_grams,
+            carbon_emissions_kg=emissions_kg,
+            carbon_intensity_gco2_kwh=carbon_intensity,
+            runtime_hours=runtime_hours,
+            cost_usd=cost_usd,
+            region=region,
+            timestamp=datetime.now()
+        )
+    
+    def compare_carbon_apis(self, region: str) -> Dict[str, Any]:
+        """Compare carbon intensity from different APIs"""
+        
+        comparison = {
+            'region': region,
+            'timestamp': datetime.now().isoformat(),
+            'apis': {}
+        }
+        
+        # ElectricityMap
+        try:
+            electricitymap_intensity = self.carbon_client.get_current_intensity(region)
+            comparison['apis']['electricitymap'] = {
+                'intensity_gco2_kwh': electricitymap_intensity,
+                'status': 'success',
+                'source': 'electricitymap'
+            }
+        except Exception as e:
+            comparison['apis']['electricitymap'] = {
+                'intensity_gco2_kwh': None,
+                'status': 'failed',
+                'error': str(e)
+            }
+        
+        # WattTime (if available)
+        try:
+            watttime_client = WattTimeClient()
+            watttime_intensity = watttime_client.get_current_intensity(region)
+            comparison['apis']['watttime'] = {
+                'intensity_gco2_kwh': watttime_intensity,
+                'status': 'success',
+                'source': 'watttime'
+            }
+        except Exception as e:
+            comparison['apis']['watttime'] = {
+                'intensity_gco2_kwh': None,
+                'status': 'failed', 
+                'error': str(e)
+            }
+        
+        # Fallback
+        fallback_intensity = FALLBACK_CARBON_VALUES.get(region, 300)
+        comparison['apis']['fallback'] = {
+            'intensity_gco2_kwh': fallback_intensity,
+            'status': 'success',
+            'source': 'fallback'
+        }
+        
+        # Calculate differences
+        valid_values = [api['intensity_gco2_kwh'] for api in comparison['apis'].values() 
+                       if api['intensity_gco2_kwh'] is not None]
+        
+        if len(valid_values) > 1:
+            comparison['analysis'] = {
+                'min_intensity': min(valid_values),
+                'max_intensity': max(valid_values),
+                'average_intensity': sum(valid_values) / len(valid_values),
+                'variance': max(valid_values) - min(valid_values),
+                'variance_percentage': ((max(valid_values) - min(valid_values)) / min(valid_values)) * 100
+            }
+        
+        return comparison
+    
+    def calculate_optimization_savings(self, baseline_data: InstanceEnergyData, 
+                                     optimized_data: InstanceEnergyData) -> Dict[str, Any]:
+        """Calculate savings from optimization"""
+        
+        cost_savings = baseline_data.cost_usd - optimized_data.cost_usd
+        carbon_savings = baseline_data.carbon_emissions_kg - optimized_data.carbon_emissions_kg
+        energy_savings = baseline_data.energy_consumption_kwh - optimized_data.energy_consumption_kwh
+        
+        cost_savings_pct = (cost_savings / baseline_data.cost_usd) * 100 if baseline_data.cost_usd > 0 else 0
+        carbon_savings_pct = (carbon_savings / baseline_data.carbon_emissions_kg) * 100 if baseline_data.carbon_emissions_kg > 0 else 0
+        energy_savings_pct = (energy_savings / baseline_data.energy_consumption_kwh) * 100 if baseline_data.energy_consumption_kwh > 0 else 0
+        
+        return {
+            'cost_savings_usd': round(cost_savings, 4),
+            'carbon_savings_kg': round(carbon_savings, 4),
+            'energy_savings_kwh': round(energy_savings, 4),
+            'cost_savings_percentage': round(cost_savings_pct, 2),
+            'carbon_savings_percentage': round(carbon_savings_pct, 2),
+            'energy_savings_percentage': round(energy_savings_pct, 2),
+            'baseline': {
+                'cost_usd': baseline_data.cost_usd,
+                'carbon_kg': baseline_data.carbon_emissions_kg,
+                'energy_kwh': baseline_data.energy_consumption_kwh,
+                'runtime_hours': baseline_data.runtime_hours
+            },
+            'optimized': {
+                'cost_usd': optimized_data.cost_usd,
+                'carbon_kg': optimized_data.carbon_emissions_kg,
+                'energy_kwh': optimized_data.energy_consumption_kwh,
+                'runtime_hours': optimized_data.runtime_hours
+            }
+        }

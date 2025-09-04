@@ -213,8 +213,7 @@ resource "aws_iam_role_policy" "lambda_policy" {
         ]
         Resource = [
           aws_dynamodb_table.state.arn,
-          aws_dynamodb_table.rightsizing.arn,
-          aws_dynamodb_table.costs.arn
+          aws_dynamodb_table.hourly.arn
         ]
       },
       {
@@ -229,37 +228,7 @@ resource "aws_iam_role_policy" "lambda_policy" {
   })
 }
 
-# S3 Bucket for data storage
-resource "aws_s3_bucket" "data" {
-  bucket = "${var.project_name}-data-${var.environment}-${data.aws_caller_identity.current.account_id}"
-  
-  tags = {
-    Name = "${var.project_name}-data"
-  }
-}
-
-# S3 Bucket Versioning
-resource "aws_s3_bucket_versioning" "data" {
-  bucket = aws_s3_bucket.data.id
-  
-  versioning_configuration {
-    status = "Enabled"
-  }
-}
-
-# S3 Bucket Encryption
-resource "aws_s3_bucket_server_side_encryption_configuration" "data" {
-  bucket = aws_s3_bucket.data.id
-
-  rule {
-    apply_server_side_encryption_by_default {
-      sse_algorithm = "AES256"
-    }
-  }
-}
-
-# Data source for current AWS account
-data "aws_caller_identity" "current" {}
+# (Removed S3 bucket resources for minimal thesis setup)
 
 # DynamoDB table for state tracking
 resource "aws_dynamodb_table" "state" {
@@ -283,41 +252,29 @@ resource "aws_dynamodb_table" "state" {
   }
 }
 
-# DynamoDB table for rightsizing recommendations
-resource "aws_dynamodb_table" "rightsizing" {
-  name           = "${var.project_name}-rightsizing"
-  billing_mode   = "PAY_PER_REQUEST"
-  hash_key       = "instance_id"
+# (Removed rightsizing table for minimal setup; can be added later)
+
+# (Removed daily costs table; dashboard uses hourly table totals or Cost Explorer directly)
+
+# DynamoDB table for hourly per-instance metrics (cost, carbon, energy)
+resource "aws_dynamodb_table" "hourly" {
+  name         = "${var.project_name}-hourly"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "instance_id"
+  range_key    = "timestamp"
 
   attribute {
     name = "instance_id"
     type = "S"
   }
 
-  tags = {
-    Name = "${var.project_name}-rightsizing"
-  }
-}
-
-# DynamoDB table for cost tracking
-resource "aws_dynamodb_table" "costs" {
-  name           = "${var.project_name}-costs"
-  billing_mode   = "PAY_PER_REQUEST"
-  hash_key       = "date"
-  range_key      = "instance_id"
-
   attribute {
-    name = "date"
-    type = "S"
-  }
-
-  attribute {
-    name = "instance_id"
-    type = "S"
+    name = "timestamp"
+    type = "N"
   }
 
   tags = {
-    Name = "${var.project_name}-costs"
+    Name = "${var.project_name}-hourly"
   }
 }
 
@@ -331,64 +288,50 @@ resource "aws_cloudwatch_log_group" "main" {
   }
 }
 
-# Test EC2 instances
-module "test_instances" {
-  source = "./modules/ec2"
-  
-  instance_count       = var.test_instance_count
-  instance_type        = var.instance_type
-  subnet_id            = aws_subnet.public.id
-  security_group_id    = aws_security_group.main.id
-  iam_instance_profile = aws_iam_instance_profile.ec2_profile.name
-  
-  tags = {
-    Project     = var.project_name
-    Environment = var.environment
-    Owner       = "carbon-aware-finops"
-    Name        = "${var.project_name}-instance"
-  }
-}
+# (Removed) test_instances module to keep infra minimal for thesis
 
 # Create instances with different scheduling patterns for demonstration
 resource "aws_instance" "scheduled_instances" {
   for_each = {
     "web-server" = {
-      schedule    = "24/7 Always Running"
-      purpose     = "Production web server"
-      description = "Always-on web server demonstrating 24/7 operational requirements"
+      schedule         = "24/7 Always Running"
+      purpose          = "Production web server"
+      description      = "Always-on web server demonstrating 24/7 operational requirements"
+      instance_type    = "t3.medium"  # Over-provisioned for rightsizing demo
+      rightsizing_demo = "over-provisioned"
     }
     "app-server" = {
-      schedule    = "Office Hours + Weekend Shutdown"
-      purpose     = "Application server with time-based scheduling"
-      description = "Business application server with office hours scheduling pattern"
-    }
-    "db-server" = {
-      schedule    = "Extended Development Hours"
-      purpose     = "Database server for development"
-      description = "Development database with extended hours for global team collaboration"
+      schedule         = "Office Hours + Weekend Shutdown"
+      purpose          = "Application server with time-based scheduling"
+      description      = "Business application server with office hours scheduling pattern"
+      instance_type    = "t3.large"   # Over-provisioned for rightsizing demo
+      rightsizing_demo = "over-provisioned"
     }
     "batch-server" = {
-      schedule    = "Carbon-Aware 24/7"
-      purpose     = "Carbon-aware batch processing"
-      description = "Batch processing server that responds to carbon intensity levels"
+      schedule         = "Carbon-Aware 24/7"
+      purpose          = "Carbon-aware batch processing"
+      description      = "Batch processing server that responds to carbon intensity levels"
+      instance_type    = "t3.micro"   # Right-sized for comparison
+      rightsizing_demo = "right-sized"
     }
   }
 
   ami                    = data.aws_ami.amazon_linux.id
-  instance_type          = var.instance_type
+  instance_type          = each.value.instance_type
   subnet_id              = aws_subnet.public.id
   vpc_security_group_ids = [aws_security_group.main.id]
   iam_instance_profile   = aws_iam_instance_profile.ec2_profile.name
   monitoring             = true
 
   tags = {
-    Name         = "${var.project_name}-${each.key}"
-    Project      = var.project_name
-    Environment  = var.environment
-    Schedule     = each.value.schedule
-    Purpose      = each.value.purpose
-    Description  = each.value.description
-    InstanceRole = "Scheduled"
+    Name             = "${var.project_name}-${each.key}"
+    Project          = var.project_name
+    Environment      = var.environment
+    Schedule         = each.value.schedule
+    Purpose          = each.value.purpose
+    Description      = each.value.description
+    InstanceRole     = "Scheduled"
+    RightsizingDemo  = each.value.rightsizing_demo
   }
 }
 
@@ -416,21 +359,11 @@ output "security_group_id" {
   value = aws_security_group.main.id
 }
 
-output "s3_bucket_name" {
-  value = aws_s3_bucket.data.id
-}
-
 output "dynamodb_state_table" {
   value = aws_dynamodb_table.state.id
 }
 
-output "dynamodb_rightsizing_table" {
-  value = aws_dynamodb_table.rightsizing.id
-}
-
-output "dynamodb_costs_table" {
-  value = aws_dynamodb_table.costs.id
-}
+// rightsizing and costs tables removed in minimal setup
 
 output "instance_ids" {
   value = [for instance in aws_instance.scheduled_instances : instance.id]

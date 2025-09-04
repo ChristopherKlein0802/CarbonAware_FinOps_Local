@@ -14,7 +14,8 @@ class TestAWSCostClient:
     def test_cost_client_initialization(self, mock_boto):
         """Test cost client initialization."""
         client = AWSCostClient(region='eu-central-1')
-        mock_boto.assert_called_with('ce', region_name='eu-central-1')
+        # Cost Explorer uses us-east-1 regardless of the workload region
+        mock_boto.assert_called_with('ce', region_name='us-east-1')
         assert client.region == 'eu-central-1'
     
     @patch('boto3.client')

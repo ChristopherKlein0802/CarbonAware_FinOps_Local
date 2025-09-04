@@ -177,9 +177,9 @@ run: ## 🏃 Run the complete carbon-aware system
 	@echo "$(YELLOW)1/3 Collecting baseline data...$(NC)"
 	@./$(VENV)/bin/python scripts/collect_baseline.py --profile $(AWS_PROFILE) || echo "$(RED)⚠️  Baseline collection failed$(NC)"
 	@echo "$(YELLOW)2/3 Running scheduler...$(NC)"
-	@./$(VENV)/bin/python src/scheduler/shutdown_scheduler.py || echo "$(RED)⚠️  Scheduler failed$(NC)"
+	@./$(VENV)/bin/python src/automation/shutdown_scheduler.py || echo "$(RED)⚠️  Scheduler failed$(NC)"
 	@echo "$(YELLOW)3/3 Running rightsizing analysis...$(NC)"
-	@./$(VENV)/bin/python src/rightsizing/analyzer.py || echo "$(RED)⚠️  Rightsizing failed$(NC)"
+	@./$(VENV)/bin/python src/lambda/rightsizing_handler.py || echo "$(RED)⚠️  Rightsizing failed$(NC)"
 	@echo "$(GREEN)✅ System execution complete$(NC)"
 	@echo "$(BLUE)💡 Launch dashboard: make dashboard$(NC)"
 
@@ -189,7 +189,7 @@ dashboard: ## 📊 Launch real-time Carbon-Aware FinOps dashboard
 	@echo "$(BLUE)🌐 Dashboard will be available at: http://localhost:8050$(NC)"
 	@echo "$(YELLOW)Press Ctrl+C to stop the dashboard$(NC)"
 	@$(MAKE) _ensure-venv
-	@./$(VENV)/bin/python src/reporting/dashboard.py
+	@./$(VENV)/bin/python src/reporting/realtime_dashboard.py
 
 status: ## 📊 Show comprehensive system and infrastructure status
 	@echo "$(BOLD)$(BLUE)📊 Carbon-Aware FinOps System Status$(NC)"
@@ -232,8 +232,12 @@ logs: ## 📄 View recent Lambda function logs
 	@echo "$(YELLOW)Scheduler Lambda logs:$(NC)"
 	@aws logs tail /aws/lambda/carbon-aware-finops-scheduler --since 1h --profile $(AWS_PROFILE) 2>/dev/null || echo "$(RED)No scheduler logs found$(NC)"
 	@echo ""
-	@echo "$(YELLOW)Rightsizing Lambda logs:$(NC)"
-	@aws logs tail /aws/lambda/carbon-aware-finops-rightsizing --since 1h --profile $(AWS_PROFILE) 2>/dev/null || echo "$(RED)No rightsizing logs found$(NC)"
+	@echo "$(YELLOW)Hourly Aggregator Lambda logs:$(NC)"
+	@aws logs tail /aws/lambda/carbon-aware-finops-hourly-aggregator --since 1h --profile $(AWS_PROFILE) 2>/dev/null || echo "$(RED)No hourly aggregator logs found$(NC)"
+
+.PHONY: logs-hourly
+logs-hourly: ## 📄 Tail hourly aggregator logs
+	@aws logs tail /aws/lambda/carbon-aware-finops-hourly-aggregator --since 1h --follow --profile $(AWS_PROFILE)
 
 instances: ## 💻 List all managed EC2 instances with their purposes
 	@echo "$(BOLD)$(BLUE)💻 Managed EC2 Instances$(NC)"

@@ -18,6 +18,8 @@ class AWSConfig:
     state_table: str = "carbon-aware-finops-state"
     rightsizing_table: str = "carbon-aware-finops-rightsizing"
     costs_table: str = "carbon-aware-finops-costs"
+    # Hourly metrics table (cost and carbon per hour)
+    hourly_table: str = "carbon-aware-finops-hourly"
 
     # CloudWatch settings
     cloudwatch_namespace: str = "CarbonAwareFinOps"
