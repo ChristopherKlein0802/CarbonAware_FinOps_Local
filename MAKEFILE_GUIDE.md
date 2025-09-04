@@ -116,9 +116,9 @@ make destroy
 #### `make run`
 - **Purpose**: Run the complete carbon-aware system
 - **What it does**:
-  1. Collects baseline data
-  2. Runs carbon-aware scheduler
-  3. Performs rightsizing analysis
+  1. Triggers Lambda carbon-aware scheduler
+  2. Checks Lambda execution results
+  3. Shows system status
 - **Prerequisites**: Infrastructure must be deployed
 - **Example**:
 ```bash
@@ -162,7 +162,7 @@ make emergency-stop
 
 #### `make logs`
 - **Purpose**: View recent Lambda function logs
-- **What it shows**: Recent logs from scheduler and rightsizing Lambda functions
+- **What it shows**: Recent logs from scheduler Lambda function
 - **When to use**: For debugging and monitoring
 - **Example**:
 ```bash

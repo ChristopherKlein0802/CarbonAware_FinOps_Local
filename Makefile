@@ -233,14 +233,8 @@ logs: ## 📄 View recent Lambda function logs
 	@echo "$(BOLD)$(BLUE)📄 Recent Lambda Logs$(NC)"
 	@echo "====================="
 	@echo "$(YELLOW)Scheduler Lambda logs:$(NC)"
-	@aws logs tail /aws/lambda/carbon-aware-finops-scheduler --since 1h --profile $(AWS_PROFILE) 2>/dev/null || echo "$(RED)No scheduler logs found$(NC)"
-	@echo ""
-	@echo "$(YELLOW)Hourly Aggregator Lambda logs:$(NC)"
-	@aws logs tail /aws/lambda/carbon-aware-finops-hourly-aggregator --since 1h --profile $(AWS_PROFILE) 2>/dev/null || echo "$(RED)No hourly aggregator logs found$(NC)"
+	@aws logs tail /aws/lambda/carbon-aware-finops-carbon-scheduler --since 1h --profile $(AWS_PROFILE) 2>/dev/null || echo "$(RED)No scheduler logs found$(NC)"
 
-.PHONY: logs-hourly
-logs-hourly: ## 📄 Tail hourly aggregator logs
-	@aws logs tail /aws/lambda/carbon-aware-finops-hourly-aggregator --since 1h --follow --profile $(AWS_PROFILE)
 
 instances: ## 💻 List all managed EC2 instances with their purposes
 	@echo "$(BOLD)$(BLUE)💻 Managed EC2 Instances$(NC)"
@@ -305,7 +299,5 @@ _instance_status:
 	echo "  🟢 Running: $$RUNNING  🔴 Stopped: $$STOPPED"
 
 _lambda_status:
-	@SCHEDULER_STATUS=$$(aws lambda get-function --function-name carbon-aware-finops-scheduler --query 'Configuration.State' --output text --profile $(AWS_PROFILE) 2>/dev/null || echo "NotFound"); \
-	RIGHTSIZING_STATUS=$$(aws lambda get-function --function-name carbon-aware-finops-rightsizing --query 'Configuration.State' --output text --profile $(AWS_PROFILE) 2>/dev/null || echo "NotFound"); \
-	echo "  ⚡ Scheduler: $$SCHEDULER_STATUS"; \
-	echo "  📐 Rightsizing: $$RIGHTSIZING_STATUS"
+	@SCHEDULER_STATUS=$$(aws lambda get-function --function-name carbon-aware-finops-carbon-scheduler --query 'Configuration.State' --output text --profile $(AWS_PROFILE) 2>/dev/null || echo "NotFound"); \
+	echo "  ⚡ Scheduler: $$SCHEDULER_STATUS"

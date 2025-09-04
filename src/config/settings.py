@@ -103,33 +103,6 @@ class SchedulingConfig:
             }
 
 
-@dataclass
-class RightsizingConfig:
-    """Rightsizing analysis configuration."""
-
-    # CPU utilization thresholds (%)
-    downsize_cpu_p95_threshold: float = 40.0
-    downsize_cpu_max_threshold: float = 60.0
-    upsize_cpu_avg_threshold: float = 80.0
-    upsize_cpu_p95_threshold: float = 90.0
-
-    # Analysis periods
-    default_analysis_days: int = 14
-    minimum_datapoints: int = 24  # Minimum hours of data needed
-
-    # Power consumption estimates (kW) for carbon calculations
-    power_consumption: Optional[Dict[str, float]] = None
-
-    def __post_init__(self):
-        if self.power_consumption is None:
-            self.power_consumption = {
-                "t3.micro": 0.01,
-                "t3.small": 0.02,
-                "t3.medium": 0.04,
-                "t3.large": 0.08,
-                "t3.xlarge": 0.16,
-                "t3.2xlarge": 0.32,
-            }
 
 
 @dataclass
@@ -156,7 +129,6 @@ class Settings:
     aws: Optional[AWSConfig] = None
     carbon: Optional[CarbonConfig] = None
     scheduling: Optional[SchedulingConfig] = None
-    rightsizing: Optional[RightsizingConfig] = None
     dashboard: Optional[DashboardConfig] = None
 
     # Environment
@@ -171,8 +143,6 @@ class Settings:
             self.carbon = CarbonConfig()
         if self.scheduling is None:
             self.scheduling = SchedulingConfig()
-        if self.rightsizing is None:
-            self.rightsizing = RightsizingConfig()
         if self.dashboard is None:
             self.dashboard = DashboardConfig()
 
@@ -201,8 +171,3 @@ def get_instance_pricing(instance_type: str) -> float:
     return 0.05  # Default fallback
 
 
-def get_power_consumption(instance_type: str) -> float:
-    """Get power consumption estimate for an instance type."""
-    if settings.rightsizing and settings.rightsizing.power_consumption:
-        return settings.rightsizing.power_consumption.get(instance_type, 0.05)
-    return 0.05  # Default fallback

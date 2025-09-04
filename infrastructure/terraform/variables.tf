@@ -82,11 +82,6 @@ variable "notification_email" {
   default     = "ch.klein@reply.de"
 }
 
-variable "enable_lambda_functions" {
-  description = "Enable Lambda functions deployment"
-  type        = bool
-  default     = false
-}
 
 variable "lambda_log_retention_days" {
   description = "CloudWatch Log retention in days for Lambda functions"

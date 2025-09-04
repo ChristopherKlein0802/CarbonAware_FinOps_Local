@@ -65,12 +65,10 @@ mkdir -p $LAMBDA_DIR
 
 # Copy source code
 cp -r $PROJECT_ROOT/src $LAMBDA_DIR/
-cp -r $PROJECT_ROOT/config $LAMBDA_DIR/ 2>/dev/null || mkdir -p $LAMBDA_DIR/config
 
-# Create placeholder config files if they don't exist
-if [ ! -f "$LAMBDA_DIR/config/scheduling_rules.yaml" ]; then
-    cp $PROJECT_ROOT/config/scheduling_rules.yaml $LAMBDA_DIR/config/ 2>/dev/null || true
-fi
+# Copy config from src/config instead of project root
+mkdir -p $LAMBDA_DIR/config
+cp -r $PROJECT_ROOT/src/config/* $LAMBDA_DIR/config/ 2>/dev/null || true
 
 # Create __init__.py files if missing
 find $LAMBDA_DIR -type d -exec touch {}/__init__.py \; 2>/dev/null || true
