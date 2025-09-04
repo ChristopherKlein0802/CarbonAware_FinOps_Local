@@ -150,15 +150,9 @@ class WattTimeClient(CarbonAPIClient):
             self.username = username or os.getenv("WATTTIME_USERNAME")
             self.password = password or os.getenv("WATTTIME_PASSWORD")
             
+            # Simplified: just use environment variables
             if not self.username or not self.password:
-                try:
-                    from ..utils.secrets_manager import get_secrets_manager
-                    aws_profile = os.getenv("AWS_PROFILE")
-                    manager = get_secrets_manager(aws_profile)
-                    self.username = self.username or manager.get_secret("watttime_username")
-                    self.password = self.password or manager.get_secret("watttime_password")
-                except Exception as e:
-                    logger.debug(f"Could not retrieve WattTime credentials from secrets manager: {e}")
+                logger.warning("WattTime credentials not provided. Set WATTTIME_USERNAME and WATTTIME_PASSWORD environment variables.")
         
         self.token = None
         if self.username and self.password:
@@ -271,15 +265,10 @@ class ElectricityMapClient(CarbonAPIClient):
         else:
             # Try environment variable first, then secrets manager
             self.api_key = os.getenv("ELECTRICITYMAP_API_KEY")
+            # Simplified: just use environment variable
             if not self.api_key:
-                try:
-                    from ..utils.secrets_manager import get_secrets_manager
-                    aws_profile = os.getenv("AWS_PROFILE")
-                    manager = get_secrets_manager(aws_profile)
-                    self.api_key = manager.get_secret("electricitymap_api_key")
-                except Exception as e:
-                    logger.debug(f"Could not retrieve API key from secrets manager: {e}")
-                    self.api_key = None
+                logger.warning("ElectricityMap API key not provided. Set ELECTRICITYMAP_API_KEY environment variable.")
+                self.api_key = None
 
     def get_current_intensity(self, region: str) -> CarbonIntensity:
         """Get current carbon intensity from electricityMap."""

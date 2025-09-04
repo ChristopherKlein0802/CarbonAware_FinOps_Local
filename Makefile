@@ -146,7 +146,11 @@ deploy: ## 🚀 Deploy complete infrastructure to AWS
 	@echo "$(YELLOW)3/4 Deploying infrastructure...$(NC)"
 	@cd infrastructure/terraform && terraform apply -var="aws_profile=$(AWS_PROFILE)" -var="aws_region=$(AWS_REGION)" -auto-approve
 	@echo "$(YELLOW)4/4 Setting up secrets...$(NC)"
-	@./$(VENV)/bin/python scripts/setup_secrets.py --aws-profile $(AWS_PROFILE) || echo "$(YELLOW)⚠️  Configure API secrets manually$(NC)"
+	@echo "$(YELLOW)4/4 Setting environment variables...$(NC)"
+	@echo "$(BLUE)Set these environment variables for enhanced features:$(NC)"
+	@echo "  export ELECTRICITYMAP_API_KEY='your-key'"
+	@echo "  export WATTTIME_USERNAME='your-username'"
+	@echo "  export WATTTIME_PASSWORD='your-password'"
 	@echo ""
 	@echo "$(BOLD)$(GREEN)🎉 Deployment complete!$(NC)"
 	@echo "$(BLUE)Infrastructure deployed successfully$(NC)"
@@ -174,12 +178,11 @@ run: ## 🏃 Run the complete carbon-aware system
 	@echo "$(BOLD)$(YELLOW)🏃 Running Carbon-Aware System$(NC)"
 	@echo "==============================="
 	@$(MAKE) _ensure-venv
-	@echo "$(YELLOW)1/3 Collecting baseline data...$(NC)"
-	@./$(VENV)/bin/python scripts/collect_baseline.py --profile $(AWS_PROFILE) || echo "$(RED)⚠️  Baseline collection failed$(NC)"
-	@echo "$(YELLOW)2/3 Running scheduler...$(NC)"
-	@./$(VENV)/bin/python src/automation/shutdown_scheduler.py || echo "$(RED)⚠️  Scheduler failed$(NC)"
-	@echo "$(YELLOW)3/3 Running rightsizing analysis...$(NC)"
-	@./$(VENV)/bin/python src/lambda/rightsizing_handler.py || echo "$(RED)⚠️  Rightsizing failed$(NC)"
+	@echo "$(YELLOW)1/3 Triggering Lambda scheduler...$(NC)"
+	@aws lambda invoke --function-name carbon-aware-finops-carbon-scheduler --profile $(AWS_PROFILE) /tmp/lambda-response.json || echo "$(RED)⚠️  Lambda invocation failed$(NC)"
+	@echo "$(YELLOW)2/3 Checking Lambda execution results...$(NC)"
+	@cat /tmp/lambda-response.json 2>/dev/null || echo "$(YELLOW)⚠️  No response file$(NC)"
+	@echo "$(YELLOW)3/3 System ready - Lambda runs automatically every hour$(NC)"
 	@echo "$(GREEN)✅ System execution complete$(NC)"
 	@echo "$(BLUE)💡 Launch dashboard: make dashboard$(NC)"
 
@@ -189,7 +192,7 @@ dashboard: ## 📊 Launch real-time Carbon-Aware FinOps dashboard
 	@echo "$(BLUE)🌐 Dashboard will be available at: http://localhost:8050$(NC)"
 	@echo "$(YELLOW)Press Ctrl+C to stop the dashboard$(NC)"
 	@$(MAKE) _ensure-venv
-	@./$(VENV)/bin/python src/reporting/realtime_dashboard.py
+	@./$(VENV)/bin/python src/reporting/thesis_dashboard.py
 
 status: ## 📊 Show comprehensive system and infrastructure status
 	@echo "$(BOLD)$(BLUE)📊 Carbon-Aware FinOps System Status$(NC)"

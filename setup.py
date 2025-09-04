@@ -48,8 +48,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'carbon-scheduler=src.automation.shutdown_scheduler:main',
-            'carbon-dashboard=src.reporting.realtime_dashboard:main',
+            'carbon-dashboard=src.reporting.thesis_dashboard:main',
         ],
     },
     package_data={

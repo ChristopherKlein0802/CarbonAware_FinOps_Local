@@ -11,8 +11,8 @@ Core thesis contribution: Quantifying both financial and environmental impact of
 import json
 import os
 import boto3
-from datetime import datetime, timedelta
-from typing import Dict, List, Any, Tuple
+from datetime import datetime, timedelta, timezone
+from typing import Dict, List, Tuple
 from decimal import Decimal
 import logging
 
@@ -34,7 +34,7 @@ dynamodb = boto3.resource('dynamodb')
 cloudwatch = boto3.client('cloudwatch')
 
 
-def lambda_handler(event, context):
+def lambda_handler(_event, _context):
     """
     Main Lambda handler for carbon-aware scheduling analysis.
     
@@ -57,7 +57,7 @@ def lambda_handler(event, context):
         if not results_table_name:
             raise ValueError("DYNAMODB_RESULTS_TABLE environment variable not set")
         
-        results_table = dynamodb.Table(results_table_name)
+        results_table = dynamodb.Table(results_table_name)  # type: ignore
         
         # 1. Get current test instances
         instances = get_test_instances(project_name)
@@ -99,7 +99,7 @@ def lambda_handler(event, context):
             # Store individual instance analysis
             result = {
                 'instance_id': instance_id,
-                'timestamp': int(datetime.utcnow().timestamp()),
+                'timestamp': int(datetime.now(timezone.utc).timestamp()),
                 'schedule_type': schedule_type,
                 'current_cost_usd': float(current_cost),
                 'optimized_cost_usd': float(optimized_cost),
@@ -123,13 +123,13 @@ def lambda_handler(event, context):
         # 5. Store aggregated results
         aggregated_result = {
             'instance_id': 'AGGREGATED_TOTALS',
-            'timestamp': int(datetime.utcnow().timestamp()),
+            'timestamp': int(datetime.now(timezone.utc).timestamp()),
             'schedule_type': 'ALL',
             'total_instances': len(instances),
             'total_cost_savings_usd': float(total_cost_savings),
             'total_carbon_savings_kg': float(total_carbon_savings),
             'carbon_intensity': carbon_intensity,
-            'analysis_date': datetime.utcnow().isoformat()
+            'analysis_date': datetime.now(timezone.utc).isoformat()
         }
         
         store_analysis_result(results_table, aggregated_result)
@@ -185,7 +185,7 @@ def get_ec2_costs(instances: List[Dict]) -> Dict[str, Dict]:
     """Get real cost data from Cost Explorer for EC2 instances."""
     try:
         # Get costs for the last 24 hours
-        end_date = datetime.utcnow().date()
+        end_date = datetime.now(timezone.utc).date()
         start_date = end_date - timedelta(days=1)
         
         response = ce.get_cost_and_usage(
@@ -356,7 +356,7 @@ def apply_scheduling_decision(instance: Dict, schedule_type: str,
 
 def should_instance_run(schedule_type: str, carbon_intensity: float, carbon_threshold: float) -> bool:
     """Determine if an instance should be running based on its schedule type."""
-    current_time = datetime.utcnow()
+    current_time = datetime.now(timezone.utc)
     weekday = current_time.weekday()  # 0=Monday, 6=Sunday
     hour = current_time.hour
     

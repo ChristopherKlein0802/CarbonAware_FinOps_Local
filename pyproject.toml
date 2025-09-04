@@ -39,8 +39,7 @@ dev = [
 ]
 
 [project.scripts]
-carbon-scheduler = "src.automation.shutdown_scheduler:main"
-carbon-dashboard = "src.reporting.realtime_dashboard:main"
+carbon-dashboard = "src.reporting.thesis_dashboard:main"
 
 [tool.setuptools]
 packages = ["src"]
