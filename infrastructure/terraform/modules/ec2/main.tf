@@ -55,7 +55,7 @@ locals {
     {
       name        = "research-variable"
       purpose     = "Variable workload testing"
-      description = "Instance with varying CPU/memory usage patterns for rightsizing analysis"
+      description = "Instance with varying CPU/memory usage patterns for scheduling analysis"
     },
     {
       name        = "research-peak"
