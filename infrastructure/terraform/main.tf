@@ -212,8 +212,7 @@ resource "aws_iam_role_policy" "lambda_policy" {
           "dynamodb:DeleteItem"
         ]
         Resource = [
-          aws_dynamodb_table.state.arn,
-          aws_dynamodb_table.hourly.arn
+          aws_dynamodb_table.results.arn
         ]
       },
       {
@@ -230,35 +229,9 @@ resource "aws_iam_role_policy" "lambda_policy" {
 
 # (Removed S3 bucket resources for minimal thesis setup)
 
-# DynamoDB table for state tracking
-resource "aws_dynamodb_table" "state" {
-  name           = "${var.project_name}-state"
-  billing_mode   = "PAY_PER_REQUEST"
-  hash_key       = "instance_id"
-  range_key      = "timestamp"
-
-  attribute {
-    name = "instance_id"
-    type = "S"
-  }
-
-  attribute {
-    name = "timestamp"
-    type = "N"
-  }
-
-  tags = {
-    Name = "${var.project_name}-state"
-  }
-}
-
-# (Removed rightsizing table for minimal setup; can be added later)
-
-# (Removed daily costs table; dashboard uses hourly table totals or Cost Explorer directly)
-
-# DynamoDB table for hourly per-instance metrics (cost, carbon, energy)
-resource "aws_dynamodb_table" "hourly" {
-  name         = "${var.project_name}-hourly"
+# Single DynamoDB table for storing cost and carbon analysis results
+resource "aws_dynamodb_table" "results" {
+  name         = "${var.project_name}-results"
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "instance_id"
   range_key    = "timestamp"
@@ -274,7 +247,8 @@ resource "aws_dynamodb_table" "hourly" {
   }
 
   tags = {
-    Name = "${var.project_name}-hourly"
+    Name = "${var.project_name}-results"
+    Purpose = "Store cost and carbon analysis results"
   }
 }
 
@@ -290,29 +264,32 @@ resource "aws_cloudwatch_log_group" "main" {
 
 # (Removed) test_instances module to keep infra minimal for thesis
 
-# Create instances with different scheduling patterns for demonstration
-resource "aws_instance" "scheduled_instances" {
+# Four test instances with different scheduling patterns for thesis demonstration
+resource "aws_instance" "test_instances" {
   for_each = {
-    "web-server" = {
-      schedule         = "24/7 Always Running"
-      purpose          = "Production web server"
-      description      = "Always-on web server demonstrating 24/7 operational requirements"
-      instance_type    = "t3.medium"  # Over-provisioned for rightsizing demo
-      rightsizing_demo = "over-provisioned"
+    "baseline" = {
+      schedule      = "24/7 Always Running"
+      purpose       = "Baseline cost and carbon measurement"
+      description   = "Always-on instance for establishing baseline costs and carbon emissions"
+      instance_type = "t3.micro"
     }
-    "app-server" = {
-      schedule         = "Office Hours + Weekend Shutdown"
-      purpose          = "Application server with time-based scheduling"
-      description      = "Business application server with office hours scheduling pattern"
-      instance_type    = "t3.large"   # Over-provisioned for rightsizing demo
-      rightsizing_demo = "over-provisioned"
+    "office-hours" = {
+      schedule      = "Office Hours Only (Mon-Fri 8-18)"
+      purpose       = "Office hours scheduling demonstration"
+      description   = "Runs only during business hours to demonstrate time-based optimization"
+      instance_type = "t3.micro"
     }
-    "batch-server" = {
-      schedule         = "Carbon-Aware 24/7"
-      purpose          = "Carbon-aware batch processing"
-      description      = "Batch processing server that responds to carbon intensity levels"
-      instance_type    = "t3.micro"   # Right-sized for comparison
-      rightsizing_demo = "right-sized"
+    "weekdays-only" = {
+      schedule      = "Weekdays Only (Mon-Fri 24h)"
+      purpose       = "Weekend shutdown demonstration"
+      description   = "Shuts down on weekends to demonstrate weekly scheduling patterns"
+      instance_type = "t3.micro"
+    }
+    "carbon-aware" = {
+      schedule      = "Carbon-Aware Scheduling"
+      purpose       = "Carbon intensity based scheduling"
+      description   = "Stops during high carbon intensity periods to minimize emissions"
+      instance_type = "t3.micro"
     }
   }
 
@@ -324,14 +301,14 @@ resource "aws_instance" "scheduled_instances" {
   monitoring             = true
 
   tags = {
-    Name             = "${var.project_name}-${each.key}"
-    Project          = var.project_name
-    Environment      = var.environment
-    Schedule         = each.value.schedule
-    Purpose          = each.value.purpose
-    Description      = each.value.description
-    InstanceRole     = "Scheduled"
-    RightsizingDemo  = each.value.rightsizing_demo
+    Name         = "${var.project_name}-${each.key}"
+    Project      = var.project_name
+    Environment  = var.environment
+    Schedule     = each.value.schedule
+    Purpose      = each.value.purpose
+    Description  = each.value.description
+    InstanceRole = "TestInstance"
+    ScheduleType = each.key
   }
 }
 
@@ -359,14 +336,23 @@ output "security_group_id" {
   value = aws_security_group.main.id
 }
 
-output "dynamodb_state_table" {
-  value = aws_dynamodb_table.state.id
+output "dynamodb_results_table" {
+  value = aws_dynamodb_table.results.id
 }
 
-// rightsizing and costs tables removed in minimal setup
-
 output "instance_ids" {
-  value = [for instance in aws_instance.scheduled_instances : instance.id]
+  value = [for instance in aws_instance.test_instances : instance.id]
+}
+
+output "instance_details" {
+  value = {
+    for key, instance in aws_instance.test_instances : key => {
+      id          = instance.id
+      schedule    = instance.tags.Schedule
+      purpose     = instance.tags.Purpose
+      private_ip  = instance.private_ip
+    }
+  }
 }
 
 output "lambda_role_arn" {

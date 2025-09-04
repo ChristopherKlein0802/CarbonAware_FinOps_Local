@@ -14,12 +14,8 @@ class AWSConfig:
     region: str = "eu-central-1"
     profile: str = "carbon-finops-sandbox"
 
-    # DynamoDB table names
-    state_table: str = "carbon-aware-finops-state"
-    rightsizing_table: str = "carbon-aware-finops-rightsizing"
-    costs_table: str = "carbon-aware-finops-costs"
-    # Hourly metrics table (cost and carbon per hour)
-    hourly_table: str = "carbon-aware-finops-hourly"
+    # Single DynamoDB table for results
+    results_table: str = "carbon-aware-finops-results"
 
     # CloudWatch settings
     cloudwatch_namespace: str = "CarbonAwareFinOps"
@@ -58,32 +54,23 @@ class CarbonConfig:
 
     @property
     def electricitymap_api_key(self) -> Optional[str]:
-        """Get ElectricityMap API key from secrets manager."""
+        """Get ElectricityMap API key from environment variable."""
         if self._electricitymap_api_key is None:
-            from src.utils.secrets_manager import get_secret
-
-            secret_value = get_secret("electricitymap_api_key")
-            self._electricitymap_api_key = str(secret_value) if secret_value else None
+            self._electricitymap_api_key = os.getenv("ELECTRICITYMAP_API_KEY")
         return self._electricitymap_api_key
 
     @property
     def watttime_username(self) -> Optional[str]:
-        """Get WattTime username from secrets manager."""
+        """Get WattTime username from environment variable."""
         if self._watttime_username is None:
-            from src.utils.secrets_manager import get_secret
-
-            secret_value = get_secret("watttime_username")
-            self._watttime_username = str(secret_value) if secret_value else None
+            self._watttime_username = os.getenv("WATTTIME_USERNAME")
         return self._watttime_username
 
     @property
     def watttime_password(self) -> Optional[str]:
-        """Get WattTime password from secrets manager."""
+        """Get WattTime password from environment variable."""
         if self._watttime_password is None:
-            from src.utils.secrets_manager import get_secret
-
-            secret_value = get_secret("watttime_password")
-            self._watttime_password = str(secret_value) if secret_value else None
+            self._watttime_password = os.getenv("WATTTIME_PASSWORD")
         return self._watttime_password
 
 
