@@ -565,7 +565,7 @@ class EC2EnergyCalculator:
             watttime_client = WattTimeClient()
             watttime_intensity = watttime_client.get_current_intensity(region)
             comparison['apis']['watttime'] = {
-                'intensity_gco2_kwh': watttime_intensity,
+                'intensity_gco2_kwh': watttime_intensity.value,
                 'status': 'success',
                 'source': 'watttime'
             }

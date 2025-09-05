@@ -70,6 +70,9 @@ cp -r $PROJECT_ROOT/src $LAMBDA_DIR/
 mkdir -p $LAMBDA_DIR/config
 cp -r $PROJECT_ROOT/src/config/* $LAMBDA_DIR/config/ 2>/dev/null || true
 
+# Move Lambda handler to root level (Lambda expects it at root)
+cp $LAMBDA_DIR/src/lambda/scheduler_handler.py $LAMBDA_DIR/ 2>/dev/null || true
+
 # Create __init__.py files if missing
 find $LAMBDA_DIR -type d -exec touch {}/__init__.py \; 2>/dev/null || true
 

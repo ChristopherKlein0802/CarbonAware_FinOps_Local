@@ -9,10 +9,10 @@ resource "aws_lambda_layer_version" "python_dependencies" {
   source_code_hash = fileexists("${path.module}/lambda_layer.zip") ? filebase64sha256("${path.module}/lambda_layer.zip") : ""
 }
 
-# Carbon-Aware Scheduler Lambda Function - Main thesis component
+# Infrastructure Analysis Lambda Function - Main thesis component  
 resource "aws_lambda_function" "carbon_scheduler" {
   filename         = "${path.module}/lambda_deployment.zip"
-  function_name    = "${var.project_name}-carbon-scheduler"
+  function_name    = "${local.project_name}-infrastructure-analyzer"
   role            = aws_iam_role.lambda_role.arn
   handler         = "scheduler_handler.lambda_handler"
   runtime         = "python3.9"
@@ -27,12 +27,14 @@ resource "aws_lambda_function" "carbon_scheduler" {
     variables = {
       CARBON_API_PROVIDER     = var.carbon_api_provider
       CARBON_THRESHOLD        = "400"  # gCO2/kWh threshold
-      PROJECT_NAME            = var.project_name
+      PROJECT_NAME            = local.project_name
       ELECTRICITYMAP_API_KEY  = var.electricitymap_api_key
       WATTTIME_USERNAME      = var.watttime_username
       WATTTIME_PASSWORD      = var.watttime_password
       DYNAMODB_RESULTS_TABLE = aws_dynamodb_table.results.name
-      AWS_REGION             = var.aws_region
+      DEPLOYMENT_MODE         = var.deployment_mode
+      ANALYZE_ALL_INSTANCES   = var.analyze_all_instances ? "true" : "false"
+      # AWS_REGION is automatically provided by Lambda runtime
     }
   }
 
@@ -46,7 +48,7 @@ resource "aws_lambda_function" "carbon_scheduler" {
 
 # CloudWatch Log Group
 resource "aws_cloudwatch_log_group" "lambda_scheduler" {
-  name              = "/aws/lambda/${var.project_name}-carbon-scheduler"
+  name              = "/aws/lambda/${local.project_name}-infrastructure-analyzer"
   retention_in_days = 7
 }
 
@@ -57,13 +59,13 @@ resource "aws_iam_role_policy_attachment" "lambda_logs" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-# EventBridge Rule - Runs every hour for continuous monitoring
+# EventBridge Rule - Runs every hour for continuous analysis
 resource "aws_cloudwatch_event_rule" "scheduler_rule" {
-  name                = "${var.project_name}-carbon-scheduler-rule"
-  description         = "Trigger carbon-aware scheduler every hour"
+  name                = "${local.project_name}-infrastructure-analyzer-rule"
+  description         = "Trigger infrastructure analysis every hour for optimization potential calculation"
   schedule_expression = "rate(1 hour)"  # Every hour for thesis data collection
   
-  # Enable automatic scheduling for thesis research
+  # Enable automatic analysis for thesis research
   state = "ENABLED"
 }
 

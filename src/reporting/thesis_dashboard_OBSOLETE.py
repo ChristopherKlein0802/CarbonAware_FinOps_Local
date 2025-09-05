@@ -473,7 +473,7 @@ class ThesisDashboard:
         print(f"📈 Demonstrating: Cost and Carbon savings through intelligent EC2 scheduling")
         print(f"\nPress Ctrl+C to stop the dashboard\n")
         
-        self.app.run_server(debug=debug, host=host, port=port)
+        self.app.run(debug=debug, host=host, port=port)
 
 
 def main():

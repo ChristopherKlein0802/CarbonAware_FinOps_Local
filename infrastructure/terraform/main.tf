@@ -11,19 +11,31 @@ terraform {
   }
 }
 
+# Auto-generate project name if not provided
+locals {
+  # Generate project name from AWS account ID if not provided
+  generated_project_name = "carbon-finops-${substr(var.aws_account_id, -6, -1)}"
+  project_name = var.project_name != "" ? var.project_name : local.generated_project_name
+  
+  # Common tags for all resources
+  common_tags = {
+    Project       = local.project_name
+    Environment   = var.environment
+    ManagedBy     = "Terraform"
+    AnalysisMode  = var.deployment_mode
+    CreatedBy     = "CarbonAware-FinOps-Tool"
+  }
+}
+
 provider "aws" {
   region = var.aws_region
   profile = var.aws_profile
 
-  # Specific AWS Account
+  # Specific AWS Account (can be any account with proper SSO access)
   allowed_account_ids = [var.aws_account_id]
   
   default_tags {
-    tags = {
-      Project     = var.project_name
-      Environment = var.environment
-      ManagedBy   = "Terraform"
-    }
+    tags = local.common_tags
   }
 }
 
@@ -32,15 +44,17 @@ data "aws_availability_zones" "available" {
   state = "available"
 }
 
-# VPC for test instances
+# VPC for instances (only created if needed for test instances)
 resource "aws_vpc" "main" {
+  count = var.deployment_mode == "testing" ? 1 : 0
+  
   cidr_block           = "10.0.0.0/16"
   enable_dns_hostnames = true
   enable_dns_support   = true
 
-  tags = {
-    Name = "${var.project_name}-vpc"
-  }
+  tags = merge(local.common_tags, {
+    Name = "${local.project_name}-vpc"
+  })
 }
 
 # Internet Gateway
@@ -265,51 +279,50 @@ resource "aws_cloudwatch_log_group" "main" {
 # (Removed) test_instances module to keep infra minimal for thesis
 
 # Four test instances with different scheduling patterns for thesis demonstration
+# Only deployed in testing mode or when explicitly requested
 resource "aws_instance" "test_instances" {
-  for_each = {
+  for_each = var.deployment_mode == "testing" || var.test_instance_count > 0 ? {
     "baseline" = {
       schedule      = "24/7 Always Running"
       purpose       = "Baseline cost and carbon measurement"
       description   = "Always-on instance for establishing baseline costs and carbon emissions"
-      instance_type = "t3.micro"
+      instance_type = "t3.medium"  # Higher cost for significant baseline comparison
     }
     "office-hours" = {
       schedule      = "Office Hours Only (Mon-Fri 8-18)"
       purpose       = "Office hours scheduling demonstration"
       description   = "Runs only during business hours to demonstrate time-based optimization"
-      instance_type = "t3.micro"
+      instance_type = "t3.small"   # Medium cost for substantial office-hours savings
     }
     "weekdays-only" = {
       schedule      = "Weekdays Only (Mon-Fri 24h)"
       purpose       = "Weekend shutdown demonstration"
       description   = "Shuts down on weekends to demonstrate weekly scheduling patterns"
-      instance_type = "t3.micro"
+      instance_type = "t3.small"   # Medium cost for visible weekend savings
     }
     "carbon-aware" = {
       schedule      = "Carbon-Aware Scheduling"
       purpose       = "Carbon intensity based scheduling"
       description   = "Stops during high carbon intensity periods to minimize emissions"
-      instance_type = "t3.micro"
+      instance_type = "t3.micro"   # Lower cost but demonstrates carbon optimization focus
     }
-  }
+  } : {}
 
   ami                    = data.aws_ami.amazon_linux.id
   instance_type          = each.value.instance_type
-  subnet_id              = aws_subnet.public.id
-  vpc_security_group_ids = [aws_security_group.main.id]
+  subnet_id              = aws_subnet.public[0].id
+  vpc_security_group_ids = [aws_security_group.main[0].id]
   iam_instance_profile   = aws_iam_instance_profile.ec2_profile.name
   monitoring             = true
 
-  tags = {
-    Name         = "${var.project_name}-${each.key}"
-    Project      = var.project_name
-    Environment  = var.environment
+  tags = merge(local.common_tags, {
+    Name         = "${local.project_name}-${each.key}"
     Schedule     = each.value.schedule
     Purpose      = each.value.purpose
     Description  = each.value.description
     InstanceRole = "TestInstance"
     ScheduleType = each.key
-  }
+  })
 }
 
 # Data source for Amazon Linux AMI

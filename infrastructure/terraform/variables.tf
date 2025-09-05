@@ -10,14 +10,32 @@ variable "aws_account_id" {
 }
 
 variable "aws_profile"  {
-  description = "AWS profile for authentication"
+  description = "AWS profile for authentication (supports SSO profiles)"
   type        = string
+  default     = "default"
 }
 
 variable "project_name" {
-  description = "Name of the project"
+  description = "Name of the project (will be auto-generated based on account if not provided)"
   type        = string
-  default     = "carbon-aware-finops"
+  default     = ""
+}
+
+variable "analyze_all_instances" {
+  description = "Analyze ALL instances in the account (true) or only tagged test instances (false)"
+  type        = bool
+  default     = true
+}
+
+variable "deployment_mode" {
+  description = "Deployment mode: 'universal' for any account, 'testing' for specific project instances"
+  type        = string
+  default     = "universal"
+  
+  validation {
+    condition     = contains(["universal", "testing"], var.deployment_mode)
+    error_message = "Deployment mode must be either 'universal' or 'testing'."
+  }
 }
 
 variable "environment" {
@@ -30,6 +48,28 @@ variable "test_instance_count" {
   description = "Number of test EC2 instances"
   type        = number
   default     = 4
+}
+
+# API Configuration Variables for secure credential management
+variable "electricitymap_api_key" {
+  description = "ElectricityMap API key (will be stored securely in SSM)"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "watttime_username" {
+  description = "WattTime API username (will be stored securely in SSM)"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "watttime_password" {
+  description = "WattTime API password (will be stored securely in SSM)"
+  type        = string
+  default     = ""
+  sensitive   = true
 }
 
 variable "instance_type" {

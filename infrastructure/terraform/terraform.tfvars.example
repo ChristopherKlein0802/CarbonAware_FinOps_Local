@@ -1,0 +1,35 @@
+# Carbon-Aware FinOps Configuration Example
+# Copy this to terraform.tfvars and configure for your environment
+
+# Required: Your AWS Account ID (found in AWS console upper right)
+aws_account_id = "123456789012"
+
+# Required: AWS Profile (usually your SSO profile name)
+aws_profile = "your-sso-profile"
+
+# Optional: AWS Region (defaults to eu-central-1 for German grid data)
+aws_region = "eu-central-1"
+
+# Optional: Project name (auto-generated from account ID if not provided)
+project_name = "carbon-finops-thesis"
+
+# Required: Deployment mode
+# - "universal": Analyze all instances in the account
+# - "testing": Deploy test instances for demonstration
+deployment_mode = "testing"
+
+# Required: Instance analysis scope  
+# - true: Analyze ALL instances in account (universal deployment)
+# - false: Only analyze tagged test instances
+analyze_all_instances = false
+
+# Optional: API Credentials (for enhanced carbon data)
+# ElectricityMap API key from https://portal.electricitymaps.com/
+electricitymap_api_key = "your-electricitymap-api-key"
+
+# WattTime credentials from https://docs.watttime.org/
+watttime_username = "your-watttime-username"
+watttime_password = "your-watttime-password"
+
+# Optional: Environment tag
+environment = "thesis-demo"

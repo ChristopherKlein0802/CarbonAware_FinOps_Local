@@ -1,7 +1,7 @@
 # Carbon-Aware FinOps - Essential Commands Only
 # Streamlined Makefile with core functionality
 
-.PHONY: help setup test cleanup reset deploy destroy run dashboard status emergency-stop logs instances
+.PHONY: help first-time-setup setup test cleanup reset deploy destroy run dashboard status emergency-stop logs instances
 .DEFAULT_GOAL := help
 
 # Configuration
@@ -19,11 +19,13 @@ BOLD := \033[1m
 NC := \033[0m
 
 help: ## 📋 Show available commands
-	@echo "$(BOLD)$(GREEN)🌱 Carbon-Aware FinOps - Essential Commands$(NC)"
+	@echo "$(BOLD)$(GREEN)🔍 Infrastructure Analysis & Optimization Tool$(NC)"
 	@echo "=================================================="
+	@echo "$(BLUE)Analysis-focused: Shows optimization potential, no automation$(NC)"
 	@echo ""
 	@echo "$(BOLD)🚀 Getting Started:$(NC)"
-	@echo "  $(BLUE)make setup$(NC)        - Complete project setup (first time)"
+	@echo "  $(BLUE)make first-time-setup$(NC) - Complete first-time setup (recommended)"
+	@echo "  $(BLUE)make setup$(NC)        - Project setup only (existing config)"
 	@echo ""
 	@echo "$(BOLD)💻 Development:$(NC)"
 	@echo "  $(BLUE)make test$(NC)         - Run all tests and quality checks"
@@ -45,7 +47,43 @@ help: ## 📋 Show available commands
 	@echo "  $(BLUE)make instances$(NC)    - 💻 List managed EC2 instances"
 
 # 🚀 GETTING STARTED
-setup: ## 🔧 Complete project setup (run this first!)
+first-time-setup: ## 🚀 Complete first-time setup with automatic configuration
+	@echo "$(BOLD)$(GREEN)🚀 Carbon-Aware FinOps First-Time Setup$(NC)"
+	@echo "========================================"
+	@echo ""
+	@if [ ! -f "infrastructure/terraform/terraform.tfvars" ]; then \
+		echo "$(YELLOW)1/4 Creating terraform.tfvars from example...$(NC)"; \
+		cp infrastructure/terraform/terraform.tfvars.example infrastructure/terraform/terraform.tfvars; \
+		echo ""; \
+		echo "$(BOLD)$(RED)⚠️  CONFIGURATION REQUIRED$(NC)"; \
+		echo "$(RED)Please edit infrastructure/terraform/terraform.tfvars with:$(NC)"; \
+		echo "  • Your AWS Account ID (find in AWS console upper right)"; \
+		echo "  • Your AWS Profile (usually your SSO profile name)"; \
+		echo "  • Optional: API keys for enhanced carbon data"; \
+		echo ""; \
+		echo "$(BLUE)💡 Then run 'make first-time-setup' again to continue$(NC)"; \
+		echo "$(BLUE)💡 Or run individual commands: make setup && make deploy$(NC)"; \
+	else \
+		echo "$(YELLOW)1/4 Configuration found, proceeding with setup...$(NC)"; \
+		$(MAKE) setup; \
+		echo "$(YELLOW)2/4 Deploying infrastructure...$(NC)"; \
+		$(MAKE) deploy; \
+		echo "$(YELLOW)3/4 Running initial analysis...$(NC)"; \
+		$(MAKE) run; \
+		echo "$(YELLOW)4/4 Setup complete!$(NC)"; \
+		echo ""; \
+		echo "$(BOLD)$(GREEN)🎉 First-Time Setup Complete!$(NC)"; \
+		echo "================================"; \
+		echo "$(BLUE)Your Carbon-Aware FinOps tool is ready!$(NC)"; \
+		echo ""; \
+		echo "$(BOLD)Next steps:$(NC)"; \
+		echo "  • Run $(BOLD)make dashboard$(NC) to view analysis results"; \
+		echo "  • Check $(BOLD)make status$(NC) for system health"; \
+		echo "  • View $(BOLD)make instances$(NC) for test instances"; \
+		echo ""; \
+		echo "$(YELLOW)💡 The system analyzes instances hourly automatically$(NC)"; \
+	fi
+setup: ## 🔧 Project setup only (use 'make first-time-setup' for new installations)
 	@echo "$(BOLD)$(GREEN)🚀 Setting up Carbon-Aware FinOps Project$(NC)"
 	@echo "=========================================="
 	@echo "$(YELLOW)1/4 Creating virtual environment...$(NC)"
@@ -67,6 +105,7 @@ setup: ## 🔧 Complete project setup (run this first!)
 	@echo "  • Run '$(BOLD)make deploy$(NC)' to deploy infrastructure"
 	@echo "  • Run '$(BOLD)make run$(NC)' to start the carbon-aware system"
 	@echo "  • Run '$(BOLD)make dashboard$(NC)' to view real-time metrics"
+	@echo "$(YELLOW)💡 For new installations, use '$(BOLD)make first-time-setup$(NC)' instead$(NC)"
 
 # 💻 DEVELOPMENT
 test: ## 🧪 Run comprehensive tests and quality checks
@@ -186,13 +225,23 @@ run: ## 🏃 Run the complete carbon-aware system
 	@echo "$(GREEN)✅ System execution complete$(NC)"
 	@echo "$(BLUE)💡 Launch dashboard: make dashboard$(NC)"
 
-dashboard: ## 📊 Launch real-time Carbon-Aware FinOps dashboard
-	@echo "$(BOLD)$(BLUE)📊 Starting Carbon-Aware Dashboard$(NC)"
-	@echo "==================================="
+dashboard: ## 📊 Launch Infrastructure Analysis & Optimization Dashboard
+	@echo "$(BOLD)$(BLUE)📊 Starting Infrastructure Analysis Dashboard$(NC)"
+	@echo "=============================================="
+	@echo "$(BLUE)🌐 Dashboard will be available at: http://localhost:8051$(NC)"
+	@echo "$(BLUE)🎯 Focus: Analysis & optimization potential (no automation)$(NC)"
+	@echo "$(YELLOW)Press Ctrl+C to stop the dashboard$(NC)"
+	@$(MAKE) _ensure-venv
+	@./$(VENV)/bin/python src/reporting/optimization_analysis_dashboard.py
+
+dashboard-legacy: ## 📊 Launch legacy dashboard (deprecated)
+	@echo "$(BOLD)$(YELLOW)📊 Starting Legacy Dashboard$(NC)"
+	@echo "================================="
+	@echo "$(YELLOW)⚠️  This is the old dashboard - use 'make dashboard' for current version$(NC)"
 	@echo "$(BLUE)🌐 Dashboard will be available at: http://localhost:8050$(NC)"
 	@echo "$(YELLOW)Press Ctrl+C to stop the dashboard$(NC)"
 	@$(MAKE) _ensure-venv
-	@./$(VENV)/bin/python src/reporting/thesis_dashboard.py
+	@./$(VENV)/bin/python src/reporting/thesis_dashboard_OBSOLETE.py
 
 status: ## 📊 Show comprehensive system and infrastructure status
 	@echo "$(BOLD)$(BLUE)📊 Carbon-Aware FinOps System Status$(NC)"
