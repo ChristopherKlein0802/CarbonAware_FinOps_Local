@@ -107,7 +107,7 @@ class PowerConsumptionService:
         
         try:
             # Boavizta cloud API endpoint for AWS instances
-            endpoint = f"{self.boavizta_base_url}/cloud/aws"
+            endpoint = f"{self.boavizta_base_url}/cloud/instance"
             
             payload = {
                 "instance_type": boavizta_config["instance_type"],

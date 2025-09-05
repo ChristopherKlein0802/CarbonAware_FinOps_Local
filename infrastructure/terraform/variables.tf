@@ -94,27 +94,7 @@ variable "carbon_api_provider" {
     error_message = "Carbon API provider must be either 'watttime' or 'electricitymap'."
   }
 }
-# Lambda-spezifische Variablen
-variable "electricitymap_api_key" {
-  description = "ElectricityMap API Key"
-  type        = string
-  default     = ""
-  sensitive   = true
-}
-
-variable "watttime_username" {
-  description = "WattTime API Username"
-  type        = string
-  default     = ""
-  sensitive   = true
-}
-
-variable "watttime_password" {
-  description = "WattTime API Password"
-  type        = string
-  default     = ""
-  sensitive   = true
-}
+# Lambda-spezifische Variablen (API credentials are already defined above)
 
 variable "notification_email" {
   description = "Email address for notifications"

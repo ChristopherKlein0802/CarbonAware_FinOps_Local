@@ -59,7 +59,7 @@ resource "aws_vpc" "main" {
 
 # Internet Gateway
 resource "aws_internet_gateway" "main" {
-  vpc_id = aws_vpc.main.id
+  vpc_id = aws_vpc.main[0].id
 
   tags = {
     Name = "${var.project_name}-igw"
@@ -68,7 +68,7 @@ resource "aws_internet_gateway" "main" {
 
 # Public Subnet
 resource "aws_subnet" "public" {
-  vpc_id                  = aws_vpc.main.id
+  vpc_id                  = aws_vpc.main[0].id
   cidr_block              = "10.0.1.0/24"
   availability_zone       = data.aws_availability_zones.available.names[0]
   map_public_ip_on_launch = true
@@ -80,7 +80,7 @@ resource "aws_subnet" "public" {
 
 # Route Table
 resource "aws_route_table" "public" {
-  vpc_id = aws_vpc.main.id
+  vpc_id = aws_vpc.main[0].id
 
   route {
     cidr_block = "0.0.0.0/0"
@@ -102,7 +102,7 @@ resource "aws_route_table_association" "public" {
 resource "aws_security_group" "main" {
   name        = "${var.project_name}-sg"
   description = "Security group for Carbon-Aware FinOps test instances"
-  vpc_id      = aws_vpc.main.id
+  vpc_id      = aws_vpc.main[0].id
 
   egress {
     from_port   = 0
@@ -310,8 +310,8 @@ resource "aws_instance" "test_instances" {
 
   ami                    = data.aws_ami.amazon_linux.id
   instance_type          = each.value.instance_type
-  subnet_id              = aws_subnet.public[0].id
-  vpc_security_group_ids = [aws_security_group.main[0].id]
+  subnet_id              = aws_subnet.public.id
+  vpc_security_group_ids = [aws_security_group.main.id]
   iam_instance_profile   = aws_iam_instance_profile.ec2_profile.name
   monitoring             = true
 
@@ -338,7 +338,7 @@ data "aws_ami" "amazon_linux" {
 
 # Output values
 output "vpc_id" {
-  value = aws_vpc.main.id
+  value = aws_vpc.main[0].id
 }
 
 output "subnet_id" {

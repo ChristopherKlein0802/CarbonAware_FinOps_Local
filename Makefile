@@ -29,6 +29,8 @@ help: ## 📋 Show available commands
 	@echo ""
 	@echo "$(BOLD)💻 Development:$(NC)"
 	@echo "  $(BLUE)make test$(NC)         - Run all tests and quality checks"
+	@echo "  $(BLUE)make test-power$(NC)    - Test Power Consumption Service"
+	@echo "  $(BLUE)make test-apis$(NC)     - Test API integrations"
 	@echo "  $(BLUE)make cleanup$(NC)      - Clean temporary files and caches"
 	@echo "  $(BLUE)make reset$(NC)        - Complete project cleanup (⚠️  removes everything!)"
 	@echo ""
@@ -234,14 +236,6 @@ dashboard: ## 📊 Launch Infrastructure Analysis & Optimization Dashboard
 	@$(MAKE) _ensure-venv
 	@./$(VENV)/bin/python src/reporting/optimization_analysis_dashboard.py
 
-dashboard-legacy: ## 📊 Launch legacy dashboard (deprecated)
-	@echo "$(BOLD)$(YELLOW)📊 Starting Legacy Dashboard$(NC)"
-	@echo "================================="
-	@echo "$(YELLOW)⚠️  This is the old dashboard - use 'make dashboard' for current version$(NC)"
-	@echo "$(BLUE)🌐 Dashboard will be available at: http://localhost:8050$(NC)"
-	@echo "$(YELLOW)Press Ctrl+C to stop the dashboard$(NC)"
-	@$(MAKE) _ensure-venv
-	@./$(VENV)/bin/python src/reporting/thesis_dashboard_OBSOLETE.py
 
 status: ## 📊 Show comprehensive system and infrastructure status
 	@echo "$(BOLD)$(BLUE)📊 Carbon-Aware FinOps System Status$(NC)"
@@ -350,3 +344,17 @@ _instance_status:
 _lambda_status:
 	@SCHEDULER_STATUS=$$(aws lambda get-function --function-name carbon-aware-finops-carbon-scheduler --query 'Configuration.State' --output text --profile $(AWS_PROFILE) 2>/dev/null || echo "NotFound"); \
 	echo "  ⚡ Scheduler: $$SCHEDULER_STATUS"
+
+
+# 🧪 TESTING
+test-power: ## ⚡ Test Power Consumption Service integration
+	@echo "$(BOLD)$(YELLOW)⚡ Testing Power Consumption Service$(NC)"
+	@echo "=====================================" 
+	@$(MAKE) _ensure-venv
+	@./$(VENV)/bin/python tests/integration/test_power_service.py
+
+test-apis: ## 🌍 Test API integrations (Power + ElectricityMap)
+	@echo "$(BOLD)$(YELLOW)🌍 Testing API Integrations$(NC)"
+	@echo "============================="
+	@$(MAKE) _ensure-venv
+	@./$(VENV)/bin/python tests/integration/demo_api_interaction.py
