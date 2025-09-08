@@ -59,6 +59,22 @@ class OptimizationAnalysisDashboard:
         else:
             self.advanced_viz = None
             logger.warning("Advanced Visualization Service not available")
+            
+        # Initialize DynamoDB Service (Optional)
+        try:
+            from src.services.dynamodb_service import DynamoDBService
+            self.dynamodb_service = DynamoDBService(aws_profile, project_name)
+            if self.dynamodb_service.table:
+                logger.info("DynamoDB Service initialized - data persistence enabled")
+            else:
+                logger.info("DynamoDB Service available but not connected")
+                self.dynamodb_service = None
+        except ImportError:
+            logger.info("DynamoDB Service not available - dashboard works without persistence")
+            self.dynamodb_service = None
+        except Exception as e:
+            logger.warning(f"DynamoDB Service initialization failed: {e}")
+            self.dynamodb_service = None
         
         # Initialize AWS clients
         try:
@@ -255,6 +271,11 @@ class OptimizationAnalysisDashboard:
     def setup_callbacks(self):
         """Set up dashboard callbacks for the optimization analysis."""
         
+        # Store callback function as instance method to avoid "not accessed" warning
+        self.update_optimization_analysis = self._create_update_callback()
+        
+    def _create_update_callback(self):
+        """Create and register the main update callback for the dashboard."""
         @self.app.callback(
             [Output('cost-overview-card', 'children'),
              Output('co2-overview-card', 'children'),
@@ -276,8 +297,9 @@ class OptimizationAnalysisDashboard:
              Output('methodology-explanation', 'children')],
             [Input('interval-component', 'n_intervals')]
         )
-        def update_optimization_analysis(_):  # noqa: F841
+        def update_optimization_analysis(_):
             """Update all optimization analysis components."""
+            # This function is used as a Dash callback and accessed via self.update_optimization_analysis
             
             # Get current infrastructure data
             data = self.get_infrastructure_data()
@@ -316,6 +338,8 @@ class OptimizationAnalysisDashboard:
                    trends_chart, significance_chart, regional_chart, seasonal_chart,
                    scheduling_chart, cost_co2_chart, recommendations,
                    roi_calculator, esg_summary, methodology)
+                   
+        return update_optimization_analysis
 
     def get_infrastructure_data(self) -> List[Dict]:
         """Get real infrastructure data from AWS."""
@@ -323,6 +347,7 @@ class OptimizationAnalysisDashboard:
             import boto3
             from src.services.power_consumption_service import PowerConsumptionService
             from src.carbon.carbon_api_client import CarbonIntensityClient
+            from datetime import datetime, timedelta  # noqa: F401
             import os
             
             # Ensure API key is set

@@ -1,12 +1,13 @@
-# Carbon-Aware FinOps - Essential Commands Only
-# Streamlined Makefile with core functionality
+# Carbon-Aware FinOps - Bachelor Thesis Dashboard
+# Separate Dashboard and AWS Infrastructure Management
 
-.PHONY: help first-time-setup setup test cleanup reset deploy destroy run dashboard status emergency-stop logs instances
+.PHONY: help setup-env dashboard deploy destroy test-apis test status instances keys cleanup _check-env deploy-aws destroy-aws
 .DEFAULT_GOAL := help
 
 # Configuration
 PYTHON := python3
 VENV := venv
+# AWS configuration (will be overridden from .env if present)
 AWS_PROFILE := carbon-finops-sandbox
 AWS_REGION := eu-central-1
 
@@ -19,342 +20,191 @@ BOLD := \033[1m
 NC := \033[0m
 
 help: ## 📋 Show available commands
-	@echo "$(BOLD)$(GREEN)🔍 Infrastructure Analysis & Optimization Tool$(NC)"
-	@echo "=================================================="
-	@echo "$(BLUE)Analysis-focused: Shows optimization potential, no automation$(NC)"
+	@echo "$(BOLD)$(GREEN)🎓 Carbon-Aware FinOps Dashboard - Bachelor Thesis$(NC)"
+	@echo "======================================================="
+	@echo "$(BLUE)Separate Dashboard & AWS Infrastructure Management$(NC)"
 	@echo ""
-	@echo "$(BOLD)🚀 Getting Started:$(NC)"
-	@echo "  $(BLUE)make first-time-setup$(NC) - Complete first-time setup (recommended)"
-	@echo "  $(BLUE)make setup$(NC)        - Project setup only (existing config)"
+	@echo "$(BOLD)🚀 Quick Start:$(NC)"
+	@echo "  $(BLUE)make setup-env$(NC)  - Setup environment & API keys"
+	@echo "  $(BLUE)make dashboard$(NC)  - 📊 Launch dashboard"
+	@echo "  $(BLUE)make deploy$(NC)     - ☁️  Deploy AWS instances"
 	@echo ""
-	@echo "$(BOLD)💻 Development:$(NC)"
-	@echo "  $(BLUE)make test$(NC)         - Run all tests and quality checks"
-	@echo "  $(BLUE)make test-power$(NC)    - Test Power Consumption Service"
-	@echo "  $(BLUE)make test-apis$(NC)     - Test API integrations"
-	@echo "  $(BLUE)make cleanup$(NC)      - Clean temporary files and caches"
-	@echo "  $(BLUE)make reset$(NC)        - Complete project cleanup (⚠️  removes everything!)"
+	@echo "$(BOLD)📊 Dashboard & Testing:$(NC)"
+	@echo "  $(BLUE)make dashboard$(NC)  - Launch analysis dashboard"
+	@echo "  $(BLUE)make test-apis$(NC)  - Test API connections"
+	@echo "  $(BLUE)make test$(NC)       - Run test suite"
+	@echo "  $(BLUE)make keys$(NC)       - Check API key status"
 	@echo ""
-	@echo "$(BOLD)☁️  Deployment:$(NC)"
-	@echo "  $(BLUE)make deploy$(NC)       - Deploy complete infrastructure to AWS"
-	@echo "  $(BLUE)make destroy$(NC)      - Destroy AWS infrastructure (⚠️  careful!)"
-	@echo ""
-	@echo "$(BOLD)🏃 Operations:$(NC)"
-	@echo "  $(BLUE)make run$(NC)          - Run the complete carbon-aware system"
-	@echo "  $(BLUE)make dashboard$(NC)    - Launch real-time dashboard"
-	@echo "  $(BLUE)make status$(NC)       - Show system and infrastructure status"
+	@echo "$(BOLD)☁️  AWS Infrastructure:$(NC)"
+	@echo "  $(BLUE)make deploy$(NC)     - Deploy 8 test instances"
+	@echo "  $(BLUE)make destroy$(NC)    - Remove all AWS resources (⚠️  careful!)"
+	@echo "  $(BLUE)make status$(NC)     - Show infrastructure status"
+	@echo "  $(BLUE)make instances$(NC)  - List EC2 instances"
 	@echo ""
 	@echo "$(BOLD)🔧 Utilities:$(NC)"
-	@echo "  $(BLUE)make emergency-stop$(NC) - 🚨 Emergency stop all managed instances"
-	@echo "  $(BLUE)make logs$(NC)         - 📄 View recent Lambda logs"
-	@echo "  $(BLUE)make instances$(NC)    - 💻 List managed EC2 instances"
+	@echo "  $(BLUE)make cleanup$(NC)    - Clean temporary files"
 
-# 🚀 GETTING STARTED
-first-time-setup: ## 🚀 Complete first-time setup with automatic configuration
-	@echo "$(BOLD)$(GREEN)🚀 Carbon-Aware FinOps First-Time Setup$(NC)"
-	@echo "========================================"
-	@echo ""
-	@if [ ! -f "infrastructure/terraform/terraform.tfvars" ]; then \
-		echo "$(YELLOW)1/4 Creating terraform.tfvars from example...$(NC)"; \
-		cp infrastructure/terraform/terraform.tfvars.example infrastructure/terraform/terraform.tfvars; \
-		echo ""; \
-		echo "$(BOLD)$(RED)⚠️  CONFIGURATION REQUIRED$(NC)"; \
-		echo "$(RED)Please edit infrastructure/terraform/terraform.tfvars with:$(NC)"; \
-		echo "  • Your AWS Account ID (find in AWS console upper right)"; \
-		echo "  • Your AWS Profile (usually your SSO profile name)"; \
-		echo "  • Optional: API keys for enhanced carbon data"; \
-		echo ""; \
-		echo "$(BLUE)💡 Then run 'make first-time-setup' again to continue$(NC)"; \
-		echo "$(BLUE)💡 Or run individual commands: make setup && make deploy$(NC)"; \
+# 🚀 ENVIRONMENT SETUP
+setup-env: ## 🔧 Setup environment and API keys
+	@echo "$(BOLD)$(GREEN)🔧 Carbon-Aware FinOps Environment Setup$(NC)"
+	@echo "========================================="
+	@echo "$(YELLOW)1/4 Creating Python virtual environment...$(NC)"
+	@if [ ! -d "$(VENV)" ]; then \
+		$(PYTHON) -m venv $(VENV) && echo "$(GREEN)✅ Virtual environment created$(NC)" || echo "$(RED)❌ Error creating venv$(NC)"; \
 	else \
-		echo "$(YELLOW)1/4 Configuration found, proceeding with setup...$(NC)"; \
-		$(MAKE) setup; \
-		echo "$(YELLOW)2/4 Deploying infrastructure...$(NC)"; \
-		$(MAKE) deploy; \
-		echo "$(YELLOW)3/4 Running initial analysis...$(NC)"; \
-		$(MAKE) run; \
-		echo "$(YELLOW)4/4 Setup complete!$(NC)"; \
-		echo ""; \
-		echo "$(BOLD)$(GREEN)🎉 First-Time Setup Complete!$(NC)"; \
-		echo "================================"; \
-		echo "$(BLUE)Your Carbon-Aware FinOps tool is ready!$(NC)"; \
-		echo ""; \
-		echo "$(BOLD)Next steps:$(NC)"; \
-		echo "  • Run $(BOLD)make dashboard$(NC) to view analysis results"; \
-		echo "  • Check $(BOLD)make status$(NC) for system health"; \
-		echo "  • View $(BOLD)make instances$(NC) for test instances"; \
-		echo ""; \
-		echo "$(YELLOW)💡 The system analyzes instances hourly automatically$(NC)"; \
+		echo "$(GREEN)✅ Virtual environment already exists$(NC)"; \
 	fi
-setup: ## 🔧 Project setup only (use 'make first-time-setup' for new installations)
-	@echo "$(BOLD)$(GREEN)🚀 Setting up Carbon-Aware FinOps Project$(NC)"
-	@echo "=========================================="
-	@echo "$(YELLOW)1/4 Creating virtual environment...$(NC)"
-	@$(PYTHON) -m venv $(VENV)
-	@./$(VENV)/bin/pip install --upgrade pip setuptools wheel
-	@echo "$(YELLOW)2/4 Installing dependencies...$(NC)"
-	@./$(VENV)/bin/pip install -r requirements.txt
-	@./$(VENV)/bin/pip install -r requirements-dev.txt 2>/dev/null || echo "$(YELLOW)⚠️  Dev requirements not found, skipping$(NC)"
-	@./$(VENV)/bin/pip install -e .
-	@echo "$(YELLOW)3/4 Running quality checks...$(NC)"
-	@$(MAKE) _quick-test
-	@echo "$(YELLOW)4/4 Checking AWS connectivity...$(NC)"
-	@aws sts get-caller-identity --profile $(AWS_PROFILE) >/dev/null 2>&1 && \
-		echo "$(GREEN)✅ AWS connection successful$(NC)" || \
-		echo "$(RED)⚠️  AWS not configured. Run: aws sso login --sso-session $(AWS_PROFILE)$(NC)"
-	@echo ""
-	@echo "$(BOLD)$(GREEN)🎉 Setup complete!$(NC)"
-	@echo "$(BLUE)Next steps:$(NC)"
-	@echo "  • Run '$(BOLD)make deploy$(NC)' to deploy infrastructure"
-	@echo "  • Run '$(BOLD)make run$(NC)' to start the carbon-aware system"
-	@echo "  • Run '$(BOLD)make dashboard$(NC)' to view real-time metrics"
-	@echo "$(YELLOW)💡 For new installations, use '$(BOLD)make first-time-setup$(NC)' instead$(NC)"
-
-# 💻 DEVELOPMENT
-test: ## 🧪 Run comprehensive tests and quality checks
-	@echo "$(BOLD)$(YELLOW)🧪 Running Quality Checks$(NC)"
-	@echo "=========================="
-	@$(MAKE) _ensure-venv
-	@echo "$(YELLOW)1/4 Linting code...$(NC)"
-	@./$(VENV)/bin/flake8 src --max-line-length=120 --extend-ignore=E203,W503 || (echo "$(RED)❌ Linting failed$(NC)" && exit 1)
-	@echo "$(YELLOW)2/4 Type checking...$(NC)"
-	@./$(VENV)/bin/mypy src --ignore-missing-imports || (echo "$(RED)❌ Type checking failed$(NC)" && exit 1)
-	@echo "$(YELLOW)3/4 Running tests...$(NC)"
-	@./$(VENV)/bin/pytest tests/ -v --tb=short || (echo "$(RED)❌ Tests failed$(NC)" && exit 1)
-	@echo "$(YELLOW)4/4 Security scan...$(NC)"
-	@./$(VENV)/bin/bandit -r src --quiet || echo "$(YELLOW)⚠️  Security warnings found$(NC)"
-	@echo "$(GREEN)✅ All quality checks passed!$(NC)"
-
-cleanup: ## 🧹 Clean temporary files and caches
-	@echo "$(YELLOW)🧹 Cleaning project...$(NC)"
-	@find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
-	@find . -type f -name "*.pyc" -delete 2>/dev/null || true
-	@find . -type d -name ".pytest_cache" -exec rm -rf {} + 2>/dev/null || true
-	@rm -rf .mypy_cache htmlcov carbon_aware_finops.egg-info 2>/dev/null || true
-	@find infrastructure/ -name "*.tfstate.backup" -delete 2>/dev/null || true
-	@find . -name ".DS_Store" -delete 2>/dev/null || true
-	@echo "$(GREEN)✅ Cleanup complete$(NC)"
-
-reset: ## 🔥 Complete project reset (removes everything!)
-	@echo "$(BOLD)$(RED)🔥 COMPLETE PROJECT RESET$(NC)"
-	@echo "=========================="
-	@echo "$(RED)⚠️  This will remove:$(NC)"
-	@echo "  • Virtual environment"
-	@echo "  • All temporary/cache files"
-	@echo "  • Terraform state and cache"
-	@echo "  • Lambda zip files"
-	@echo "  • Log files"
-	@echo "  • All build artifacts"
-	@echo ""
-	@read -p "⚠️  Continue with complete reset? [y/N] " -r && \
-	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
-		echo "$(YELLOW)1/6 Removing virtual environment...$(NC)"; \
-		rm -rf $(VENV) 2>/dev/null || true; \
-		echo "$(YELLOW)2/6 Cleaning Python artifacts...$(NC)"; \
-		find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true; \
-		find . -type f -name "*.pyc" -delete 2>/dev/null || true; \
-		find . -type f -name "*.pyo" -delete 2>/dev/null || true; \
-		rm -rf .mypy_cache .pytest_cache htmlcov carbon_aware_finops.egg-info 2>/dev/null || true; \
-		echo "$(YELLOW)3/6 Cleaning Terraform artifacts...$(NC)"; \
-		rm -rf infrastructure/terraform/.terraform 2>/dev/null || true; \
-		rm -rf infrastructure/terraform/.terraform.lock.hcl 2>/dev/null || true; \
-		find infrastructure/ -name "*.tfstate*" -delete 2>/dev/null || true; \
-		find infrastructure/ -name "terraform.tfplan*" -delete 2>/dev/null || true; \
-		echo "$(YELLOW)4/6 Removing Lambda packages...$(NC)"; \
-		find infrastructure/ -name "*.zip" -delete 2>/dev/null || true; \
-		echo "$(YELLOW)5/6 Cleaning logs and temporary files...$(NC)"; \
-		rm -rf logs/*.log 2>/dev/null || true; \
-		find . -name ".DS_Store" -delete 2>/dev/null || true; \
-		find . -name "*.tmp" -delete 2>/dev/null || true; \
-		echo "$(YELLOW)6/6 Final cleanup...$(NC)"; \
-		rm -rf OPTIMIZATION_REPORT.md 2>/dev/null || true; \
-		echo ""; \
-		echo "$(BOLD)$(GREEN)🎉 Complete reset finished!$(NC)"; \
-		echo "$(BLUE)Project is now in pristine state$(NC)"; \
-		echo "$(BLUE)Run 'make setup' to begin again$(NC)"; \
+	@./$(VENV)/bin/pip install --upgrade pip setuptools wheel > /dev/null 2>&1
+	@echo "$(YELLOW)2/4 Installing Python dependencies...$(NC)"
+	@./$(VENV)/bin/pip install -r requirements.txt > /dev/null 2>&1 && echo "$(GREEN)✅ Dependencies installed$(NC)" || echo "$(RED)❌ Dependency installation failed$(NC)"
+	@echo "$(YELLOW)3/4 Setting up API keys...$(NC)"
+	@if [ ! -f ".env" ]; then \
+		echo "$(RED)❌ No .env file found$(NC)"; \
+		echo "Create .env file with your API keys"; \
+		exit 1; \
 	else \
-		echo "$(BLUE)❌ Reset cancelled$(NC)"; \
+		echo "$(GREEN)✅ .env file found$(NC)"; \
+	fi
+	@echo "$(YELLOW)4/4 Testing API connections...$(NC)"
+	@$(MAKE) test-apis
+	@echo ""
+	@echo "$(BOLD)$(GREEN)🎉 Environment Setup Complete!$(NC)"
+	@echo "Next: Run $(BOLD)make dashboard$(NC) to start dashboard"
+
+# 📊 DASHBOARD
+dashboard: ## 📊 Launch Carbon-Aware FinOps Dashboard
+	@echo "$(BOLD)$(GREEN)📊 Launching Carbon-Aware FinOps Dashboard$(NC)"
+	@echo "==============================================="
+	@echo "$(BLUE)Dashboard URL: http://127.0.0.1:8051$(NC)"
+	@echo "$(BLUE)Press Ctrl+C to stop$(NC)"
+	@echo ""
+	@echo "$(YELLOW)Loading dashboard with:$(NC)"
+	@echo "  ✅ ElectricityMap API (German grid data)"
+	@echo "  ✅ Boavizta API (hardware power data)"
+	@echo "  ✅ AWS Cost Explorer (if instances deployed)"
+	@echo ""
+	@if [ -f ".env" ]; then \
+		set -a && source .env && set +a && ./$(VENV)/bin/python3 src/visualization/optimization_analysis_dashboard.py; \
+	else \
+		echo "$(YELLOW)⚠️  No .env file found, using demo mode$(NC)"; \
+		./$(VENV)/bin/python3 src/visualization/optimization_analysis_dashboard.py; \
 	fi
 
-# ☁️ DEPLOYMENT
-deploy: ## 🚀 Deploy complete infrastructure to AWS
-	@echo "$(BOLD)$(GREEN)🚀 Deploying Carbon-Aware FinOps$(NC)"
+# ☁️  AWS INFRASTRUCTURE  
+deploy: ## ☁️  Deploy 8 test instances to AWS
+	@echo "$(BOLD)$(GREEN)☁️  Deploying AWS Infrastructure$(NC)"
 	@echo "=================================="
-	@$(MAKE) _ensure-venv
-	@echo "$(YELLOW)1/4 Initializing Terraform...$(NC)"
-	@cd infrastructure/terraform && terraform init -upgrade
-	@echo "$(YELLOW)2/4 Building Lambda packages...$(NC)"
-	@cd infrastructure/terraform && ./build_lambda.sh
-	@echo "$(YELLOW)3/4 Deploying infrastructure...$(NC)"
-	@cd infrastructure/terraform && terraform apply -var="aws_profile=$(AWS_PROFILE)" -var="aws_region=$(AWS_REGION)" -auto-approve
-	@echo "$(YELLOW)4/4 Setting up secrets...$(NC)"
-	@echo "$(YELLOW)4/4 Setting environment variables...$(NC)"
-	@echo "$(BLUE)Set these environment variables for enhanced features:$(NC)"
-	@echo "  export ELECTRICITYMAP_API_KEY='your-key'"
-	@echo "  export WATTTIME_USERNAME='your-username'"
-	@echo "  export WATTTIME_PASSWORD='your-password'"
+	@echo "$(YELLOW)Deploying 8 test instances to AWS...$(NC)"
+	@cd infrastructure/terraform && \
+		terraform init && \
+		terraform apply -auto-approve
 	@echo ""
-	@echo "$(BOLD)$(GREEN)🎉 Deployment complete!$(NC)"
-	@echo "$(BLUE)Infrastructure deployed successfully$(NC)"
+	@echo "$(BOLD)$(GREEN)🎉 AWS Deployment Complete!$(NC)"
+	@echo "Instances will appear in dashboard within 60 seconds"
 	@$(MAKE) status
 
-destroy: ## 🧹 Complete cleanup of ALL AWS resources
-	@echo "$(BOLD)$(RED)🧹 COMPREHENSIVE AWS CLEANUP$(NC)"
-	@echo "$(BOLD)🔍 Checking current resources:$(NC)"
-	@$(MAKE) --no-print-directory _check_resources
-	@read -p "$(RED)Type 'CLEANUP' to permanently delete ALL resources: $(NC)" confirm && \
-	if [ "$$confirm" = "CLEANUP" ]; then \
-		echo "$(YELLOW)🚀 Using Terraform destroy for complete cleanup...$(NC)"; \
-		cd infrastructure/terraform && terraform destroy -auto-approve; \
-		cd ../..; \
-		echo "$(YELLOW)🧹 Cleaning up any remaining orphaned resources...$(NC)"; \
-		$(MAKE) --no-print-directory _cleanup_orphaned_resources; \
-		echo "$(YELLOW)✅ Verifying cleanup completion...$(NC)"; \
-		$(MAKE) --no-print-directory _verify_cleanup; \
+deploy-aws: ## ☁️  Alias for deploy (backward compatibility)
+	@$(MAKE) deploy
+
+destroy: ## 🗑️  Destroy all AWS resources
+	@echo "$(BOLD)$(RED)⚠️  Destroying AWS Infrastructure$(NC)"
+	@echo "==================================="
+	@echo "$(RED)This will remove all AWS resources!$(NC)"
+	@read -p "Are you sure? (yes/no): " confirm && [ "$$confirm" = "yes" ] || exit 1
+	@cd infrastructure/terraform && terraform destroy -auto-approve
+	@echo "$(GREEN)✅ AWS resources destroyed$(NC)"
+
+destroy-aws: ## 🗑️  Alias for destroy (backward compatibility)
+	@$(MAKE) destroy
+
+# 🔍 MONITORING & STATUS
+status: ## 📊 Show AWS infrastructure status
+	@echo "$(BOLD)$(GREEN)📊 Infrastructure Status$(NC)"
+	@echo "========================="
+	@echo "$(YELLOW)AWS Profile:$(NC) $(AWS_PROFILE)"
+	@echo "$(YELLOW)AWS Region:$(NC) $(AWS_REGION)"
+	@echo ""
+	@aws ec2 describe-instances --profile $(AWS_PROFILE) --region $(AWS_REGION) \
+		--filters "Name=tag:Project,Values=carbon-aware-finops" "Name=instance-state-name,Values=running,stopped,pending" \
+		--query 'Reservations[].Instances[].[InstanceId,InstanceType,State.Name,Tags[?Key==`Name`].Value|[0]]' \
+		--output table || echo "$(RED)❌ No AWS access or instances found$(NC)"
+
+instances: ## 💻 List managed EC2 instances
+	@echo "$(BOLD)$(GREEN)💻 Managed EC2 Instances$(NC)"
+	@echo "=========================="
+	@aws ec2 describe-instances --profile $(AWS_PROFILE) --region $(AWS_REGION) \
+		--filters "Name=tag:Project,Values=carbon-aware-finops" \
+		--query 'Reservations[].Instances[].[InstanceId,InstanceType,State.Name,LaunchTime,Tags[?Key==`Name`].Value|[0],Tags[?Key==`ScheduleType`].Value|[0]]' \
+		--output table || echo "$(RED)❌ No instances found$(NC)"
+
+# 🧪 TESTING & APIs  
+test-apis: ## 🧪 Test API connections
+	@echo "$(BOLD)$(GREEN)🧪 Testing API Connections$(NC)"
+	@echo "============================"
+	@echo "$(YELLOW)1/3 Testing Boavizta API...$(NC)"
+	@./$(VENV)/bin/python3 -c "from src.services.power_consumption_service import PowerConsumptionService; service = PowerConsumptionService(); result = service.get_instance_power_consumption('t3.medium'); print(f'✅ Boavizta API: {result.avg_power_watts}W avg power')" || echo "$(RED)❌ Boavizta API failed$(NC)"
+	@echo "$(YELLOW)2/3 Testing ElectricityMap API...$(NC)"
+	@if [ -f ".env" ]; then \
+		set -a && source .env && set +a && ./$(VENV)/bin/python3 -c "from src.carbon.carbon_api_client import CarbonIntensityClient; client = CarbonIntensityClient(provider='electricitymap'); result = client.get_current_intensity('eu-central-1'); print(f'✅ ElectricityMap API: {result}g CO2/kWh')" 2>/dev/null || echo "$(YELLOW)⚠️  ElectricityMap API: Check API key in .env$(NC)"; \
 	else \
-		echo "$(RED)❌ Cleanup cancelled. Resources preserved.$(NC)"; \
+		echo "$(YELLOW)⚠️  No .env file - using demo mode$(NC)"; \
+	fi
+	@echo "$(YELLOW)3/3 Testing AWS access...$(NC)"
+	@aws sts get-caller-identity --profile $(AWS_PROFILE) --query 'Account' --output text >/dev/null && echo "$(GREEN)✅ AWS access working$(NC)" || echo "$(RED)❌ AWS access failed$(NC)"
+
+test: ## 🧪 Run test suite
+	@echo "$(BOLD)$(GREEN)🧪 Running Test Suite$(NC)"
+	@echo "===================="
+	@echo "$(YELLOW)Running Python tests...$(NC)"
+	@if [ -f "tests/test_carbon.py" ]; then \
+		if [ -f ".env" ]; then set -a && source .env && set +a; fi && \
+		./$(VENV)/bin/python3 -m pytest tests/ -v || echo "$(YELLOW)⚠️  Some tests failed$(NC)"; \
+	else \
+		echo "$(YELLOW)⚠️  No test files found$(NC)"; \
+	fi
+	@echo ""
+	@echo "$(YELLOW)Running demo scripts...$(NC)"
+	@if [ -f "tests/integration/demo_api_interaction.py" ]; then \
+		if [ -f ".env" ]; then set -a && source .env && set +a; fi && \
+		./$(VENV)/bin/python3 tests/integration/demo_api_interaction.py && echo "$(GREEN)✅ API demo successful$(NC)" || echo "$(YELLOW)⚠️  API demo had issues$(NC)"; \
 	fi
 
-# 🏃 OPERATIONS
-run: ## 🏃 Run the complete carbon-aware system
-	@echo "$(BOLD)$(YELLOW)🏃 Running Carbon-Aware System$(NC)"
-	@echo "==============================="
-	@$(MAKE) _ensure-venv
-	@echo "$(YELLOW)1/3 Triggering Lambda scheduler...$(NC)"
-	@aws lambda invoke --function-name carbon-aware-finops-carbon-scheduler --profile $(AWS_PROFILE) /tmp/lambda-response.json || echo "$(RED)⚠️  Lambda invocation failed$(NC)"
-	@echo "$(YELLOW)2/3 Checking Lambda execution results...$(NC)"
-	@cat /tmp/lambda-response.json 2>/dev/null || echo "$(YELLOW)⚠️  No response file$(NC)"
-	@echo "$(YELLOW)3/3 System ready - Lambda runs automatically every hour$(NC)"
-	@echo "$(GREEN)✅ System execution complete$(NC)"
-	@echo "$(BLUE)💡 Launch dashboard: make dashboard$(NC)"
-
-dashboard: ## 📊 Launch Infrastructure Analysis & Optimization Dashboard
-	@echo "$(BOLD)$(BLUE)📊 Starting Infrastructure Analysis Dashboard$(NC)"
-	@echo "=============================================="
-	@echo "$(BLUE)🌐 Dashboard will be available at: http://localhost:8051$(NC)"
-	@echo "$(BLUE)🎯 Focus: Analysis & optimization potential (no automation)$(NC)"
-	@echo "$(YELLOW)Press Ctrl+C to stop the dashboard$(NC)"
-	@$(MAKE) _ensure-venv
-	@./$(VENV)/bin/python src/reporting/optimization_analysis_dashboard.py
-
-
-status: ## 📊 Show comprehensive system and infrastructure status
-	@echo "$(BOLD)$(BLUE)📊 Carbon-Aware FinOps System Status$(NC)"
-	@echo "====================================="
+keys: ## 🔐 Check API key status
+	@echo "$(BOLD)$(GREEN)🔐 API Key Status$(NC)"
+	@echo "======================"
+	@echo "$(YELLOW)Current API key status:$(NC)"
 	@echo ""
-	@echo "$(BOLD)🏗️  Infrastructure:$(NC)"
-	@$(MAKE) --no-print-directory _infrastructure_status
+	@echo "$(BLUE)1. ElectricityMap API:$(NC)"
+	@if [ -f ".env" ] && grep -q "ELECTRICITYMAP_API_KEY=" .env; then \
+		echo "   ✅ Configured in .env"; \
+	else \
+		echo "   ⚠️  Not configured - using demo fallback"; \
+	fi
 	@echo ""
-	@echo "$(BOLD)💻 EC2 Instances:$(NC)"
-	@$(MAKE) --no-print-directory _instance_status
+	@echo "$(BLUE)2. AWS Credentials:$(NC)"
+	@aws sts get-caller-identity --profile $(AWS_PROFILE) --query 'Account' --output text >/dev/null 2>&1 && echo "   ✅ AWS profile '$(AWS_PROFILE)' working" || echo "   ❌ AWS profile '$(AWS_PROFILE)' not configured"
 	@echo ""
-	@echo "$(BOLD)⚡ Lambda Functions:$(NC)"
-	@$(MAKE) --no-print-directory _lambda_status
+	@echo "$(BLUE)3. Boavizta API:$(NC)"
+	@echo "   ✅ No API key required (public API)"
+	@echo ""
+	@echo "$(YELLOW)To update API keys:$(NC)"
+	@echo "  • Edit .env file for ElectricityMap API key"
+	@echo "  • Use 'aws configure sso' for AWS credentials"
 
 # 🔧 UTILITIES
-emergency-stop: ## 🚨 Emergency stop all managed instances
-	@echo "$(BOLD)$(RED)🚨 EMERGENCY STOP$(NC)"
-	@echo "=================="
-	@echo "$(RED)⚠️  This will immediately stop ALL managed instances$(NC)"
-	@echo ""
-	@read -p "$(RED)Continue with emergency stop? [y/N] $(NC)" -r && \
-	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
-		echo "$(YELLOW)Stopping all instances...$(NC)"; \
-		aws ec2 stop-instances \
-			--instance-ids $$(aws ec2 describe-instances \
-				--filters "Name=tag:Project,Values=carbon-aware-finops" "Name=instance-state-name,Values=running" \
-				--query 'Reservations[*].Instances[*].InstanceId' \
-				--output text \
-				--profile $(AWS_PROFILE) 2>/dev/null || echo "") \
-			--profile $(AWS_PROFILE) 2>/dev/null && \
-		echo "$(GREEN)✅ Emergency stop completed$(NC)" || \
-		echo "$(YELLOW)ℹ️  No running instances found$(NC)"; \
-	else \
-		echo "$(BLUE)❌ Emergency stop cancelled$(NC)"; \
+cleanup: ## 🧹 Clean temporary files and caches
+	@echo "$(BOLD)$(GREEN)🧹 Cleaning up temporary files$(NC)"
+	@echo "=================================="
+	@find . -type f -name "*.pyc" -delete
+	@find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+	@find . -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
+	@rm -rf .pytest_cache/ 2>/dev/null || true
+	@rm -rf build/ dist/ 2>/dev/null || true
+	@echo "$(GREEN)✅ Cleanup complete$(NC)"
+
+# Development helpers (internal)
+_check-env:
+	@if [ ! -d "$(VENV)" ]; then \
+		echo "$(RED)❌ Virtual environment not found. Run 'make setup-env' first$(NC)"; \
+		exit 1; \
 	fi
-
-logs: ## 📄 View recent Lambda function logs
-	@echo "$(BOLD)$(BLUE)📄 Recent Lambda Logs$(NC)"
-	@echo "====================="
-	@echo "$(YELLOW)Scheduler Lambda logs:$(NC)"
-	@aws logs tail /aws/lambda/carbon-aware-finops-carbon-scheduler --since 1h --profile $(AWS_PROFILE) 2>/dev/null || echo "$(RED)No scheduler logs found$(NC)"
-
-
-instances: ## 💻 List all managed EC2 instances with their purposes
-	@echo "$(BOLD)$(BLUE)💻 Managed EC2 Instances$(NC)"
-	@echo "========================"
-	@echo "$(YELLOW)Instances with their roles and purposes:$(NC)"
-	@aws ec2 describe-instances \
-		--filters "Name=tag:Project,Values=carbon-aware-finops" \
-		--query 'Reservations[*].Instances[*].[InstanceId,InstanceType,State.Name,Tags[?Key==`Name`].Value|[0],Tags[?Key==`Purpose`].Value|[0],Tags[?Key==`InstanceRole`].Value|[0]]' \
-		--output table \
-		--profile $(AWS_PROFILE) 2>/dev/null || echo "$(RED)No instances found$(NC)"
-
-# 🔧 INTERNAL HELPERS
-_ensure-venv:
-	@test -d $(VENV) || (echo "$(RED)❌ Virtual environment not found. Run 'make setup' first$(NC)" && exit 1)
-
-_quick-test:
-	@./$(VENV)/bin/flake8 src --max-line-length=120 --extend-ignore=E203,W503 --quiet || echo "$(YELLOW)⚠️  Code style issues found$(NC)"
-	@./$(VENV)/bin/mypy src --ignore-missing-imports --quiet || echo "$(YELLOW)⚠️  Type checking issues found$(NC)"
-
-_check_resources:
-	@echo "$(YELLOW)Checking current AWS resources...$(NC)"
-	@INSTANCES=$$(aws ec2 describe-instances --filters "Name=tag:Project,Values=carbon-aware-finops" --query 'length(Reservations[*].Instances[*])' --output text --profile $(AWS_PROFILE) 2>/dev/null || echo "0"); \
-	LAMBDAS=$$(aws lambda list-functions --query 'length(Functions[?contains(FunctionName, `carbon-aware-finops`)])' --output text --profile $(AWS_PROFILE) 2>/dev/null || echo "0"); \
-	TABLES=$$(aws dynamodb list-tables --query 'length(TableNames[?contains(@, `carbon-aware-finops`)])' --output text --profile $(AWS_PROFILE) 2>/dev/null || echo "0"); \
-	echo "  • EC2 Instances: $$INSTANCES"; \
-	echo "  • Lambda Functions: $$LAMBDAS"; \
-	echo "  • DynamoDB Tables: $$TABLES"
-
-_cleanup_orphaned_resources:
-	@echo "$(YELLOW)Cleaning orphaned Lambda functions...$(NC)"
-	@aws lambda list-functions --query 'Functions[?contains(FunctionName, `carbon-aware-finops`)].FunctionName' --output text --profile $(AWS_PROFILE) 2>/dev/null | \
-	while read -r func; do \
-		if [ -n "$$func" ]; then \
-			aws lambda delete-function --function-name "$$func" --profile $(AWS_PROFILE) 2>/dev/null || true; \
-		fi; \
-	done
-
-_verify_cleanup:
-	@echo "$(BOLD)🔍 FINAL VERIFICATION - Checking for remaining resources:$(NC)"
-	@REMAINING=0; \
-	INSTANCES=$$(aws ec2 describe-instances --filters "Name=tag:Project,Values=carbon-aware-finops" --query 'length(Reservations[*].Instances[*])' --output text --profile $(AWS_PROFILE) 2>/dev/null || echo "0"); \
-	LAMBDAS=$$(aws lambda list-functions --query 'length(Functions[?contains(FunctionName, `carbon-aware-finops`)])' --output text --profile $(AWS_PROFILE) 2>/dev/null || echo "0"); \
-	TABLES=$$(aws dynamodb list-tables --query 'length(TableNames[?contains(@, `carbon-aware-finops`)])' --output text --profile $(AWS_PROFILE) 2>/dev/null || echo "0"); \
-	REMAINING=$$(($$INSTANCES + $$LAMBDAS + $$TABLES)); \
-	if [ "$$REMAINING" = "0" ]; then \
-		echo "$(GREEN)✅ VERIFICATION PASSED: All resources successfully removed!$(NC)"; \
-	else \
-		echo "$(YELLOW)⚠️  Some resources remain: EC2($$INSTANCES), Lambda($$LAMBDAS), DynamoDB($$TABLES)$(NC)"; \
-	fi
-
-_infrastructure_status:
-	@aws sts get-caller-identity --query 'Account' --output text --profile $(AWS_PROFILE) 2>/dev/null && \
-		echo "  ✅ AWS Connection: Active" || \
-		echo "  ❌ AWS Connection: Failed"
-	@cd infrastructure/terraform && terraform show -json 2>/dev/null | jq -r '.values.root_module.resources | length' 2>/dev/null | \
-		xargs -I {} echo "  📊 Terraform Resources: {}" || \
-		echo "  ⚠️  Terraform: Not initialized"
-
-_instance_status:
-	@RUNNING=$$(aws ec2 describe-instances --filters "Name=tag:Project,Values=carbon-aware-finops" "Name=instance-state-name,Values=running" --query 'length(Reservations[*].Instances[*])' --output text --profile $(AWS_PROFILE) 2>/dev/null || echo "0"); \
-	STOPPED=$$(aws ec2 describe-instances --filters "Name=tag:Project,Values=carbon-aware-finops" "Name=instance-state-name,Values=stopped" --query 'length(Reservations[*].Instances[*])' --output text --profile $(AWS_PROFILE) 2>/dev/null || echo "0"); \
-	echo "  🟢 Running: $$RUNNING  🔴 Stopped: $$STOPPED"
-
-_lambda_status:
-	@SCHEDULER_STATUS=$$(aws lambda get-function --function-name carbon-aware-finops-carbon-scheduler --query 'Configuration.State' --output text --profile $(AWS_PROFILE) 2>/dev/null || echo "NotFound"); \
-	echo "  ⚡ Scheduler: $$SCHEDULER_STATUS"
-
-
-# 🧪 TESTING
-test-power: ## ⚡ Test Power Consumption Service integration
-	@echo "$(BOLD)$(YELLOW)⚡ Testing Power Consumption Service$(NC)"
-	@echo "=====================================" 
-	@$(MAKE) _ensure-venv
-	@./$(VENV)/bin/python tests/integration/test_power_service.py
-
-test-apis: ## 🌍 Test API integrations (Power + ElectricityMap)
-	@echo "$(BOLD)$(YELLOW)🌍 Testing API Integrations$(NC)"
-	@echo "============================="
-	@$(MAKE) _ensure-venv
-	@./$(VENV)/bin/python tests/integration/demo_api_interaction.py

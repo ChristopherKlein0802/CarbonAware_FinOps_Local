@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "carbon-aware-finops"
 version = "1.0.0"
 authors = [
-    {name = "Carbon-Aware FinOps Team"}
+    {name = "Christopher Klein", email = "ch.klein@reply.de"}
 ]
 description = "Carbon-aware financial operations and resource optimization for AWS"
 readme = "README.md"
@@ -39,7 +39,7 @@ dev = [
 ]
 
 [project.scripts]
-carbon-dashboard = "src.reporting.thesis_dashboard:main"
+carbon-dashboard = "src.visualization.optimization_analysis_dashboard:main"
 
 [tool.setuptools]
 packages = ["src"]

@@ -22,14 +22,48 @@ This **Bachelor Thesis tool** analyzes AWS infrastructure to calculate **both co
 ❌ **No production disruption** - safe to deploy in any AWS environment  
 ❌ **No trust required** - shows potential before implementation
 
+## 📁 Project Structure
+
+```
+CarbonAware_FinOps_Local/
+├── README.md                    # Main project documentation
+├── Makefile                     # Build and deployment commands  
+├── requirements.txt             # Python dependencies
+│
+├── docs/                        # 📚 Documentation
+│   ├── project-summary.md       # Detailed project overview
+│   ├── thesis-assessment.md     # Academic assessment criteria
+│   ├── deployment-guide.md      # Deployment instructions
+│   ├── api-integration-guide.md # API setup and usage
+│   └── makefile-guide.md        # Available make commands
+│
+├── src/                         # 🐍 Application source code
+│   ├── visualization/           # Dashboard and interactive charts
+│   ├── services/                # AWS and external API clients
+│   ├── analytics/               # Data analysis logic
+│   ├── carbon/                  # Carbon intensity calculations
+│   ├── config/                  # Configuration management
+│   └── utils/                   # Utility functions
+│
+├── tests/                       # 🧪 Test suite
+│   ├── examples/                # Demo and example scripts
+│   └── test_*.py                # Unit and integration tests
+│
+├── infrastructure/              # 🏗️ Infrastructure as Code
+│   └── terraform/               # AWS resource definitions
+│
+└── config/                      # ⚙️ Configuration files
+    └── pyrightconfig.json       # Type checker settings
+```
+
 ## 🚀 Quick Start
 
 ### Option 1: Automated Setup (Recommended)
 ```bash
-# Clone and run complete first-time setup
+# Clone repository
 git clone <your-repo>
 cd CarbonAware_FinOps_Local
-make first-time-setup
+make setup-env
 ```
 
 ### Option 2: Manual Setup
