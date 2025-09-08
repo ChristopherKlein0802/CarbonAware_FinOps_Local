@@ -156,17 +156,23 @@ test: ## 🧪 Run test suite
 	@echo "$(BOLD)$(GREEN)🧪 Running Test Suite$(NC)"
 	@echo "===================="
 	@echo "$(YELLOW)Running Python tests...$(NC)"
-	@if [ -f "tests/test_carbon.py" ]; then \
+	@if [ -f "tests/test_carbon_api.py" ]; then \
 		if [ -f ".env" ]; then set -a && source .env && set +a; fi && \
 		./$(VENV)/bin/python3 -m pytest tests/ -v || echo "$(YELLOW)⚠️  Some tests failed$(NC)"; \
 	else \
 		echo "$(YELLOW)⚠️  No test files found$(NC)"; \
 	fi
 	@echo ""
-	@echo "$(YELLOW)Running demo scripts...$(NC)"
-	@if [ -f "tests/integration/demo_api_interaction.py" ]; then \
+	@echo "$(YELLOW)Running integration tests...$(NC)"
+	@if [ -f "tests/test_power_service.py" ]; then \
 		if [ -f ".env" ]; then set -a && source .env && set +a; fi && \
-		./$(VENV)/bin/python3 tests/integration/demo_api_interaction.py && echo "$(GREEN)✅ API demo successful$(NC)" || echo "$(YELLOW)⚠️  API demo had issues$(NC)"; \
+		./$(VENV)/bin/python3 tests/test_power_service.py && echo "$(GREEN)✅ Power service test successful$(NC)" || echo "$(YELLOW)⚠️  Power service test had issues$(NC)"; \
+	fi
+	@echo ""
+	@echo "$(YELLOW)Running demo scripts...$(NC)"
+	@if [ -f "tests/demo_api_interaction.py" ]; then \
+		if [ -f ".env" ]; then set -a && source .env && set +a; fi && \
+		./$(VENV)/bin/python3 tests/demo_api_interaction.py && echo "$(GREEN)✅ API demo successful$(NC)" || echo "$(YELLOW)⚠️  API demo had issues$(NC)"; \
 	fi
 
 keys: ## 🔐 Check API key status

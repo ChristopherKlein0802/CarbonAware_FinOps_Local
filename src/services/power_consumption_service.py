@@ -37,44 +37,26 @@ class PowerConsumptionService:
         # Cache for API responses to avoid repeated calls
         self._power_cache: Dict[str, PowerConsumption] = {}
         
-        # Fallback power consumption data (watts) based on AWS instance families
-        # Source: AWS documentation, Intel/AMD specs, and industry estimates
+        # Simplified fallback power consumption data for Bachelor Thesis
         self._fallback_power_data = {
-            # General Purpose instances
-            't3.nano': {'idle': 2.5, 'max': 5.0},
             't3.micro': {'idle': 3.5, 'max': 7.0},
             't3.small': {'idle': 7.0, 'max': 14.0},
             't3.medium': {'idle': 14.0, 'max': 28.0},
             't3.large': {'idle': 28.0, 'max': 56.0},
-            't3.xlarge': {'idle': 56.0, 'max': 112.0},
-            
-            # Compute optimized
             'c5.large': {'idle': 25.0, 'max': 50.0},
-            'c5.xlarge': {'idle': 50.0, 'max': 100.0},
-            'c5.2xlarge': {'idle': 100.0, 'max': 200.0},
-            
-            # Memory optimized  
-            'r5.large': {'idle': 30.0, 'max': 60.0},
-            'r5.xlarge': {'idle': 60.0, 'max': 120.0},
-            'r5.2xlarge': {'idle': 120.0, 'max': 240.0},
-            
-            # Storage optimized
-            'i3.large': {'idle': 35.0, 'max': 70.0},
-            'i3.xlarge': {'idle': 70.0, 'max': 140.0},
         }
     
-    def get_instance_power_consumption(self, instance_type: str, region: str = "eu-central-1") -> PowerConsumption:
+    def get_instance_power_consumption(self, instance_type: str) -> PowerConsumption:
         """
         Get power consumption data for an EC2 instance type
         
         Args:
             instance_type: AWS EC2 instance type (e.g., "t3.micro")
-            region: AWS region (used for data center efficiency factors)
             
         Returns:
             PowerConsumption object with power data and metadata
         """
-        cache_key = f"{instance_type}_{region}"
+        cache_key = instance_type
         
         # Check cache first
         if cache_key in self._power_cache:
@@ -83,7 +65,7 @@ class PowerConsumptionService:
         
         # Try Boavizta API first
         try:
-            power_data = self._get_boavizta_power_data(instance_type, region)
+            power_data = self._get_boavizta_power_data(instance_type)
             if power_data:
                 self._power_cache[cache_key] = power_data
                 return power_data
@@ -96,7 +78,7 @@ class PowerConsumptionService:
         self._power_cache[cache_key] = fallback_data
         return fallback_data
     
-    def _get_boavizta_power_data(self, instance_type: str, _: str) -> Optional[PowerConsumption]:
+    def _get_boavizta_power_data(self, instance_type: str) -> Optional[PowerConsumption]:
         """Get power consumption data from Boavizta API"""
         
         # Direct AWS instance type mapping - no conversion needed with new API format
@@ -126,39 +108,6 @@ class PowerConsumptionService:
             logger.error(f"Error parsing Boavizta response: {e}")
             return None
     
-    def _map_aws_to_boavizta(self, instance_type: str) -> Optional[Dict]:
-        """Map AWS instance types to Boavizta API format"""
-        
-        # Extract family and size from AWS instance type
-        parts = instance_type.split('.')
-        if len(parts) != 2:
-            return None
-            
-        _, size = parts[0], parts[1]
-        
-        # Boavizta uses standardized instance configurations
-        # This is a simplified mapping - in production, you'd have more comprehensive mapping
-        size_mapping = {
-            'nano': {'vcpu': 1, 'memory': 0.5},
-            'micro': {'vcpu': 1, 'memory': 1.0},
-            'small': {'vcpu': 1, 'memory': 2.0},
-            'medium': {'vcpu': 2, 'memory': 4.0},
-            'large': {'vcpu': 2, 'memory': 8.0},
-            'xlarge': {'vcpu': 4, 'memory': 16.0},
-            '2xlarge': {'vcpu': 8, 'memory': 32.0},
-        }
-        
-        if size not in size_mapping:
-            logger.warning(f"Unknown instance size: {size}")
-            return None
-        
-        config = size_mapping[size]
-        
-        return {
-            "instance_type": instance_type,
-            "vcpu": config['vcpu'],
-            "memory": config['memory']
-        }
     
     def _parse_boavizta_response(self, data: Dict, instance_type: str) -> PowerConsumption:
         """Parse Boavizta API response to extract power consumption"""
@@ -223,51 +172,22 @@ class PowerConsumptionService:
         )
     
     def _estimate_power_from_pattern(self, instance_type: str) -> Tuple[float, float]:
-        """Estimate power consumption for unknown instance types based on patterns"""
+        """Simplified power estimation for unknown instance types"""
         
         parts = instance_type.split('.')
         if len(parts) != 2:
-            # Default for completely unknown instances
-            return 20.0, 40.0
+            return 20.0, 40.0  # Default fallback
             
-        family, size = parts[0], parts[1]
+        size = parts[1]
         
-        # Base power estimates by family type
-        family_base_power = {
-            't2': 5.0,   # Burstable general purpose
-            't3': 7.0,   # Burstable general purpose  
-            't4g': 6.0,  # ARM-based burstable
-            'm5': 25.0,  # General purpose
-            'm6i': 28.0, # General purpose Intel
-            'c5': 40.0,  # Compute optimized
-            'c6i': 45.0, # Compute optimized Intel
-            'r5': 35.0,  # Memory optimized
-            'r6i': 40.0, # Memory optimized Intel
-            'i3': 50.0,  # Storage optimized
+        # Simple size-based estimation
+        size_power = {
+            'micro': 7.0, 'small': 14.0, 'medium': 28.0, 
+            'large': 56.0, 'xlarge': 112.0
         }
         
-        # Size multipliers
-        size_multipliers = {
-            'nano': 0.5,
-            'micro': 1.0,
-            'small': 2.0,
-            'medium': 4.0,
-            'large': 8.0,
-            'xlarge': 16.0,
-            '2xlarge': 32.0,
-            '4xlarge': 64.0,
-            '8xlarge': 128.0,
-        }
-        
-        # Get base power for family (default to general purpose if unknown)
-        base_power = family_base_power.get(family, 25.0)
-        
-        # Get size multiplier (default to medium if unknown)
-        size_mult = size_multipliers.get(size, 4.0)
-        
-        # Calculate power consumption
-        idle_power = base_power * size_mult * 0.3  # 30% at idle
-        max_power = base_power * size_mult
+        max_power = size_power.get(size, 28.0)  # Default to medium
+        idle_power = max_power * 0.5  # 50% at idle
         
         return idle_power, max_power
     

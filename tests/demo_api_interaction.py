@@ -29,7 +29,7 @@ def main():
     
     print("\n🔌 Step 1: Get German Grid Carbon Intensity (ElectricityMap API)")
     try:
-        carbon_intensity = carbon_client.get_carbon_intensity('DE')
+        carbon_intensity = carbon_client.get_current_intensity('eu-central-1')
         print(f"   Current German Grid: {carbon_intensity} gCO2/kWh")
         print(f"   Source: ElectricityMap API (Real-time)")
     except Exception as e:

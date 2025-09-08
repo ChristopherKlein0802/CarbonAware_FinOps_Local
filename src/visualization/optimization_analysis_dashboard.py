@@ -5,10 +5,10 @@ Approach: Analysis and recommendations, NOT automatic scheduling
 """
 
 import dash
-from dash import dcc, html, dash_table, Input, Output
+from dash import dcc, html, dash_table, Input, Output, State
 import plotly.graph_objects as go
 import boto3
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Dict, List
 import logging
 
@@ -60,18 +60,14 @@ class OptimizationAnalysisDashboard:
             self.advanced_viz = None
             logger.warning("Advanced Visualization Service not available")
             
-        # Initialize DynamoDB Service (Optional)
+        # Initialize DynamoDB Service for data persistence
         try:
             from src.services.dynamodb_service import DynamoDBService
             self.dynamodb_service = DynamoDBService(aws_profile, project_name)
             if self.dynamodb_service.table:
                 logger.info("DynamoDB Service initialized - data persistence enabled")
             else:
-                logger.info("DynamoDB Service available but not connected")
-                self.dynamodb_service = None
-        except ImportError:
-            logger.info("DynamoDB Service not available - dashboard works without persistence")
-            self.dynamodb_service = None
+                logger.warning("DynamoDB Service available but table not accessible")
         except Exception as e:
             logger.warning(f"DynamoDB Service initialization failed: {e}")
             self.dynamodb_service = None
@@ -79,22 +75,17 @@ class OptimizationAnalysisDashboard:
         # Initialize AWS clients
         try:
             boto3.setup_default_session(profile_name=aws_profile)
-            self.dynamodb = boto3.resource('dynamodb')
             self.ec2 = boto3.client('ec2')
             self.ce = boto3.client('ce', region_name='us-east-1')
             logger.info("AWS clients initialized successfully")
         except Exception as e:
             logger.error(f"AWS initialization failed: {e}")
-            self.dynamodb = None
             self.ec2 = None
             self.ce = None
         
         # Set up layout and callbacks
         self.setup_layout()
         self.setup_callbacks()
-        
-        # DynamoDB table name
-        self.results_table_name = f"{project_name}-results"
 
     def setup_layout(self):
         """Set up the Infrastructure Analysis & Optimization Potential dashboard layout."""
@@ -339,7 +330,91 @@ class OptimizationAnalysisDashboard:
                    scheduling_chart, cost_co2_chart, recommendations,
                    roi_calculator, esg_summary, methodology)
                    
+        # Persistence Settings Callback
+        @self.app.callback(
+            Output('persistence-status', 'children'),
+            [Input('update-persistence-btn', 'n_clicks')],
+            [State('persistence-settings', 'value')]
+        )
+        def update_persistence_settings(n_clicks, selected_options):
+            """Handle persistence settings updates."""
+            if n_clicks is None:
+                return html.Div("💾 Select data types to store for historical analysis", 
+                              style={'color': '#666', 'fontStyle': 'italic'})
+            
+            if not self.dynamodb_service:
+                return html.Div("❌ DynamoDB not available - data persistence disabled", 
+                              style={'color': '#d32f2f'})
+            
+            if not selected_options:
+                return html.Div("⚠️ No data types selected for persistence", 
+                              style={'color': '#f57c00'})
+            
+            # Store current data based on selections
+            success_count = 0
+            total_count = len(selected_options)
+            
+            if 'carbon' in selected_options:
+                try:
+                    from src.carbon.carbon_api_client import CarbonIntensityClient
+                    carbon_client = CarbonIntensityClient()
+                    intensity = carbon_client.get_current_intensity('eu-central-1')
+                    if self.dynamodb_service.store_carbon_intensity('eu-central-1', intensity):
+                        success_count += 1
+                except Exception as e:
+                    logger.warning(f"Failed to store carbon data: {e}")
+            
+            if 'power' in selected_options:
+                try:
+                    from src.services.power_consumption_service import PowerConsumptionService
+                    power_service = PowerConsumptionService()
+                    power_data = power_service.get_instance_power_consumption('t3.medium')
+                    if self.dynamodb_service.store_power_data('t3.medium', power_data._asdict()):
+                        success_count += 1
+                except Exception as e:
+                    logger.warning(f"Failed to store power data: {e}")
+            
+            if 'costs' in selected_options:
+                try:
+                    data = self.get_infrastructure_data() or self.get_demo_optimization_data()
+                    if self.dynamodb_service.store_cost_data(data):
+                        success_count += 1
+                except Exception as e:
+                    logger.warning(f"Failed to store cost data: {e}")
+            
+            if success_count == total_count:
+                return html.Div(f"✅ Successfully stored {success_count} data types to DynamoDB", 
+                              style={'color': '#2e7d32'})
+            else:
+                return html.Div(f"⚠️ Stored {success_count}/{total_count} data types - check logs for details", 
+                              style={'color': '#f57c00'})
+
         return update_optimization_analysis
+
+    def get_historical_data_for_charts(self) -> Dict:
+        """Get historical data for trend analysis charts."""
+        if not self.dynamodb_service:
+            return {'carbon_data': [], 'cost_data': [], 'summary': {'carbon_points': 0, 'cost_points': 0}}
+        
+        try:
+            # Get historical carbon intensity data (last 7 days)
+            carbon_data = self.dynamodb_service.get_historical_carbon_data('eu-central-1', days=7)
+            
+            # Get historical cost data (last 30 days)
+            cost_data = self.dynamodb_service.get_historical_cost_data(days=30)
+            
+            # Get data summary
+            summary = self.dynamodb_service.get_data_summary()
+            
+            return {
+                'carbon_data': carbon_data,
+                'cost_data': cost_data,
+                'summary': summary
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to get historical data: {e}")
+            return {'carbon_data': [], 'cost_data': [], 'summary': {'carbon_points': 0, 'cost_points': 0}}
 
     def get_infrastructure_data(self) -> List[Dict]:
         """Get real infrastructure data from AWS."""
@@ -347,7 +422,7 @@ class OptimizationAnalysisDashboard:
             import boto3
             from src.services.power_consumption_service import PowerConsumptionService
             from src.carbon.carbon_api_client import CarbonIntensityClient
-            from datetime import datetime, timedelta  # noqa: F401
+            from datetime import datetime
             import os
             
             # Ensure API key is set
@@ -383,6 +458,15 @@ class OptimizationAnalysisDashboard:
                     
                     # Get REAL German grid carbon intensity from ElectricityMap
                     carbon_intensity = carbon_client.get_current_intensity('eu-central-1')
+                    
+                    # Auto-save carbon intensity data to DynamoDB
+                    if self.dynamodb_service:
+                        try:
+                            self.dynamodb_service.store_carbon_intensity('eu-central-1', carbon_intensity)
+                            self.dynamodb_service.store_power_data(instance_type, power_data._asdict())
+                        except Exception as e:
+                            logger.debug(f"Auto-save to DynamoDB failed: {e}")
+                    
                     daily_carbon = power_service.calculate_carbon_emissions(
                         power_consumption=power_data,
                         carbon_intensity_g_kwh=carbon_intensity,

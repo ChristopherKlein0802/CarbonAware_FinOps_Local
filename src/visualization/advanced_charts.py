@@ -7,7 +7,6 @@ Provides sophisticated charts for academic analysis and thesis documentation
 import plotly.graph_objects as go
 import plotly.express as px
 from plotly.subplots import make_subplots
-import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 from typing import Dict, List
@@ -361,78 +360,6 @@ class AdvancedVisualization:
                     font=dict(size=10)
                 )
             ]
-        )
-        
-        return fig
-    
-    def create_business_impact_matrix(self, scenarios: List[Dict]) -> go.Figure:
-        """
-        Create business impact matrix: Implementation Effort vs Environmental Impact
-        
-        This helps with business case justification in your thesis
-        """
-        # Define realistic business impact data
-        impact_data = [
-            {'name': 'Baseline (No Optimization)', 'effort': 0, 'environmental_impact': 0, 'cost_savings': 0},
-            {'name': 'Office Hours Scheduling', 'effort': 20, 'environmental_impact': 60, 'cost_savings': 50},
-            {'name': 'Weekdays Only', 'effort': 15, 'environmental_impact': 25, 'cost_savings': 30},
-            {'name': 'Carbon-Aware Scheduling', 'effort': 40, 'environmental_impact': 75, 'cost_savings': 45},
-            {'name': 'Full AI Optimization', 'effort': 90, 'environmental_impact': 85, 'cost_savings': 70}
-        ]
-        
-        # Create scatter plot matrix
-        fig = go.Figure()
-        
-        for item in impact_data:
-            # Color based on cost savings potential
-            color_intensity = item['cost_savings'] / 100
-            color = f"rgba({int(255 * (1-color_intensity))}, {int(255 * color_intensity)}, 100, 0.7)"
-            
-            fig.add_trace(go.Scatter(
-                x=[item['effort']],
-                y=[item['environmental_impact']],
-                mode='markers+text',
-                name=item['name'],
-                marker=dict(
-                    size=20,
-                    color=item['cost_savings'],
-                    colorscale='RdYlGn',
-                    showscale=True,
-                    colorbar=dict(title="Cost Savings %"),
-                    line=dict(width=2, color='white'),
-                    cmax=100,
-                    cmin=0
-                ),
-                text=[item['name']],
-                textposition="top center",
-                hovertemplate='<b>%{text}</b><br>' +
-                            'Implementation Effort: %{x}%<br>' +
-                            'Environmental Impact: %{y}%<br>' +
-                            f'Cost Savings: {item["cost_savings"]}%<extra></extra>'
-            ))
-        
-        # Add quadrant lines
-        fig.add_hline(y=50, line_dash="dash", line_color="gray", opacity=0.5)
-        fig.add_vline(x=50, line_dash="dash", line_color="gray", opacity=0.5)
-        
-        # Add quadrant labels
-        fig.add_annotation(x=25, y=75, text="Quick Wins<br>(Low Effort, High Impact)", 
-                          showarrow=False, bgcolor=self.colors['success'], opacity=0.8, font=dict(color='white'))
-        fig.add_annotation(x=75, y=75, text="Major Projects<br>(High Effort, High Impact)", 
-                          showarrow=False, bgcolor=self.colors['warning'], opacity=0.8)
-        fig.add_annotation(x=25, y=25, text="Fill-ins<br>(Low Effort, Low Impact)", 
-                          showarrow=False, bgcolor='lightgray', opacity=0.8)
-        fig.add_annotation(x=75, y=25, text="Questionable<br>(High Effort, Low Impact)", 
-                          showarrow=False, bgcolor=self.colors['danger'], opacity=0.8, font=dict(color='white'))
-        
-        fig.update_layout(
-            title='Business Impact Matrix: Implementation Effort vs Environmental Benefit',
-            xaxis_title='Implementation Effort (%)',
-            yaxis_title='Environmental Impact (%)',
-            height=600,
-            showlegend=False,
-            xaxis=dict(range=[0, 100]),
-            yaxis=dict(range=[0, 100])
         )
         
         return fig
