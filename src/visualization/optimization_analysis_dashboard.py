@@ -329,64 +329,6 @@ class OptimizationAnalysisDashboard:
                    scheduling_chart, cost_co2_chart, recommendations,
                    roi_calculator, esg_summary, methodology)
                    
-        # Persistence Settings Callback
-        @self.app.callback(
-            Output('persistence-status', 'children'),
-            [Input('update-persistence-btn', 'n_clicks')],
-            [State('persistence-settings', 'value')]
-        )
-        def update_persistence_settings(n_clicks, selected_options):
-            """Handle persistence settings updates."""
-            if n_clicks is None:
-                return html.Div("💾 Select data types to store for historical analysis", 
-                              style={'color': '#666', 'fontStyle': 'italic'})
-            
-            if not self.dynamodb_service:
-                return html.Div("❌ DynamoDB not available - data persistence disabled", 
-                              style={'color': '#d32f2f'})
-            
-            if not selected_options:
-                return html.Div("⚠️ No data types selected for persistence", 
-                              style={'color': '#f57c00'})
-            
-            # Store current data based on selections
-            success_count = 0
-            total_count = len(selected_options)
-            
-            if 'carbon' in selected_options:
-                try:
-                    from src.carbon.carbon_api_client import CarbonIntensityClient
-                    carbon_client = CarbonIntensityClient()
-                    intensity = carbon_client.get_current_intensity('eu-central-1')
-                    if self.dynamodb_service.store_carbon_intensity('eu-central-1', intensity):
-                        success_count += 1
-                except Exception as e:
-                    logger.warning(f"Failed to store carbon data: {e}")
-            
-            if 'power' in selected_options:
-                try:
-                    from src.services.power_consumption_service import PowerConsumptionService
-                    power_service = PowerConsumptionService()
-                    power_data = power_service.get_instance_power_consumption('t3.medium')
-                    if self.dynamodb_service.store_power_data('t3.medium', power_data._asdict()):
-                        success_count += 1
-                except Exception as e:
-                    logger.warning(f"Failed to store power data: {e}")
-            
-            if 'costs' in selected_options:
-                try:
-                    data = self.get_infrastructure_data() or self.get_demo_optimization_data()
-                    if self.dynamodb_service.store_cost_data(data):
-                        success_count += 1
-                except Exception as e:
-                    logger.warning(f"Failed to store cost data: {e}")
-            
-            if success_count == total_count:
-                return html.Div(f"✅ Successfully stored {success_count} data types to DynamoDB", 
-                              style={'color': '#2e7d32'})
-            else:
-                return html.Div(f"⚠️ Stored {success_count}/{total_count} data types - check logs for details", 
-                              style={'color': '#f57c00'})
 
         return update_optimization_analysis
 
@@ -421,7 +363,6 @@ class OptimizationAnalysisDashboard:
             import boto3
             from src.services.power_consumption_service import PowerConsumptionService
             from src.carbon.carbon_api_client import CarbonIntensityClient
-            from datetime import datetime
             import os
             
             # Ensure API key is set
@@ -1333,75 +1274,48 @@ class OptimizationAnalysisDashboard:
         return dcc.Graph(figure=self.create_empty_chart("Seasonal analysis not available"))
 
     def create_methodology_explanation(self) -> html.Div:
-        """Create methodology explanation."""
+        """Create simplified methodology explanation."""
         return html.Div([
             html.Div([
-                html.H4("💰 Cost Calculation", style={'color': '#2E8B57'}),
-                html.P("• Real AWS Cost Explorer API data"),
-                html.P("• Monthly costs based on actual billing"),
-                html.P("• Scheduling impact: Cost × (1 - uptime_reduction_factor)")
-            ], style={'width': '48%', 'display': 'inline-block', 'marginRight': '4%'}),
-            
-            html.Div([
-                html.H4("🌍 CO2 Calculation", style={'color': '#2E8B57'}),
-                html.P("• ElectricityMap API for German grid intensity"),
-                html.P("• Boavizta API for hardware power consumption (+ fallback)"),
-                html.P("• Formula: Power (kW) × Hours × gCO2/kWh ÷ 1000")
-            ], style={'width': '48%', 'display': 'inline-block'}),
-            
-            html.Br(),
-            
-            html.Div([
-                html.H4("📊 Optimization Scenarios", style={'color': '#2E8B57'}),
-                html.Ul([
-                    html.Li("Office Hours: 200h/month (8-18h, Mo-Fr) = 72% reduction"),
-                    html.Li("Weekdays Only: 520h/month (24h, Mo-Fr) = 28% reduction"),  
-                    html.Li("Carbon-Aware: Variable reduction based on grid intensity peaks")
+                html.H4("🔍 Data Sources", style={'color': '#2E8B57', 'marginBottom': '15px'}),
+                html.Div([
+                    html.Div([
+                        html.P("💰 Cost Data", style={'fontWeight': 'bold', 'margin': '0'}),
+                        html.P("AWS Cost Explorer API", style={'color': '#666', 'fontSize': '14px', 'margin': '5px 0'}),
+                        html.P("Real billing data from Frankfurt region", style={'color': '#888', 'fontSize': '13px', 'margin': '0'})
+                    ], style={'marginBottom': '20px'}),
+                    
+                    html.Div([
+                        html.P("🌍 Carbon Data", style={'fontWeight': 'bold', 'margin': '0'}),
+                        html.P("ElectricityMap API + Boavizta API", style={'color': '#666', 'fontSize': '14px', 'margin': '5px 0'}),
+                        html.P("German grid CO2 intensity + hardware power consumption", style={'color': '#888', 'fontSize': '13px', 'margin': '0'})
+                    ], style={'marginBottom': '20px'}),
+                    
+                    html.Div([
+                        html.P("📊 Calculation Method", style={'fontWeight': 'bold', 'margin': '0'}),
+                        html.P("CO2 = Power (kW) × Hours × Grid Intensity (gCO2/kWh)", style={'color': '#666', 'fontSize': '14px', 'margin': '5px 0'}),
+                        html.P("Optimization savings = Current cost/CO2 × (1 - schedule reduction)", style={'color': '#888', 'fontSize': '13px', 'margin': '0'})
+                    ])
                 ])
             ]),
             
-            html.Div([
-                html.H4("🔍 Data Sources", style={'color': '#2E8B57'}),
-                html.Ul([
-                    html.Li("AWS Cost Explorer API - Real billing data"),
-                    html.Li("ElectricityMap API - Real-time German grid CO2 intensity"),
-                    html.Li("Boavizta API - Scientific hardware power consumption data"),
-                    html.Li("Fallback estimates - Based on AWS documentation & industry data"),
-                    html.Li("Regional focus: eu-central-1 (Frankfurt)")
-                ])
-            ]),
+            html.Hr(style={'margin': '30px 0', 'border': '1px solid #eee'}),
             
             html.Div([
-                html.H4("⚡ Power Consumption Sources", style={'color': '#2E8B57'}),
-                html.Ul([
-                    html.Li("Boavizta API: High confidence, scientific methodology"),
-                    html.Li("Fallback data: Medium/Low confidence, pattern-based estimates"),
-                    html.Li("Idle power: ~30-40% of max power consumption"),
-                    html.Li("Average power: Weighted by typical utilization patterns")
-                ])
-            ]),
-            
-            html.Div([
-                html.H4("📊 Statistical Validation & Academic Rigor", style={'color': '#2E8B57'}),
-                html.Ul([
-                    html.Li("95% Confidence intervals for all carbon calculations"),
-                    html.Li("Statistical significance testing for optimization results"),
-                    html.Li("Data quality scoring and uncertainty quantification"),
-                    html.Li("Methodology validated against published research standards"),
-                    html.Li("Time series analysis showing optimal scheduling windows"),
-                    html.Li("Seasonal patterns demonstrating renewable energy impact")
-                ])
-            ]),
-            
-            html.Div([
-                html.H4("🎓 Academic Contributions", style={'color': '#2E8B57'}),
-                html.Ul([
-                    html.Li("First FinOps tool combining cost AND carbon optimization"),
-                    html.Li("Analysis-focused approach enabling risk-free assessment"),
-                    html.Li("German grid specialization for EU Green Deal compliance"),
-                    html.Li("Quantified business case with ROI and ESG impact metrics"),
-                    html.Li("Scientific validation through multiple data source integration"),
-                    html.Li("Statistical framework for optimization significance assessment")
+                html.H4("⏰ Optimization Scenarios", style={'color': '#2E8B57', 'marginBottom': '15px'}),
+                html.Div([
+                    html.Div([
+                        html.Span("Office Hours: ", style={'fontWeight': 'bold'}),
+                        html.Span("8-18h Mon-Fri = 200h/month (72% cost reduction)")
+                    ], style={'margin': '8px 0'}),
+                    html.Div([
+                        html.Span("Weekdays: ", style={'fontWeight': 'bold'}),
+                        html.Span("24h Mon-Fri = 520h/month (28% cost reduction)")  
+                    ], style={'margin': '8px 0'}),
+                    html.Div([
+                        html.Span("Carbon-Aware: ", style={'fontWeight': 'bold'}),
+                        html.Span("Schedule based on German grid renewable energy peaks")
+                    ], style={'margin': '8px 0'})
                 ])
             ])
         ], style={'backgroundColor': 'white', 'padding': '20px', 'borderRadius': '8px'})
