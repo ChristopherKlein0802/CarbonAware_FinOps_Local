@@ -16,7 +16,7 @@ import os
 # Add parent directory to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from components.cards import DashboardCards
+from components.components import DashboardCards
 
 class AcademicTab:
     """Handles all Academic Value tab functionality"""

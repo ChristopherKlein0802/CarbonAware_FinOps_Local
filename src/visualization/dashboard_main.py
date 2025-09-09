@@ -17,7 +17,7 @@ from tabs.infrastructure_tab import infrastructure_tab
 from tabs.carbon_tab import carbon_tab
 from tabs.optimization_tab import optimization_tab
 from tabs.academic_tab import academic_tab
-from components.cards import DashboardCards
+from components.components import DashboardCards
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -179,36 +179,55 @@ class CarbonAwareFinOpsDashboard:
         
         # Infrastructure Tab Callback
         @self.app.callback(
-            [Output('cost-overview-card', 'children'),
-             Output('co2-overview-card', 'children'),
-             Output('instances-overview-card', 'children'),
-             Output('carbon-intensity-card', 'children'),
+            [Output('active-infrastructure-card', 'children'),
+             Output('resource-efficiency-card', 'children'),
+             Output('cost-per-hour-card', 'children'),
+             Output('rightsizing-potential-card', 'children'),
              Output('cost-analysis-chart', 'children'),
+             Output('instance-type-cost-distribution', 'children'),
+             Output('runtime-cost-correlation', 'children'),
+             Output('efficiency-matrix', 'children'),
+             Output('rightsizing-recommendations', 'children'),
+             Output('instance-health-matrix', 'children'),
+             Output('optimization-actions', 'children'),
+             Output('cost-optimization-opportunities', 'children'),
              Output('instance-analysis-table', 'children'),
              Output('aws-cost-explorer-data', 'children'),
-             Output('runtime-analysis-data', 'children')],
+             Output('runtime-analysis-data', 'children'),
+             Output('api-limitations-research', 'children'),
+             Output('scientific-methodology', 'children')],
             [Input('interval-component', 'n_intervals')]
         )
         def update_infrastructure_tab(_):
-            """Update Infrastructure tab using modular approach"""
+            """Update Infrastructure tab with enhanced API data sources"""
             try:
                 data = self.data_processor.get_infrastructure_data()
                 
                 return (
-                    self.infrastructure_tab.create_cost_card(data),
-                    self.infrastructure_tab.create_co2_card(data),
-                    self.infrastructure_tab.create_instances_card(data),
-                    self.infrastructure_tab.create_carbon_intensity_card(data),
+                    self.infrastructure_tab.create_active_infrastructure_card(data),
+                    self.infrastructure_tab.create_resource_efficiency_card(data),
+                    self.infrastructure_tab.create_cost_per_hour_card(data),
+                    self.infrastructure_tab.create_rightsizing_potential_card(data),
                     dcc.Graph(figure=self.infrastructure_tab.create_cost_analysis_chart(data)),
+                    dcc.Graph(figure=self.infrastructure_tab.create_instance_type_cost_distribution(data)),
+                    dcc.Graph(figure=self.infrastructure_tab.create_runtime_cost_correlation(data)),
+                    dcc.Graph(figure=self.infrastructure_tab.create_efficiency_matrix(data)),
+                    self.infrastructure_tab.create_rightsizing_recommendations(data),
+                    self.infrastructure_tab.create_instance_health_matrix(data),
+                    self.infrastructure_tab.create_optimization_actions(data),
+                    self.infrastructure_tab.create_cost_optimization_opportunities(data),
                     self.infrastructure_tab.create_instance_analysis_table(data),
                     self.infrastructure_tab.create_aws_cost_explorer_data(data),
-                    self.infrastructure_tab.create_runtime_analysis_data(data)
+                    self.infrastructure_tab.create_runtime_analysis_data(data),
+                    self.infrastructure_tab.create_api_limitations_research(data),
+                    self.infrastructure_tab.create_scientific_methodology(data)
                 )
             except Exception as e:
                 logger.error(f"❌ Infrastructure tab update failed: {e}")
                 empty_card = self.cards.create_empty_state_card("Error", "Failed to load data", "❌")
                 empty_content = html.Div("Error loading data")
-                return (empty_card, empty_card, empty_card, empty_card, empty_content, empty_content, empty_content, empty_content)
+                empty_chart = dcc.Graph(figure=self.infrastructure_tab.charts.create_empty_chart("Error loading data"))
+                return (empty_card, empty_card, empty_card, empty_card, empty_chart, empty_chart, empty_chart, empty_chart, empty_content, empty_content, empty_content, empty_content, empty_content, empty_content, empty_content, empty_content, empty_content)
         
         # Carbon Tab Callback
         @self.app.callback(

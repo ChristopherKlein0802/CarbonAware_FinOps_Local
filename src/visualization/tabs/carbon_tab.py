@@ -20,8 +20,7 @@ from datetime import datetime, timedelta
 # Add parent directory to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from components.cards import DashboardCards
-from components.charts import DashboardCharts
+from components.components import DashboardCards, DashboardCharts
 
 class CarbonTab:
     """Handles all Carbon & Power Data tab functionality"""
