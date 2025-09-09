@@ -8,7 +8,7 @@ import dash
 from dash import dcc, html, dash_table, Input, Output, State
 import plotly.graph_objects as go
 import boto3
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List
 import logging
 
@@ -295,8 +295,7 @@ class OptimizationAnalysisDashboard:
             # Get current infrastructure data
             data = self.get_infrastructure_data()
             
-            if not data:
-                data = self.get_demo_optimization_data()
+            # If no data, keep empty list - don't use demo data
             
             # Generate all components
             cost_card = self.create_cost_overview_card(data)
@@ -638,6 +637,20 @@ class OptimizationAnalysisDashboard:
 
     def create_cost_overview_card(self, data: List[Dict]) -> html.Div:
         """Create cost overview card."""
+        if not data:
+            return html.Div([
+                html.H3("💰 Monthly Costs", style={'color': '#2E8B57', 'margin': '0'}),
+                html.H2("€0.00", style={'color': '#999', 'margin': '5px 0'}),
+                html.P("No AWS instances deployed", style={'color': '#999', 'fontSize': '12px', 'margin': '0'}),
+                html.P("Account has no running instances", style={'color': '#888', 'fontSize': '11px', 'margin': '0'})
+            ], style={
+                'padding': '20px', 
+                'backgroundColor': 'white', 
+                'borderRadius': '8px',
+                'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
+                'textAlign': 'center'
+            })
+        
         total_cost = sum(item['monthly_cost_eur'] for item in data)
         
         return html.Div([
@@ -655,6 +668,20 @@ class OptimizationAnalysisDashboard:
 
     def create_co2_overview_card(self, data: List[Dict]) -> html.Div:
         """Create CO2 overview card."""
+        if not data:
+            return html.Div([
+                html.H3("🌍 Monthly CO2", style={'color': '#2E8B57', 'margin': '0'}),
+                html.H2("0.0 kg", style={'color': '#999', 'margin': '5px 0'}),
+                html.P("No infrastructure running", style={'color': '#999', 'fontSize': '12px', 'margin': '0'}),
+                html.P("No carbon footprint to analyze", style={'color': '#888', 'fontSize': '11px', 'margin': '0'})
+            ], style={
+                'padding': '20px', 
+                'backgroundColor': 'white', 
+                'borderRadius': '8px',
+                'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
+                'textAlign': 'center'
+            })
+        
         total_co2 = sum(item['monthly_co2_kg'] for item in data)
         
         return html.Div([
@@ -673,6 +700,21 @@ class OptimizationAnalysisDashboard:
     def create_instances_overview_card(self, data: List[Dict]) -> html.Div:
         """Create instances overview card."""
         instance_count = len(data)
+        
+        if not data:
+            return html.Div([
+                html.H3("🖥️ Instances", style={'color': '#2E8B57', 'margin': '0'}),
+                html.H2("0", style={'color': '#999', 'margin': '5px 0'}),
+                html.P("No instances found", style={'color': '#999', 'fontSize': '12px', 'margin': '0'}),
+                html.P("Account currently empty", style={'color': '#888', 'fontSize': '11px', 'margin': '0'})
+            ], style={
+                'padding': '20px', 
+                'backgroundColor': 'white', 
+                'borderRadius': '8px',
+                'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
+                'textAlign': 'center'
+            })
+        
         total_runtime = sum(item['runtime_hours_month'] for item in data)
         
         return html.Div([
@@ -712,7 +754,13 @@ class OptimizationAnalysisDashboard:
     def create_instance_analysis_table(self, data: List[Dict]):
         """Create detailed instance analysis table."""
         if not data:
-            return html.P("No instance data available", style={'color': 'red'})
+            return html.Div([
+                html.H4("📊 No Infrastructure Deployed", style={'color': '#2E8B57', 'textAlign': 'center', 'margin': '40px 0 20px 0'}),
+                html.P("No AWS instances are currently running in your account.", 
+                      style={'textAlign': 'center', 'color': '#666', 'fontSize': '16px', 'margin': '20px 0'}),
+                html.P("Dashboard will show detailed analysis when AWS resources are available.", 
+                      style={'textAlign': 'center', 'color': '#666', 'fontSize': '14px', 'margin': '20px 0'})
+            ], style={'padding': '40px', 'backgroundColor': '#f8f9fa', 'borderRadius': '8px', 'margin': '20px 0'})
         
         table_data = []
         for item in data:
@@ -752,7 +800,7 @@ class OptimizationAnalysisDashboard:
     def create_scheduling_optimization_chart(self, data: List[Dict]) -> go.Figure:
         """Create scheduling optimization potential chart."""
         if not data:
-            return self.create_empty_chart("No data available")
+            return self.create_empty_chart("No optimization data available\n\nNo AWS infrastructure found in account")
         
         # Prepare data for chart
         instances = []
@@ -816,7 +864,7 @@ class OptimizationAnalysisDashboard:
     def create_cost_co2_comparison_chart(self, data: List[Dict]) -> go.Figure:
         """Create cost vs CO2 optimization comparison scatter plot."""
         if not data:
-            return self.create_empty_chart("No data available")
+            return self.create_empty_chart("No comparison data available\n\nAccount has no running AWS instances")
         
         # Prepare data for scatter plot
         strategies = ['office_hours', 'weekdays_only', 'carbon_aware']
@@ -862,7 +910,11 @@ class OptimizationAnalysisDashboard:
     def create_optimization_recommendations(self, data: List[Dict]):
         """Create specific optimization recommendations."""
         if not data:
-            return html.P("No data available for recommendations")
+            return html.Div([
+                html.H4("🎯 No Recommendations Available", style={'color': '#2E8B57', 'textAlign': 'center', 'margin': '20px 0'}),
+                html.P("No AWS instances found to optimize.", 
+                      style={'textAlign': 'center', 'color': '#666', 'fontSize': '14px'})
+            ], style={'padding': '30px', 'backgroundColor': '#f8f9fa', 'borderRadius': '8px'})
         
         recommendations = []
         
@@ -900,7 +952,11 @@ class OptimizationAnalysisDashboard:
     def create_roi_calculator(self, data: List[Dict]):
         """Create ROI calculator for optimization investments."""
         if not data:
-            return html.P("No data available for ROI calculation")
+            return html.Div([
+                html.H4("📈 No ROI Data", style={'color': '#2E8B57', 'textAlign': 'center', 'margin': '20px 0'}),
+                html.P("No infrastructure costs to analyze.", 
+                      style={'textAlign': 'center', 'color': '#666', 'fontSize': '14px'})
+            ], style={'padding': '30px', 'backgroundColor': '#f8f9fa', 'borderRadius': '8px'})
         
         # Calculate totals
         total_monthly_cost_savings = sum(
@@ -944,7 +1000,11 @@ class OptimizationAnalysisDashboard:
     def create_esg_impact_summary(self, data: List[Dict]):
         """Create ESG impact summary."""
         if not data:
-            return html.P("No data available for ESG calculation")
+            return html.Div([
+                html.H4("🌍 No ESG Impact Data", style={'color': '#2E8B57', 'textAlign': 'center', 'margin': '20px 0'}),
+                html.P("No carbon footprint to assess.", 
+                      style={'textAlign': 'center', 'color': '#666', 'fontSize': '14px'})
+            ], style={'padding': '30px', 'backgroundColor': '#f8f9fa', 'borderRadius': '8px'})
         
         total_current_co2 = sum(item['monthly_co2_kg'] for item in data)
         total_optimized_co2_savings = sum(
