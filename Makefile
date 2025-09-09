@@ -84,10 +84,10 @@ dashboard: ## 📊 Launch Carbon-Aware FinOps Dashboard
 	@echo "  ✅ AWS Cost Explorer (if instances deployed)"
 	@echo ""
 	@if [ -f ".env" ]; then \
-		set -a && source .env && set +a && ./$(VENV)/bin/python3 src/visualization/optimization_analysis_dashboard.py; \
+		cd src/visualization && set -a && source ../../.env && set +a && ../../$(VENV)/bin/python3 dashboard_main.py; \
 	else \
 		echo "$(YELLOW)⚠️  No .env file found, using demo mode$(NC)"; \
-		./$(VENV)/bin/python3 src/visualization/optimization_analysis_dashboard.py; \
+		cd src/visualization && ../../$(VENV)/bin/python3 dashboard_main.py; \
 	fi
 
 # ☁️  AWS INFRASTRUCTURE  
