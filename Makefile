@@ -94,10 +94,12 @@ dashboard: ## 📊 Launch Carbon-Aware FinOps Dashboard
 deploy: ## ☁️  Deploy 8 test instances to AWS
 	@echo "$(BOLD)$(GREEN)☁️  Deploying AWS Infrastructure$(NC)"
 	@echo "=================================="
-	@echo "$(YELLOW)Deploying 8 test instances to AWS...$(NC)"
-	@cd infrastructure/terraform && \
+	@echo "$(YELLOW)Getting AWS account ID...$(NC)"
+	@AWS_ACCOUNT_ID=$$(aws sts get-caller-identity --profile $(AWS_PROFILE) --query 'Account' --output text) && \
+	echo "$(YELLOW)Deploying 8 test instances to AWS (Account: $$AWS_ACCOUNT_ID)...$(NC)" && \
+	cd infrastructure/terraform && \
 		terraform init && \
-		terraform apply -auto-approve
+		terraform apply -auto-approve -var="aws_account_id=$$AWS_ACCOUNT_ID" -var="aws_profile=$(AWS_PROFILE)" -var="aws_region=$(AWS_REGION)"
 	@echo ""
 	@echo "$(BOLD)$(GREEN)🎉 AWS Deployment Complete!$(NC)"
 	@echo "Instances will appear in dashboard within 60 seconds"
@@ -111,7 +113,8 @@ destroy: ## 🗑️  Destroy all AWS resources
 	@echo "==================================="
 	@echo "$(RED)This will remove all AWS resources!$(NC)"
 	@read -p "Are you sure? (yes/no): " confirm && [ "$$confirm" = "yes" ] || exit 1
-	@cd infrastructure/terraform && terraform destroy -auto-approve
+	@AWS_ACCOUNT_ID=$$(aws sts get-caller-identity --profile $(AWS_PROFILE) --query 'Account' --output text) && \
+	cd infrastructure/terraform && terraform destroy -auto-approve -var="aws_account_id=$$AWS_ACCOUNT_ID" -var="aws_profile=$(AWS_PROFILE)" -var="aws_region=$(AWS_REGION)"
 	@echo "$(GREEN)✅ AWS resources destroyed$(NC)"
 
 destroy-aws: ## 🗑️  Alias for destroy (backward compatibility)

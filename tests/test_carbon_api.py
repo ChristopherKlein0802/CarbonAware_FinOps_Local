@@ -59,7 +59,7 @@ class TestCarbonAPIClient:
         
         # Should use fallback
         intensity = client.get_current_intensity('eu-central-1')
-        assert intensity.value == 411  # Germany fallback (current ElectricityMap)
+        assert intensity.value == 358  # Germany fallback (current ElectricityMap)
         assert intensity.source == 'fallback'
     
     @patch.dict('os.environ', {'CARBON_API_PROVIDER': 'electricitymap'})

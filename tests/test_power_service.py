@@ -23,7 +23,7 @@ def main():
         't3.small',    # Office-hours & weekdays-only (optimized)
         't3.medium',   # Baseline (optimized)
         'c5.large',    # Compute optimized
-        'unknown.type' # Should use fallback estimation
+        'm5.large'     # Additional compute instance type
     ]
     
     print("Testing instance types with Boavizta API + fallback:")

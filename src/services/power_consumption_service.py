@@ -87,12 +87,23 @@ class PowerConsumptionService:
             # Boavizta cloud API endpoint for AWS instances
             endpoint = f"{self.boavizta_base_url}/cloud/instance"
             
-            # Use correct payload format based on working API test
+            # Use correct payload format based on Boavizta API documentation
             payload = {
                 "provider": "aws",
-                "instance_type": instance_type,  # Use AWS instance type directly
-                "location": "FRA",  # Frankfurt for eu-central-1
-                "verbose": True
+                "instance_type": instance_type,
+                "usage": {
+                    "usage_location": "FRA",  # Frankfurt for eu-central-1
+                    "time_workload": [
+                        {
+                            "time_percentage": 50,
+                            "load_percentage": 0
+                        },
+                        {
+                            "time_percentage": 50, 
+                            "load_percentage": 50
+                        }
+                    ]
+                }
             }
             
             response = self.session.post(endpoint, json=payload, timeout=10)

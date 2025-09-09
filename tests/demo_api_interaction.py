@@ -8,6 +8,10 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
+# Load environment variables from .env file
+from dotenv import load_dotenv
+load_dotenv()
+
 from src.services.power_consumption_service import PowerConsumptionService
 from src.carbon.carbon_api_client import CarbonIntensityClient
 
@@ -23,7 +27,7 @@ def main():
     instances = [
         {"name": "Baseline", "type": "t3.medium", "schedule": "24/7"},
         {"name": "Office Hours", "type": "t3.small", "schedule": "8h/day"},
-        {"name": "Weekdays Only", "type": "t3.small", "schedule": "5 days/week"},
+        {"name": "Compute Optimized", "type": "c5.large", "schedule": "high-performance tasks"},
         {"name": "Carbon Aware", "type": "t3.micro", "schedule": "low carbon times"}
     ]
     
