@@ -45,6 +45,12 @@ class InfrastructureTab:
                 html.Div(id='carbon-intensity-card', style={'width': '24%', 'display': 'inline-block', 'margin': '0.5%'})
             ], style={'marginBottom': '30px'}),
             
+            # Cost Analysis Chart
+            html.Div([
+                html.H3("💡 Cost Analysis - Historical vs Current Usage", style={'color': '#2E8B57', 'marginBottom': '15px'}),
+                html.Div(id='cost-analysis-chart')
+            ], style={'marginBottom': '30px'}),
+            
             # Instance analysis section
             html.Div([
                 html.H3("🖥️ Instance Analysis", style={'color': '#2E8B57', 'marginBottom': '15px'}),
@@ -80,6 +86,10 @@ class InfrastructureTab:
     def create_carbon_intensity_card(self, data: List[Dict]) -> html.Div:
         """Create carbon intensity card"""
         return self.cards.create_carbon_intensity_card(data)
+    
+    def create_cost_analysis_chart(self, data: List[Dict]):
+        """Create cost analysis chart showing historical vs current usage"""
+        return self.charts.create_cost_analysis_chart(data)
     
     def create_instance_analysis_table(self, data: List[Dict]) -> html.Div:
         """Create instance analysis table"""

@@ -183,6 +183,7 @@ class CarbonAwareFinOpsDashboard:
              Output('co2-overview-card', 'children'),
              Output('instances-overview-card', 'children'),
              Output('carbon-intensity-card', 'children'),
+             Output('cost-analysis-chart', 'children'),
              Output('instance-analysis-table', 'children'),
              Output('aws-cost-explorer-data', 'children'),
              Output('runtime-analysis-data', 'children')],
@@ -198,6 +199,7 @@ class CarbonAwareFinOpsDashboard:
                     self.infrastructure_tab.create_co2_card(data),
                     self.infrastructure_tab.create_instances_card(data),
                     self.infrastructure_tab.create_carbon_intensity_card(data),
+                    dcc.Graph(figure=self.infrastructure_tab.create_cost_analysis_chart(data)),
                     self.infrastructure_tab.create_instance_analysis_table(data),
                     self.infrastructure_tab.create_aws_cost_explorer_data(data),
                     self.infrastructure_tab.create_runtime_analysis_data(data)
@@ -206,7 +208,7 @@ class CarbonAwareFinOpsDashboard:
                 logger.error(f"❌ Infrastructure tab update failed: {e}")
                 empty_card = self.cards.create_empty_state_card("Error", "Failed to load data", "❌")
                 empty_content = html.Div("Error loading data")
-                return (empty_card, empty_card, empty_card, empty_card, empty_content, empty_content, empty_content)
+                return (empty_card, empty_card, empty_card, empty_card, empty_content, empty_content, empty_content, empty_content)
         
         # Carbon Tab Callback
         @self.app.callback(

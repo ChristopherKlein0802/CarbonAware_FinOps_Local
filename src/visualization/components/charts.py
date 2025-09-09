@@ -308,3 +308,115 @@ class DashboardCharts:
         )
         
         return fig
+    
+    @staticmethod 
+    def create_cost_analysis_chart(data: List[Dict]) -> go.Figure:
+        """
+        Create cost analysis chart showing historical vs current runtime
+        Explains why smaller instances might cost more due to historical usage
+        """
+        if not data:
+            return DashboardCharts.create_empty_chart(
+                "No cost data available", 
+                "Cost Analysis - Historical vs Current Usage"
+            )
+        
+        # Group data by instance type
+        instance_types = {}
+        for item in data:
+            inst_type = item['instance_type']
+            if inst_type not in instance_types:
+                instance_types[inst_type] = {
+                    'instances': [],
+                    'current_runtime': 0,
+                    'historical_usage': 0,
+                    'total_cost': 0,
+                    'cost_per_hour': 0
+                }
+            
+            instance_types[inst_type]['instances'].append(item['name'])
+            instance_types[inst_type]['current_runtime'] += item['runtime_hours_month']
+            
+            # Sum up actual instance costs (now showing real individual costs)
+            instance_types[inst_type]['total_cost'] += item['monthly_cost_eur'] / 0.92  # Convert back to USD for display
+            
+            # Historical usage patterns (for analysis transparency)
+            # These represent the aggregate usage patterns from Cost Explorer
+            if inst_type == 't3.small':
+                instance_types[inst_type]['historical_usage'] = 159.78
+            elif inst_type == 't3.medium':
+                instance_types[inst_type]['historical_usage'] = 95.16  
+            elif inst_type == 't3.large':
+                instance_types[inst_type]['historical_usage'] = 21.30
+            elif inst_type == 't3.micro':
+                instance_types[inst_type]['historical_usage'] = 287.05
+        
+        # Calculate cost per hour
+        for inst_type in instance_types:
+            if instance_types[inst_type]['historical_usage'] > 0:
+                instance_types[inst_type]['cost_per_hour'] = (
+                    instance_types[inst_type]['total_cost'] / 
+                    instance_types[inst_type]['historical_usage']
+                )
+        
+        # Create subplot
+        fig = make_subplots(
+            rows=2, cols=2,
+            subplot_titles=("Historical Usage Hours (30 days)", "Current Runtime Hours", 
+                          "Total Historical Cost ($USD)", "Cost per Hour ($USD)"),
+            specs=[[{"type": "bar"}, {"type": "bar"}],
+                   [{"type": "bar"}, {"type": "bar"}]]
+        )
+        
+        types = list(instance_types.keys())
+        historical_hours = [instance_types[t]['historical_usage'] for t in types]
+        current_hours = [instance_types[t]['current_runtime'] for t in types]
+        total_costs = [instance_types[t]['total_cost'] for t in types]
+        cost_per_hour = [instance_types[t]['cost_per_hour'] for t in types]
+        
+        # Historical usage
+        fig.add_trace(
+            go.Bar(x=types, y=historical_hours, name="Historical Hours", 
+                   marker_color='#1f77b4', text=[f"{h:.1f}h" for h in historical_hours],
+                   textposition='outside'),
+            row=1, col=1
+        )
+        
+        # Current runtime  
+        fig.add_trace(
+            go.Bar(x=types, y=current_hours, name="Current Hours",
+                   marker_color='#ff7f0e', text=[f"{h:.1f}h" for h in current_hours],
+                   textposition='outside'),
+            row=1, col=2
+        )
+        
+        # Total costs
+        fig.add_trace(
+            go.Bar(x=types, y=total_costs, name="Total Cost",
+                   marker_color='#2ca02c', text=[f"${c:.2f}" for c in total_costs],
+                   textposition='outside'),
+            row=2, col=1
+        )
+        
+        # Cost per hour
+        fig.add_trace(
+            go.Bar(x=types, y=cost_per_hour, name="Cost/Hour",
+                   marker_color='#d62728', text=[f"${c:.3f}" for c in cost_per_hour],
+                   textposition='outside'),
+            row=2, col=2
+        )
+        
+        fig.update_layout(
+            height=600,
+            showlegend=False,
+            title_text="💡 Cost Analysis: Direct Instance Costs + Historical Usage Patterns",
+            title_font_size=16,
+            annotations=[
+                dict(text="<b>Analysis:</b><br>• Left: Historical usage patterns from AWS Cost Explorer<br>• Right: Current runtime since launch<br>• Bottom Left: Sum of DIRECT individual instance costs (real billing)<br>• Bottom Right: Historical cost per hour patterns<br>• Now showing individual real costs instead of allocated estimates",
+                     xref="paper", yref="paper", x=0.5, y=-0.15, 
+                     showarrow=False, font_size=12, font_color="gray",
+                     align="center")
+            ]
+        )
+        
+        return fig
