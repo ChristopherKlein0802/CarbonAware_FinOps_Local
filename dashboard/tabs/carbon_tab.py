@@ -28,111 +28,153 @@ class CarbonTab:
         self.cards = DashboardCards()
         self.charts = DashboardCharts()
     
-    def create_layout(self) -> html.Div:
+    def create_tab_layout(self) -> html.Div:
         """
-        Create the complete Carbon & Power Data tab layout
+        Create the complete Carbon & Power Data tab layout with modern Builder.io design
         
         Returns:
-            html.Div: Complete carbon tab layout
+            html.Div: Complete modernized carbon tab layout
         """
         return html.Div([
-            html.H2("🌍 Carbon & Power Data Analysis", 
-                   style={'color': '#2E8B57', 'borderBottom': '2px solid #2E8B57', 'paddingBottom': '5px', 'marginBottom': '20px'}),
-            
-            # Carbon-specific Key Metrics Cards
+            # Modern header section
             html.Div([
-                html.Div(id='current-grid-intensity-card', style={'width': '24%', 'display': 'inline-block', 'margin': '0.5%'}),
-                html.Div(id='total-power-consumption-card', style={'width': '24%', 'display': 'inline-block', 'margin': '0.5%'}),
-                html.Div(id='monthly-co2-emissions-card', style={'width': '24%', 'display': 'inline-block', 'margin': '0.5%'}),
-                html.Div(id='carbon-efficiency-score-card', style={'width': '24%', 'display': 'inline-block', 'margin': '0.5%'})
-            ], style={'marginBottom': '30px'}),
+                html.Div([
+                    html.H1("Carbon & Power Data Analysis", className="modern-title"),
+                    html.P("Real-time German grid intensity, power consumption analysis with Boavizta and ElectricityMaps APIs", 
+                          className="modern-subtitle")
+                ], className="modern-header")
+            ], className="tab-header-section"),
             
-            # Carbon Analysis Charts Section
+            # Key carbon metrics grid (4 cards)
             html.Div([
-                html.H3("📊 Carbon Analysis Deep-Dive", style={'color': '#2E8B57', 'borderBottom': '2px solid #2E8B57', 'paddingBottom': '5px', 'marginBottom': '20px'}),
+                html.Div(id='current-grid-intensity-card', className="metric-card-container"),
+                html.Div(id='total-power-consumption-card', className="metric-card-container"),
+                html.Div(id='monthly-co2-emissions-card', className="metric-card-container"),
+                html.Div(id='carbon-efficiency-score-card', className="metric-card-container")
+            ], className="metrics-grid-4"),
+            
+            # Carbon Analysis Deep-Dive Section
+            html.Div([
+                html.Div([
+                    html.H2("Carbon Analysis Deep-Dive", className="section-title"),
+                    html.P("Grid intensity trends, power consumption by instance type and CO2 emissions analysis", className="section-subtitle")
+                ], className="section-header"),
                 
-                # Row 1: Grid Intensity Trends + Power by Instance Type
+                # Grid intensity + power by instance (asymmetric layout)
                 html.Div([
                     html.Div([
-                        html.H4("⚡ German Grid Intensity (24h)", style={'color': '#333', 'marginBottom': '10px'}),
-                        html.Div(id='carbon-intensity-trends-chart')
-                    ], style={'width': '65%', 'display': 'inline-block', 'marginRight': '5%'}),
+                        html.Div([
+                            html.H4("German Grid Intensity (24h)", className="chart-title"),
+                            html.Div(id='carbon-intensity-trends-chart', className="modern-chart")
+                        ], className="modern-chart-card")
+                    ], className="chart-container-large"),
                     
                     html.Div([
-                        html.H4("🔌 Power by Instance Type", style={'color': '#333', 'marginBottom': '10px'}),
-                        html.Div(id='power-by-instance-type')
-                    ], style={'width': '30%', 'display': 'inline-block', 'verticalAlign': 'top'})
-                ], style={'marginBottom': '30px'}),
+                        html.Div([
+                            html.H4("Power by Instance Type", className="chart-title"),
+                            html.Div(id='power-by-instance-type', className="modern-chart")
+                        ], className="modern-chart-card")
+                    ], className="chart-container-small")
+                ], className="charts-row-asymmetric"),
                 
-                # Row 2: CO2 Emissions + Carbon vs Cost
+                # CO2 emissions + carbon vs cost correlation (symmetric)
                 html.Div([
                     html.Div([
-                        html.H4("💨 CO2 Emissions per Instance", style={'color': '#333', 'marginBottom': '10px'}),
-                        html.Div(id='co2-emissions-chart')
-                    ], style={'width': '48%', 'display': 'inline-block', 'marginRight': '4%'}),
+                        html.Div([
+                            html.H4("CO2 Emissions per Instance", className="chart-title"),
+                            html.Div(id='co2-emissions-chart', className="modern-chart")
+                        ], className="modern-chart-card")
+                    ], className="chart-container-half"),
                     
                     html.Div([
-                        html.H4("📊 Carbon vs Cost Correlation", style={'color': '#333', 'marginBottom': '10px'}),
-                        html.Div(id='carbon-cost-correlation')
-                    ], style={'width': '48%', 'display': 'inline-block'})
-                ], style={'marginBottom': '30px'})
-            ], style={'marginBottom': '40px'}),
+                        html.Div([
+                            html.H4("Carbon vs Cost Correlation", className="chart-title"),
+                            html.Div(id='carbon-cost-correlation', className="modern-chart")
+                        ], className="modern-chart-card")
+                    ], className="chart-container-half")
+                ], className="charts-row-2")
+            ], className="content-section"),
             
             # German Grid Data Analysis Section
             html.Div([
-                html.H3("🇩🇪 German Grid Data Analysis", style={'color': '#2E8B57', 'borderBottom': '2px solid #2E8B57', 'paddingBottom': '5px', 'marginBottom': '20px'}),
+                html.Div([
+                    html.H2("German Grid Data Analysis", className="section-title"),
+                    html.P("Carbon intensity patterns and power consumption scientific analysis", className="section-subtitle")
+                ], className="section-header"),
                 
-                # Row 1: Grid Intensity Patterns + Scientific Analysis
+                # Grid patterns + power science (symmetric)
                 html.Div([
                     html.Div([
-                        html.H4("📊 Grid Carbon Intensity Patterns", style={'color': '#333', 'marginBottom': '10px'}),
-                        html.Div(id='carbon-intensity-patterns')
-                    ], style={'width': '48%', 'display': 'inline-block', 'marginRight': '4%'}),
+                        html.Div([
+                            html.H4("Grid Carbon Intensity Patterns", className="chart-title"),
+                            html.Div(id='carbon-intensity-patterns', className="modern-chart")
+                        ], className="modern-chart-card")
+                    ], className="chart-container-half"),
                     
                     html.Div([
-                        html.H4("🔬 Power Consumption Science", style={'color': '#333', 'marginBottom': '10px'}),
-                        html.Div(id='power-consumption-science')
-                    ], style={'width': '48%', 'display': 'inline-block'})
-                ], style={'marginBottom': '30px'})
-            ], style={'marginBottom': '40px'}),
+                        html.Div([
+                            html.H4("Power Consumption Science", className="chart-title"),
+                            html.Div(id='power-consumption-science', className="modern-chart")
+                        ], className="modern-chart-card")
+                    ], className="chart-container-half")
+                ], className="charts-row-2")
+            ], className="content-section"),
             
-            # Carbon Footprint Analysis Table
+            # Carbon Footprint Analysis Section
             html.Div([
-                html.H3("📊 Carbon Footprint Analysis", style={'color': '#2E8B57', 'marginBottom': '15px'}),
-                html.Div(id='carbon-footprint-table')
-            ], style={'marginBottom': '30px'}),
+                html.Div([
+                    html.H2("Carbon Footprint Analysis", className="section-title"),
+                    html.P("Detailed carbon footprint table analysis", className="section-subtitle")
+                ], className="section-header"),
+                
+                html.Div([
+                    html.Div(id='carbon-footprint-table', className="modern-table-container")
+                ], className="table-section")
+            ], className="content-section"),
             
             # API Data Sources & Methodology Section
             html.Div([
-                html.H3("🔬 Carbon API Data Sources", style={'color': '#2E8B57', 'borderBottom': '2px solid #2E8B57', 'paddingBottom': '5px', 'marginBottom': '20px'}),
+                html.Div([
+                    html.H2("Carbon API Data Sources", className="section-title"),
+                    html.P("ElectricityMaps and Boavizta API integration with scientific methodology", className="section-subtitle")
+                ], className="section-header"),
                 
-                # Row 1: ElectricityMap + Boavizta APIs
+                # ElectricityMap + Boavizta APIs
                 html.Div([
                     html.Div([
-                        html.H4("🗺️ ElectricityMap API", style={'color': '#333', 'marginBottom': '10px'}),
-                        html.Div(id='electricitymap-api-data')
-                    ], style={'width': '48%', 'display': 'inline-block', 'marginRight': '4%'}),
+                        html.Div([
+                            html.H3("ElectricityMaps API", className="card-title"),
+                            html.Div(id='electricitymap-api-data', className="card-content")
+                        ], className="modern-info-card")
+                    ], className="info-card-container"),
                     
                     html.Div([
-                        html.H4("🔧 Boavizta API", style={'color': '#333', 'marginBottom': '10px'}),
-                        html.Div(id='boavizta-api-data')
-                    ], style={'width': '48%', 'display': 'inline-block'})
-                ], style={'marginBottom': '30px'}),
+                        html.Div([
+                            html.H3("Boavizta API", className="card-title"),
+                            html.Div(id='boavizta-api-data', className="card-content")
+                        ], className="modern-info-card")
+                    ], className="info-card-container")
+                ], className="info-cards-row-2"),
                 
-                # Row 2: Carbon Calculation + Research
+                # Carbon calculation + research insights
                 html.Div([
                     html.Div([
-                        html.H4("🧮 Carbon Calculation Method", style={'color': '#333', 'marginBottom': '10px'}),
-                        html.Div(id='carbon-calculation-method')
-                    ], style={'width': '48%', 'display': 'inline-block', 'marginRight': '4%'}),
+                        html.Div([
+                            html.H3("Carbon Calculation Method", className="card-title"),
+                            html.Div(id='carbon-calculation-method', className="card-content")
+                        ], className="modern-info-card")
+                    ], className="info-card-container"),
                     
                     html.Div([
-                        html.H4("📚 Carbon Research Insights", style={'color': '#333', 'marginBottom': '10px'}),
-                        html.Div(id='carbon-research-insights')
-                    ], style={'width': '48%', 'display': 'inline-block'})
-                ], style={'marginBottom': '20px'})
-            ], style={'marginBottom': '20px'})
-        ], style={'padding': '20px'})
+                        html.Div([
+                            html.H3("Carbon Research Insights", className="card-title"),
+                            html.Div(id='carbon-research-insights', className="card-content")
+                        ], className="modern-info-card")
+                    ], className="info-card-container")
+                ], className="info-cards-row-2")
+            ], className="content-section")
+            
+        ], className="modern-tab-content")
     
     # Carbon Key Metrics Cards Methods
     

@@ -29,72 +29,80 @@ class ThesisValidationTab:
         self.cards = DashboardCards()
         self.charts = DashboardCharts()
     
-    def create_layout(self) -> html.Div:
+    def create_tab_layout(self) -> html.Div:
         """
-        Create the complete Thesis Validation tab layout
+        Create the complete Thesis Validation tab layout with modern Builder.io design
         
         Returns:
-            html.Div: Complete thesis validation tab layout
+            html.Div: Complete modernized thesis validation tab layout
         """
         return html.Div([
+            # Modern header section
             html.Div([
-                # Research Question Header
                 html.Div([
-                    html.H2("🎓 Research Question Validation", style={'color': '#2E8B57', 'marginBottom': '20px'}),
-                    html.P("Integrierte Carbon-aware FinOps Optimierung vs. separate Cost-only und Carbon-only Tools",
-                          style={'fontSize': '16px', 'color': '#666', 'fontStyle': 'italic'})
-                ], style={'textAlign': 'center', 'marginBottom': '30px'}),
-                
-                # Key Business Metrics Cards
+                    html.H1("Research Question Validation", className="modern-title"),
+                    html.P("Integrierte Carbon-aware FinOps Optimierung vs. separate Cost-only und Carbon-only Tools", 
+                          className="modern-subtitle")
+                ], className="modern-header")
+            ], className="tab-header-section"),
+            
+            # Key metrics grid (4 cards)
+            html.Div([
+                html.Div(id='thesis-cost-advantage-card', className="metric-card-container"),
+                html.Div(id='thesis-carbon-advantage-card', className="metric-card-container"),
+                html.Div(id='thesis-roi-card', className="metric-card-container"),
+                html.Div(id='thesis-novelty-card', className="metric-card-container")
+            ], className="metrics-grid-4"),
+            
+            # Competitive analysis section
+            html.Div([
                 html.Div([
-                    html.Div(id='thesis-cost-advantage-card', style={'width': '24%', 'display': 'inline-block', 'margin': '0.5%'}),
-                    html.Div(id='thesis-carbon-advantage-card', style={'width': '24%', 'display': 'inline-block', 'margin': '0.5%'}),
-                    html.Div(id='thesis-roi-card', style={'width': '24%', 'display': 'inline-block', 'margin': '0.5%'}),
-                    html.Div(id='thesis-novelty-card', style={'width': '24%', 'display': 'inline-block', 'margin': '0.5%'})
-                ], style={'marginBottom': '30px'}),
+                    html.H2("Competitive Advantage Demonstration", className="section-title"),
+                    html.P("Comparative analysis showing superiority over separate tools", className="section-subtitle")
+                ], className="section-header"),
                 
-                # Competitive Analysis Charts (Two Column Layout)
-                html.Div([
-                    html.H3("📊 Competitive Advantage Demonstration", style={'color': '#333', 'marginBottom': '20px'}),
-                    
-                    # Row 1: Cost vs Carbon Optimization
-                    html.Div([
-                        html.Div([
-                            dcc.Graph(id='cost-optimization-comparison-chart')
-                        ], style={'width': '48%', 'display': 'inline-block', 'marginRight': '4%'}),
-                        
-                        html.Div([
-                            dcc.Graph(id='carbon-optimization-comparison-chart') 
-                        ], style={'width': '48%', 'display': 'inline-block'})
-                    ], style={'marginBottom': '20px'}),
-                    
-                    # Row 2: Integrated Superiority Chart (Full Width)
-                    html.Div([
-                        dcc.Graph(id='integrated-superiority-chart')
-                    ], style={'marginBottom': '30px'})
-                ]),
-                
-                # Business Case & German Grid Analysis
+                # Charts grid (2x1 + 1 full width)
                 html.Div([
                     html.Div([
-                        html.H4("💼 Conservative Business Case", style={'color': '#333'}),
-                        html.Div(id='business-case-analysis')
-                    ], style={'width': '48%', 'display': 'inline-block', 'marginRight': '4%'}),
+                        dcc.Graph(id='cost-optimization-comparison-chart', className="modern-chart")
+                    ], className="chart-container-half"),
                     
                     html.Div([
-                        html.H4("🇩🇪 German Grid Integration", style={'color': '#333'}),
-                        html.Div(id='german-grid-analysis')
-                    ], style={'width': '48%', 'display': 'inline-block'})
-                ], style={'marginBottom': '30px'}),
+                        dcc.Graph(id='carbon-optimization-comparison-chart', className="modern-chart")
+                    ], className="chart-container-half")
+                ], className="charts-row-2"),
                 
-                # Academic Summary
                 html.Div([
-                    html.H4("📚 Academic Research Summary", style={'color': '#333'}),
-                    html.Div(id='academic-research-summary')
-                ])
+                    dcc.Graph(id='integrated-superiority-chart', className="modern-chart")
+                ], className="chart-container-full")
+            ], className="content-section"),
+            
+            # Business case and German grid analysis (2 columns)
+            html.Div([
+                html.Div([
+                    html.Div([
+                        html.H3("Conservative Business Case", className="card-title"),
+                        html.Div(id='business-case-analysis', className="card-content")
+                    ], className="modern-info-card")
+                ], className="info-card-container"),
                 
-            ], style={'padding': '20px', 'backgroundColor': '#f8f9fa', 'borderRadius': '10px', 'margin': '20px'})
-        ])
+                html.Div([
+                    html.Div([
+                        html.H3("German Grid Integration", className="card-title"),
+                        html.Div(id='german-grid-analysis', className="card-content")
+                    ], className="modern-info-card")
+                ], className="info-card-container")
+            ], className="info-cards-row-2"),
+            
+            # Academic research summary (full width)
+            html.Div([
+                html.Div([
+                    html.H3("Academic Research Summary", className="card-title"),
+                    html.Div(id='academic-research-summary', className="card-content")
+                ], className="modern-info-card")
+            ], className="content-section")
+            
+        ], className="modern-tab-content")
     
     def create_cost_advantage_card(self, data: Dict) -> html.Div:
         """Create office hours advantage card showing scheduling-based optimization"""

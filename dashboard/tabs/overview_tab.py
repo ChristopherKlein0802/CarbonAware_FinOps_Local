@@ -24,77 +24,86 @@ class OverviewTab:
         self.cards = DashboardCards()
         self.charts = DashboardCharts()
     
-    def create_layout(self) -> html.Div:
+    def create_tab_layout(self) -> html.Div:
         """
-        Create the complete Overview tab layout
+        Create the complete Overview tab layout with modern Builder.io design
         
         Returns:
-            html.Div: Complete overview tab layout
+            html.Div: Complete modernized overview tab layout
         """
         return html.Div([
+            # Modern header section
             html.Div([
-                # Key metrics cards (same as infrastructure tab)
                 html.Div([
-                    html.Div(id='overview-cost-card', style={'width': '24%', 'display': 'inline-block', 'margin': '0.5%'}),
-                    html.Div(id='overview-co2-card', style={'width': '24%', 'display': 'inline-block', 'margin': '0.5%'}),
-                    html.Div(id='overview-instances-card', style={'width': '24%', 'display': 'inline-block', 'margin': '0.5%'}),
-                    html.Div(id='overview-savings-card', style={'width': '24%', 'display': 'inline-block', 'margin': '0.5%'})
-                ]),
-                
-                html.Br(),
-                
-                # Summary charts - 4 separate charts for better visibility
+                    html.H1("Infrastructure Overview", className="modern-title"),
+                    html.P("Real-time AWS infrastructure monitoring with carbon and cost analytics", 
+                          className="modern-subtitle")
+                ], className="modern-header")
+            ], className="tab-header-section"),
+            
+            # Key metrics grid (4 cards)
+            html.Div([
+                html.Div(id='overview-cost-card', className="metric-card-container"),
+                html.Div(id='overview-co2-card', className="metric-card-container"),
+                html.Div(id='overview-instances-card', className="metric-card-container"),
+                html.Div(id='overview-savings-card', className="metric-card-container")
+            ], className="metrics-grid-4"),
+            
+            # Infrastructure analytics section
+            html.Div([
                 html.Div([
-                    html.H4("📈 Infrastructure Overview", style={'color': '#333'}),
-                    
-                    # Row 1: Costs and Runtime
-                    html.Div([
-                        html.Div([
-                            dcc.Graph(id='overview-costs-chart')
-                        ], style={'width': '48%', 'display': 'inline-block', 'marginRight': '4%'}),
-                        
-                        html.Div([
-                            dcc.Graph(id='overview-runtime-chart')
-                        ], style={'width': '48%', 'display': 'inline-block'})
-                    ]),
-                    
-                    # Row 2: CO2 and Efficiency
-                    html.Div([
-                        html.Div([
-                            dcc.Graph(id='overview-co2-chart')
-                        ], style={'width': '48%', 'display': 'inline-block', 'marginRight': '4%'}),
-                        
-                        html.Div([
-                            dcc.Graph(id='overview-efficiency-chart')
-                        ], style={'width': '48%', 'display': 'inline-block'})
-                    ])
-                ]),
+                    html.H2("Infrastructure Analytics", className="section-title"),
+                    html.P("Real-time cost, runtime, CO2 emissions and efficiency analysis", className="section-subtitle")
+                ], className="section-header"),
                 
-                html.Br(),
-                
-                # Business Case & Analysis Summary (für Management/Stakeholder)
+                # Charts grid (2x2)
                 html.Div([
                     html.Div([
-                        html.H4("💡 Key Business Insights", style={'color': '#333'}),
-                        html.Div(id='overview-insights')
-                    ], style={'width': '48%', 'display': 'inline-block', 'marginRight': '4%'}),
+                        dcc.Graph(id='overview-costs-chart', className="modern-chart")
+                    ], className="chart-container-half"),
                     
                     html.Div([
-                        html.H4("📊 Business Case Summary", style={'color': '#333'}),
-                        html.Div(id='overview-business-case')
-                    ], style={'width': '48%', 'display': 'inline-block'})
-                ]),
+                        dcc.Graph(id='overview-runtime-chart', className="modern-chart")
+                    ], className="chart-container-half")
+                ], className="charts-row-2"),
                 
-                html.Br(),
-                
-                # Scientific Data Quality & Sources
                 html.Div([
-                    html.H4("🔬 Data Quality & Sources", style={'color': '#333'}),
-                    html.Div(id='overview-data-quality')
-                ], style={'marginTop': '20px'})
+                    html.Div([
+                        dcc.Graph(id='overview-co2-chart', className="modern-chart")
+                    ], className="chart-container-half"),
+                    
+                    html.Div([
+                        dcc.Graph(id='overview-efficiency-chart', className="modern-chart")
+                    ], className="chart-container-half")
+                ], className="charts-row-2")
+            ], className="content-section"),
+            
+            # Business insights and case summary (2 columns)
+            html.Div([
+                html.Div([
+                    html.Div([
+                        html.H3("Key Business Insights", className="card-title"),
+                        html.Div(id='overview-insights', className="card-content")
+                    ], className="modern-info-card")
+                ], className="info-card-container"),
                 
-            ], style={'padding': '20px', 'backgroundColor': '#f8f9fa', 'borderRadius': '10px', 'margin': '20px'})
-        ])
+                html.Div([
+                    html.Div([
+                        html.H3("Business Case Summary", className="card-title"),
+                        html.Div(id='overview-business-case', className="card-content")
+                    ], className="modern-info-card")
+                ], className="info-card-container")
+            ], className="info-cards-row-2"),
+            
+            # Data quality and sources (full width)
+            html.Div([
+                html.Div([
+                    html.H3("Data Quality & Sources", className="card-title"),
+                    html.Div(id='overview-data-quality', className="card-content")
+                ], className="modern-info-card")
+            ], className="content-section")
+            
+        ], className="modern-tab-content")
     
     def create_cost_card(self, data: List[Dict]) -> html.Div:
         """Create cost overview card for overview tab"""

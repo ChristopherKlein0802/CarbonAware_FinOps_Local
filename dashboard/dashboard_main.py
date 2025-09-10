@@ -44,13 +44,19 @@ class CarbonAwareFinOpsDashboard:
     """
     Main Carbon-Aware FinOps Dashboard Class
     
-    This class now orchestrates the modular dashboard components instead of
-    containing all functionality in a single massive file.
+    Modern Builder.io inspired design with complete functionality preservation.
+    This class orchestrates modular dashboard components with enhanced UX/UI.
     """
     
     def __init__(self):
-        """Initialize the dashboard with modular architecture"""
-        self.app = dash.Dash(__name__)
+        """Initialize the dashboard with modern design system"""
+        # Initialize Dash app with modern external stylesheets
+        external_stylesheets = [
+            'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap',
+            '/assets/modern-thesis-styles.css'
+        ]
+        
+        self.app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
         self.data_processor = data_processor
         self.overview_tab = overview_tab
         self.infrastructure_tab = infrastructure_tab
@@ -58,88 +64,103 @@ class CarbonAwareFinOpsDashboard:
         self.thesis_validation_tab = thesis_validation_tab
         self.cards = DashboardCards()
         
-        # Setup dashboard
-        self.setup_layout()
+        # Setup modern dashboard
+        self.setup_modern_layout()
         self.setup_callbacks()
         
-        logger.info("✅ Carbon-Aware FinOps Dashboard initialized with modular architecture")
+        logger.info("✅ Carbon-Aware FinOps Dashboard initialized with modern Builder.io design")
     
-    def setup_layout(self):
-        """Setup the main dashboard layout"""
+    def setup_modern_layout(self):
+        """Setup the modern dashboard layout with Builder.io design"""
         self.app.layout = html.Div([
-            # Update interval for real-time data
+            # Update interval for real-time data (unchanged functionality)
             dcc.Interval(
                 id='interval-component',
                 interval=60*1000,  # Update every minute
                 n_intervals=0
             ),
             
-            # Thesis-focused Header
+            # Modern Header with Builder.io design
             html.Div([
-                html.H1("🎓 Carbon-Aware FinOps - Bachelor Thesis Dashboard", 
-                       style={'color': '#2E8B57', 'textAlign': 'center', 'marginBottom': '10px'}),
-                html.H3("Research Question: Integrierte Carbon-aware FinOps Optimierung vs. separate Tools",
-                       style={'color': '#666', 'textAlign': 'center', 'fontWeight': 'normal', 'marginBottom': '20px'}),
-                
-                # Academic Disclaimer Banner
                 html.Div([
-                    html.P([
-                        "🔬 ", html.Strong("Proof-of-Concept:"), " Alle Ergebnisse sind vorläufig. ",
-                        "🔢 ", html.Strong("Conservative Schätzungen:"), " ±15% Unsicherheitsintervalle dokumentiert. ",
-                        "🇩🇪 ", html.Strong("Fokus:"), " Deutsche KMU (≤100 Instanzen, EU-Central-1)."
-                    ], style={'margin': '0', 'color': '#666', 'fontSize': '14px'})
-                ], style={
-                    'backgroundColor': '#f0f8f0',
-                    'padding': '15px',
-                    'borderRadius': '5px',
-                    'border': '1px solid #2E8B57',
-                    'marginBottom': '20px'
-                })
-            ], style={'backgroundColor': 'white', 'padding': '20px', 'boxShadow': '0 2px 4px rgba(0,0,0,0.1)'}),
+                    # Hero Title Section
+                    html.Div([
+                        html.H1("🎓 Carbon-Aware FinOps", className="hero-title"),
+                        html.H2("Bachelor Thesis Dashboard", className="hero-subtitle"),
+                        html.P("Integrierte Carbon-aware FinOps Optimierung vs. separate Tools", 
+                               className="research-question")
+                    ]),
+                    
+                    # Quick Stats Bar (will be populated by callbacks)
+                    html.Div([
+                        html.Div([
+                            html.Span("4", className="stat-number"),
+                            html.Span("Active Instances", className="stat-label")
+                        ], className="stat-item"),
+                        html.Div([
+                            html.Span(id="header-cost-stat", children="€0.00", className="stat-number"),
+                            html.Span("Monthly Savings", className="stat-label")
+                        ], className="stat-item"),
+                        html.Div([
+                            html.Span(id="header-co2-stat", children="0.0kg", className="stat-number"),
+                            html.Span("CO2 Reduction", className="stat-label")
+                        ], className="stat-item"),
+                        html.Div([
+                            html.Span(id="header-api-stat", children="95%", className="stat-number"),
+                            html.Span("API Availability", className="stat-label")
+                        ], className="stat-item")
+                    ], className="quick-stats")
+                    
+                ], className="header-container")
+            ], className="modern-header"),
             
-            # Main tabs
-            dcc.Tabs(
-                id="main-tabs",
-                value="overview-tab",
-                children=[
-                    # Overview Tab
-                    dcc.Tab(
-                        label="📊 Overview", 
-                        value="overview-tab",
-                        children=[self.overview_tab.create_layout()],
-                        style={'padding': '10px', 'fontWeight': 'bold'},
-                        selected_style={'padding': '10px', 'fontWeight': 'bold', 'backgroundColor': '#2E8B57', 'color': 'white'}
-                    ),
+            # Modern Academic Disclaimer
+            html.Div([
+                html.Div([
+                    html.Div("🔬", className="disclaimer-icon"),
+                    html.Div([
+                        html.Strong("Proof-of-Concept: "), "Alle Ergebnisse sind vorläufig. ",
+                        html.Strong("Conservative Schätzungen: "), "±15% Unsicherheitsintervalle dokumentiert. ",
+                        html.Strong("Fokus: "), "Deutsche KMU (≤100 Instanzen, EU-Central-1)."
+                    ], className="disclaimer-text")
+                ], className="disclaimer-content")
+            ], className="modern-disclaimer"),
+            
+            # Modern Tab Navigation
+            html.Div([
+                # Tab Navigation Bar
+                html.Div([
+                    html.Button("📊 Overview", id="tab-overview", className="tab-item active"),
+                    html.Button("🎓 Thesis Validation", id="tab-thesis", className="tab-item"),
+                    html.Button("🏗️ Infrastructure Analysis", id="tab-infrastructure", className="tab-item"),
+                    html.Button("🌍 Carbon & Power Data", id="tab-carbon", className="tab-item")
+                ], className="tab-navigation"),
+                
+                # Tab Content Container (will hold the active tab)
+                html.Div([
+                    # Overview Tab Content
+                    html.Div(id="overview-content", children=[
+                        self.overview_tab.create_tab_layout()
+                    ], className="tab-content", style={'display': 'block'}),
                     
-                    # Thesis Validation Tab (NEW - Research Focus)
-                    dcc.Tab(
-                        label="🎓 Thesis Validation", 
-                        value="thesis-validation-tab",
-                        children=[self.thesis_validation_tab.create_layout()],
-                        style={'padding': '10px', 'fontWeight': 'bold'},
-                        selected_style={'padding': '10px', 'fontWeight': 'bold', 'backgroundColor': '#2E8B57', 'color': 'white'}
-                    ),
+                    # Thesis Validation Tab Content  
+                    html.Div(id="thesis-content", children=[
+                        self.thesis_validation_tab.create_tab_layout()
+                    ], className="tab-content", style={'display': 'none'}),
                     
-                    # Infrastructure Analysis Tab
-                    dcc.Tab(
-                        label="🏗️ Infrastructure Analysis", 
-                        value="infrastructure-tab",
-                        children=[self.infrastructure_tab.create_layout()],
-                        style={'padding': '10px', 'fontWeight': 'bold'},
-                        selected_style={'padding': '10px', 'fontWeight': 'bold', 'backgroundColor': '#2E8B57', 'color': 'white'}
-                    ),
+                    # Infrastructure Tab Content
+                    html.Div(id="infrastructure-content", children=[
+                        self.infrastructure_tab.create_tab_layout()
+                    ], className="tab-content", style={'display': 'none'}),
                     
-                    # Carbon & Power Data Tab
-                    dcc.Tab(
-                        label="🌍 Carbon & Power Data", 
-                        value="carbon-tab",
-                        children=[self.carbon_tab.create_layout()],
-                        style={'padding': '10px', 'fontWeight': 'bold'},
-                        selected_style={'padding': '10px', 'fontWeight': 'bold', 'backgroundColor': '#2E8B57', 'color': 'white'}
-                    )
-                ],
-                style={'margin': '20px 0'}
-            )
+                    # Carbon Tab Content
+                    html.Div(id="carbon-content", children=[
+                        self.carbon_tab.create_tab_layout()
+                    ], className="tab-content", style={'display': 'none'})
+                    
+                ], id="tab-content-container")
+                
+            ], className="modern-tabs")
         ])
     
     def setup_callbacks(self):
@@ -336,6 +357,67 @@ class CarbonAwareFinOpsDashboard:
                 empty_content = html.Div("Error loading data")
                 empty_chart = self.thesis_validation_tab.charts.create_empty_chart("Error loading data")
                 return (empty_card, empty_card, empty_card, empty_card, empty_chart, empty_chart, empty_chart, empty_content, empty_content, empty_content)
+        
+        # Tab Navigation Callback for modern button-based navigation
+        @self.app.callback(
+            [Output('tab-content', 'children'),
+             Output('overview-btn', 'className'),
+             Output('infrastructure-btn', 'className'),
+             Output('carbon-btn', 'className'),
+             Output('thesis-btn', 'className')],
+            [Input('overview-btn', 'n_clicks'),
+             Input('infrastructure-btn', 'n_clicks'),
+             Input('carbon-btn', 'n_clicks'),
+             Input('thesis-btn', 'n_clicks')],
+            prevent_initial_call=False
+        )
+        def handle_tab_navigation(overview_clicks, infrastructure_clicks, carbon_clicks, thesis_clicks):
+            """Handle modern button-based tab navigation"""
+            try:
+                # Determine which button was clicked
+                ctx = dash.callback_context
+                
+                # Default to overview tab on initial load
+                if not ctx.triggered:
+                    active_tab = 'overview'
+                else:
+                    button_id = ctx.triggered[0]['prop_id'].split('.')[0]
+                    active_tab = button_id.replace('-btn', '')
+                
+                # Base classes for all buttons
+                base_class = "modern-tab-btn"
+                active_class = f"{base_class} active"
+                inactive_class = base_class
+                
+                # Set active states
+                overview_btn_class = active_class if active_tab == 'overview' else inactive_class
+                infrastructure_btn_class = active_class if active_tab == 'infrastructure' else inactive_class
+                carbon_btn_class = active_class if active_tab == 'carbon' else inactive_class
+                thesis_btn_class = active_class if active_tab == 'thesis' else inactive_class
+                
+                # Render appropriate tab content
+                if active_tab == 'overview':
+                    content = self.overview_tab.create_tab_layout()
+                elif active_tab == 'infrastructure':
+                    content = self.infrastructure_tab.create_tab_layout()
+                elif active_tab == 'carbon':
+                    content = self.carbon_tab.create_tab_layout()
+                elif active_tab == 'thesis':
+                    content = self.thesis_validation_tab.create_tab_layout()
+                else:
+                    content = self.overview_tab.create_tab_layout()  # Default
+                
+                return (content, overview_btn_class, infrastructure_btn_class, 
+                       carbon_btn_class, thesis_btn_class)
+                
+            except Exception as e:
+                logger.error(f"❌ Tab navigation error: {e}")
+                error_content = html.Div([
+                    html.H3("❌ Error Loading Tab", className="error-title"),
+                    html.P(f"Error details: {str(e)}", className="error-text")
+                ], className="error-container")
+                
+                return (error_content, inactive_class, inactive_class, inactive_class, inactive_class)
     
     def create_business_case_content(self, data: Dict) -> html.Div:
         """Create business case content for thesis validation tab with scaling scenarios"""

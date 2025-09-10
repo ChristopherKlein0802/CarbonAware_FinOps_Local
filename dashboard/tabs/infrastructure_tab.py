@@ -25,124 +25,170 @@ class InfrastructureTab:
         self.cards = DashboardCards()
         self.charts = DashboardCharts()
     
-    def create_layout(self) -> html.Div:
+    def create_tab_layout(self) -> html.Div:
         """
-        Create the complete Infrastructure Analysis tab layout
+        Create the complete Infrastructure Analysis tab layout with modern Builder.io design
         
         Returns:
-            html.Div: Complete infrastructure tab layout
+            html.Div: Complete modernized infrastructure tab layout
         """
         return html.Div([
-            html.H2("🏗️ Infrastructure Analysis", 
-                   style={'color': '#2E8B57', 'borderBottom': '2px solid #2E8B57', 'paddingBottom': '5px', 'marginBottom': '20px'}),
-            
-            # Infrastructure-specific Key Metrics Cards
+            # Modern header section
             html.Div([
-                html.Div(id='active-infrastructure-card', style={'width': '24%', 'display': 'inline-block', 'margin': '0.5%'}),
-                html.Div(id='resource-efficiency-card', style={'width': '24%', 'display': 'inline-block', 'margin': '0.5%'}),
-                html.Div(id='cost-per-hour-card', style={'width': '24%', 'display': 'inline-block', 'margin': '0.5%'}),
-                html.Div(id='rightsizing-potential-card', style={'width': '24%', 'display': 'inline-block', 'margin': '0.5%'})
-            ], style={'marginBottom': '30px'}),
+                html.Div([
+                    html.H1("Infrastructure Analysis", className="modern-title"),
+                    html.P("Deep-dive analytics for AWS infrastructure optimization and cost efficiency", 
+                          className="modern-subtitle")
+                ], className="modern-header")
+            ], className="tab-header-section"),
+            
+            # Key infrastructure metrics grid (4 cards)
+            html.Div([
+                html.Div(id='active-infrastructure-card', className="metric-card-container"),
+                html.Div(id='resource-efficiency-card', className="metric-card-container"),
+                html.Div(id='cost-per-hour-card', className="metric-card-container"),
+                html.Div(id='rightsizing-potential-card', className="metric-card-container")
+            ], className="metrics-grid-4"),
             
             # Cost Analysis Deep-Dive Section
             html.Div([
-                html.H3("📊 Cost Analysis Deep-Dive", style={'color': '#2E8B57', 'borderBottom': '2px solid #2E8B57', 'paddingBottom': '5px', 'marginBottom': '20px'}),
+                html.Div([
+                    html.H2("Cost Analysis Deep-Dive", className="section-title"),
+                    html.P("Historical trends, cost distribution and runtime correlation analysis", className="section-subtitle")
+                ], className="section-header"),
                 
-                # Row 1: Historical Analysis + Cost Distribution  
+                # Historical analysis + cost distribution (asymmetric layout)
                 html.Div([
                     html.Div([
-                        html.H4("💡 Historical vs Current Analysis", style={'color': '#333', 'marginBottom': '10px'}),
-                        html.Div(id='cost-analysis-chart')
-                    ], style={'width': '65%', 'display': 'inline-block', 'marginRight': '5%'}),
+                        html.Div([
+                            html.H4("Historical vs Current Analysis", className="chart-title"),
+                            html.Div(id='cost-analysis-chart', className="modern-chart")
+                        ], className="modern-chart-card")
+                    ], className="chart-container-large"),
                     
                     html.Div([
-                        html.H4("💰 Instance Type Distribution", style={'color': '#333', 'marginBottom': '10px'}),
-                        html.Div(id='instance-type-cost-distribution')
-                    ], style={'width': '30%', 'display': 'inline-block', 'verticalAlign': 'top'})
-                ], style={'marginBottom': '30px'}),
+                        html.Div([
+                            html.H4("Instance Type Distribution", className="chart-title"),
+                            html.Div(id='instance-type-cost-distribution', className="modern-chart")
+                        ], className="modern-chart-card")
+                    ], className="chart-container-small")
+                ], className="charts-row-asymmetric"),
                 
-                # Row 2: Correlation + Efficiency Matrix
+                # Runtime correlation + efficiency matrix (symmetric)
                 html.Div([
                     html.Div([
-                        html.H4("📊 Runtime vs Cost Correlation", style={'color': '#333', 'marginBottom': '10px'}),
-                        html.Div(id='runtime-cost-correlation')
-                    ], style={'width': '48%', 'display': 'inline-block', 'marginRight': '4%'}),
+                        html.Div([
+                            html.H4("Runtime vs Cost Correlation", className="chart-title"),
+                            html.Div(id='runtime-cost-correlation', className="modern-chart")
+                        ], className="modern-chart-card")
+                    ], className="chart-container-half"),
                     
                     html.Div([
-                        html.H4("🎯 Resource Efficiency Matrix", style={'color': '#333', 'marginBottom': '10px'}),
-                        html.Div(id='efficiency-matrix')
-                    ], style={'width': '48%', 'display': 'inline-block'})
-                ], style={'marginBottom': '30px'})
-            ], style={'marginBottom': '40px'}),
+                        html.Div([
+                            html.H4("Resource Efficiency Matrix", className="chart-title"),
+                            html.Div(id='efficiency-matrix', className="modern-chart")
+                        ], className="modern-chart-card")
+                    ], className="chart-container-half")
+                ], className="charts-row-2")
+            ], className="content-section"),
             
             # Infrastructure Health Section
             html.Div([
-                html.H3("🏥 Infrastructure Health", style={'color': '#2E8B57', 'borderBottom': '2px solid #2E8B57', 'paddingBottom': '5px', 'marginBottom': '20px'}),
+                html.Div([
+                    html.H2("Infrastructure Health", className="section-title"),
+                    html.P("Right-sizing recommendations, health monitoring and utilization analysis", className="section-subtitle")
+                ], className="section-header"),
                 
-                # Row 1: Right-sizing Recommendations + Health Matrix
+                # Right-sizing + health matrix (asymmetric)
                 html.Div([
                     html.Div([
-                        html.H4("🎯 Right-sizing Recommendations", style={'color': '#333', 'marginBottom': '10px'}),
-                        html.Div(id='rightsizing-recommendations')
-                    ], style={'width': '60%', 'display': 'inline-block', 'marginRight': '5%'}),
+                        html.Div([
+                            html.H4("Right-sizing Recommendations", className="chart-title"),
+                            html.Div(id='rightsizing-recommendations', className="modern-chart")
+                        ], className="modern-chart-card")
+                    ], className="chart-container-large"),
                     
                     html.Div([
-                        html.H4("📊 Instance Health Matrix", style={'color': '#333', 'marginBottom': '10px'}),
-                        html.Div(id='instance-health-matrix')
-                    ], style={'width': '35%', 'display': 'inline-block', 'verticalAlign': 'top'})
-                ], style={'marginBottom': '30px'}),
+                        html.Div([
+                            html.H4("Instance Health Matrix", className="chart-title"),
+                            html.Div(id='instance-health-matrix', className="modern-chart")
+                        ], className="modern-chart-card")
+                    ], className="chart-container-small")
+                ], className="charts-row-asymmetric"),
                 
-                # Row 2: Rightsizing Analysis + Basic Optimization Analysis
+                # Rightsizing + utilization analysis (symmetric)
                 html.Div([
                     html.Div([
-                        html.H4("🔧 Rightsizing Analysis", style={'color': '#333', 'marginBottom': '10px'}),
-                        html.Div(id='rightsizing-analysis')
-                    ], style={'width': '48%', 'display': 'inline-block', 'marginRight': '4%'}),
+                        html.Div([
+                            html.H4("Rightsizing Analysis", className="chart-title"),
+                            html.Div(id='rightsizing-analysis', className="modern-chart")
+                        ], className="modern-chart-card")
+                    ], className="chart-container-half"),
                     
                     html.Div([
-                        html.H4("📊 Utilization Analysis", style={'color': '#333', 'marginBottom': '10px'}),
-                        html.Div(id='utilization-analysis')
-                    ], style={'width': '48%', 'display': 'inline-block'})
-                ], style={'marginBottom': '30px'})
-            ], style={'marginBottom': '40px'}),
+                        html.Div([
+                            html.H4("Utilization Analysis", className="chart-title"),
+                            html.Div(id='utilization-analysis', className="modern-chart")
+                        ], className="modern-chart-card")
+                    ], className="chart-container-half")
+                ], className="charts-row-2")
+            ], className="content-section"),
             
-            # Instance analysis section
+            # Instance Analysis Section
             html.Div([
-                html.H3("🖥️ Instance Analysis", style={'color': '#2E8B57', 'marginBottom': '15px'}),
-                html.Div(id='instance-analysis-table')
-            ], style={'marginBottom': '30px'}),
+                html.Div([
+                    html.H2("Instance Analysis", className="section-title"),
+                    html.P("Detailed table analysis of individual instances", className="section-subtitle")
+                ], className="section-header"),
+                
+                html.Div([
+                    html.Div(id='instance-analysis-table', className="modern-table-container")
+                ], className="table-section")
+            ], className="content-section"),
             
             # API Data Sources & Methodology Section
             html.Div([
-                html.H3("📊 Data Sources & API Methodology", style={'color': '#2E8B57', 'borderBottom': '2px solid #2E8B57', 'paddingBottom': '5px', 'marginBottom': '20px'}),
+                html.Div([
+                    html.H2("Data Sources & API Methodology", className="section-title"),
+                    html.P("AWS Cost Explorer integration, API limitations and scientific methodology", className="section-subtitle")
+                ], className="section-header"),
                 
-                # Row 1: AWS Cost Explorer + Runtime Analysis
+                # AWS Cost Explorer + Runtime analysis
                 html.Div([
                     html.Div([
-                        html.H4("💰 AWS Cost Explorer API", style={'color': '#333', 'marginBottom': '10px'}),
-                        html.Div(id='aws-cost-explorer-data')
-                    ], style={'width': '48%', 'display': 'inline-block', 'marginRight': '4%'}),
+                        html.Div([
+                            html.H3("AWS Cost Explorer API", className="card-title"),
+                            html.Div(id='aws-cost-explorer-data', className="card-content")
+                        ], className="modern-info-card")
+                    ], className="info-card-container"),
                     
                     html.Div([
-                        html.H4("⏱️ Runtime Analysis Data", style={'color': '#333', 'marginBottom': '10px'}),
-                        html.Div(id='runtime-analysis-data')
-                    ], style={'width': '48%', 'display': 'inline-block'})
-                ], style={'marginBottom': '30px'}),
+                        html.Div([
+                            html.H3("Runtime Analysis Data", className="card-title"),
+                            html.Div(id='runtime-analysis-data', className="card-content")
+                        ], className="modern-info-card")
+                    ], className="info-card-container")
+                ], className="info-cards-row-2"),
                 
-                # Row 2: API Limitations + Methodology
+                # API limitations + methodology
                 html.Div([
                     html.Div([
-                        html.H4("⚠️ API Limitations & Research", style={'color': '#333', 'marginBottom': '10px'}),
-                        html.Div(id='api-limitations-research')
-                    ], style={'width': '48%', 'display': 'inline-block', 'marginRight': '4%'}),
+                        html.Div([
+                            html.H3("API Limitations & Research", className="card-title"),
+                            html.Div(id='api-limitations-research', className="card-content")
+                        ], className="modern-info-card")
+                    ], className="info-card-container"),
                     
                     html.Div([
-                        html.H4("🔬 Scientific Methodology", style={'color': '#333', 'marginBottom': '10px'}),
-                        html.Div(id='scientific-methodology')
-                    ], style={'width': '48%', 'display': 'inline-block'})
-                ], style={'marginBottom': '20px'})
-            ], style={'marginBottom': '20px'})
-        ], style={'padding': '20px'})
+                        html.Div([
+                            html.H3("Scientific Methodology", className="card-title"),
+                            html.Div(id='scientific-methodology', className="card-content")
+                        ], className="modern-info-card")
+                    ], className="info-card-container")
+                ], className="info-cards-row-2")
+            ], className="content-section")
+            
+        ], className="modern-tab-content")
     
     def create_active_infrastructure_card(self, data: List[Dict]) -> html.Div:
         """Create active infrastructure card"""
