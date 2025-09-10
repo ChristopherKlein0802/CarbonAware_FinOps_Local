@@ -39,17 +39,17 @@ dev = [
 ]
 
 [project.scripts]
-carbon-dashboard = "src.visualization.optimization_analysis_dashboard:main"
+carbon-dashboard = "dashboard.dashboard_main:main"
 
 [tool.setuptools]
-packages = ["src"]
+packages = ["dashboard"]
 include-package-data = true
 
 [tool.setuptools.dynamic]
 dependencies = {file = ["requirements.txt"]}
 
 [tool.setuptools.package-data]
-"src" = ["config/*.yaml"]
+"dashboard" = ["**/*.py", "**/*.yaml", "**/*.json"]
 
 [tool.black]
 line-length = 120
