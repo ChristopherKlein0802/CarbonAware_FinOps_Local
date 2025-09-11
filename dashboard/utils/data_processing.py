@@ -28,6 +28,24 @@ from typing import List, Dict
 # Import unified API client
 from dashboard.api_clients.unified_api_client import UnifiedAPIClient
 
+def safe_round(value, decimals=2):
+    """
+    Safe rounding function that handles None values and preserves scientific honesty.
+    
+    Args:
+        value: Value to round (can be None)
+        decimals: Number of decimal places
+    
+    Returns:
+        Rounded value or None if input was None (preserves API unavailability)
+    """
+    if value is None:
+        return None
+    try:
+        return round(float(value), decimals)
+    except (TypeError, ValueError):
+        return None
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -241,16 +259,16 @@ class ThesisDataProcessor:
             'scenario': instance.get('scenario', 'Unknown'),
             'optimization_type': optimization_type,
             'business_size': instance.get('business_size', 'Unknown'),
-            'monthly_cost_eur': round(monthly_cost_eur, 2),
-            'monthly_power_kwh': round(monthly_power_kwh, 2) if monthly_power_kwh is not None else None,
-            'monthly_co2_kg': round(monthly_co2_kg, 4) if monthly_co2_kg is not None else None,
+            'monthly_cost_eur': safe_round(monthly_cost_eur, 2),
+            'monthly_power_kwh': safe_round(monthly_power_kwh, 2),
+            'monthly_co2_kg': safe_round(monthly_co2_kg, 4),
             'power_watts': power_watts,  # Can be None if Boavizta API unavailable
             'power_consumption_watts': power_watts,  # Additional field for compatibility
             'runtime_hours_month': actual_runtime_hours if 'actual_runtime_hours' in locals() else monthly_hours,  # ACTUAL runtime, not projected
             'actual_runtime_hours': actual_runtime_hours if 'actual_runtime_hours' in locals() else 0,  # Real hours since launch
             'projected_monthly_hours': monthly_hours,  # What monthly would be if 24/7
-            'potential_cost_savings': round(cost_savings, 2),
-            'potential_co2_savings': round(co2_savings, 2) if co2_savings is not None else None,
+            'potential_cost_savings': safe_round(cost_savings, 2),
+            'potential_co2_savings': safe_round(co2_savings, 2),
             'carbon_intensity': carbon_intensity,
             'carbon_data_available': carbon_data_available,  # Scientific honesty: track carbon data availability
             'power_data_available': power_data_available    # Scientific honesty: track power data availability
@@ -310,7 +328,7 @@ class ThesisDataProcessor:
                 'office_hours_only': {
                     'monthly_cost_savings': office_hours_cost_savings,
                     'monthly_co2_reduction_kg': office_hours_co2_reduction,
-                    'runtime_reduction_pct': round((1 - self.SCHEDULING_CONSTANTS['OFFICE_HOURS_FACTOR']) * 100, 1),
+                    'runtime_reduction_pct': safe_round((1 - self.SCHEDULING_CONSTANTS['OFFICE_HOURS_FACTOR']) * 100, 1),
                     'approach': 'Conservative Office Hours (Mixed workloads)',
                     'limitation': 'Assumes 50% schedulable workloads only',
                     'data_available': carbon_data_available
@@ -334,8 +352,8 @@ class ThesisDataProcessor:
             },
             'competitive_advantage': {
                 'integration_superiority': 'Only tool optimizing BOTH cost AND carbon simultaneously',
-                'cost_advantage_pct': round(cost_advantage_pct, 1),
-                'carbon_advantage_pct': round(carbon_advantage_pct, 1),
+                'cost_advantage_pct': safe_round(cost_advantage_pct, 1),
+                'carbon_advantage_pct': safe_round(carbon_advantage_pct, 1),
                 'scientific_foundation': 'Scheduling-based, not hypothetical percentages'
             },
             # Legacy structure for compatibility (will be phased out)
@@ -343,12 +361,12 @@ class ThesisDataProcessor:
             'carbon_only_tools': {'cost_savings': carbon_aware_cost_savings, 'co2_reduction': carbon_aware_co2_reduction},
             'this_research': {'cost_savings': integrated_cost_savings, 'co2_reduction': integrated_co2_reduction},
             'advantage_over_cost_only': {
-                'better_co2_reduction_pct': round(carbon_advantage_pct, 1),
-                'better_cost_savings_pct': round(cost_advantage_pct, 1)
+                'better_co2_reduction_pct': safe_round(carbon_advantage_pct, 1),
+                'better_cost_savings_pct': safe_round(cost_advantage_pct, 1)
             },
             'advantage_over_carbon_only': {
                 'cost_savings_vs_none': integrated_cost_savings,
-                'better_co2_reduction_pct': round(carbon_advantage_pct, 1)
+                'better_co2_reduction_pct': safe_round(carbon_advantage_pct, 1)
             }
         }
     
@@ -386,14 +404,14 @@ class ThesisDataProcessor:
         return {
             'methodology': 'Independent business case based on industry benchmarks (NO circular logic)',
             'baseline_monthly_cost_eur': baseline_monthly_cost,
-            'monthly_cost_savings_eur': round(independent_monthly_savings, 2),
-            'monthly_co2_reduction_kg': round(independent_co2_reduction, 4),
+            'monthly_cost_savings_eur': safe_round(independent_monthly_savings, 2),
+            'monthly_co2_reduction_kg': safe_round(independent_co2_reduction, 4),
             'savings_rate_applied': f"{conservative_savings_rate:.0%} (industry standard)",
-            'theoretical_esg_value_eur': round(theoretical_co2_value_eur, 4),
+            'theoretical_esg_value_eur': safe_round(theoretical_co2_value_eur, 4),
             'esg_value_disclaimer': 'THEORETICAL ONLY - EU ETS prices do not apply to SME AWS usage',
-            'annual_total_value_eur': round(annual_savings, 2),
+            'annual_total_value_eur': safe_round(annual_savings, 2),
             'implementation_cost_eur': implementation_cost,
-            'roi_payback_months': round(roi_months, 1),
+            'roi_payback_months': safe_round(roi_months, 1),
             'proof_of_concept_status': 'Conservative industry-standard estimates',
             'circularity_avoided': 'Business case uses external benchmarks, not tool claims',
             'statistical_analysis': self._calculate_confidence_intervals(independent_monthly_savings, independent_co2_reduction),
@@ -431,8 +449,8 @@ class ThesisDataProcessor:
         
         # Round ROI months for readability
         for scenario in scenarios.values():
-            scenario['roi_months'] = round(min(scenario['roi_months'], 999), 1)
-            scenario['monthly_savings'] = round(scenario['monthly_savings'], 2)
+            scenario['roi_months'] = safe_round(min(scenario['roi_months'], 999), 1)
+            scenario['monthly_savings'] = safe_round(scenario['monthly_savings'], 2)
             
         return scenarios
     
@@ -463,18 +481,18 @@ class ThesisDataProcessor:
         return {
             'method': 'Root Sum of Squares (RSS) from documented API uncertainties',
             'confidence_level': '95%',
-            'total_uncertainty_pct': round(total_uncertainty * 100, 1),
+            'total_uncertainty_pct': safe_round(total_uncertainty * 100, 1),
             'cost_savings': {
-                'point_estimate': round(cost_savings, 2),
-                'lower_bound': round(cost_savings - cost_margin, 2),
-                'upper_bound': round(cost_savings + cost_margin, 2),
-                'margin_of_error': round(cost_margin, 2)
+                'point_estimate': safe_round(cost_savings, 2),
+                'lower_bound': safe_round(cost_savings - cost_margin, 2),
+                'upper_bound': safe_round(cost_savings + cost_margin, 2),
+                'margin_of_error': safe_round(cost_margin, 2)
             },
             'co2_reduction': {
-                'point_estimate': round(co2_reduction, 4) if co2_reduction else None,
-                'lower_bound': round(co2_reduction - co2_margin, 4) if co2_margin else None,
-                'upper_bound': round(co2_reduction + co2_margin, 4) if co2_margin else None,
-                'margin_of_error': round(co2_margin, 4) if co2_margin else None,
+                'point_estimate': safe_round(co2_reduction, 4),
+                'lower_bound': safe_round(co2_reduction - co2_margin, 4) if co2_margin else None,
+                'upper_bound': safe_round(co2_reduction + co2_margin, 4) if co2_margin else None,
+                'margin_of_error': safe_round(co2_margin, 4) if co2_margin else None,
                 'data_available': co2_reduction is not None
             },
             'uncertainty_sources': api_uncertainties

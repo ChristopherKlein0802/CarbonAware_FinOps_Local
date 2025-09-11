@@ -1,14 +1,15 @@
 """
-Infrastructure Analysis Tab for Carbon-Aware FinOps Dashboard
+Infrastructure Tab - Modern Builder.io Design
+Carbon-Aware FinOps Dashboard - Bachelor Thesis
 
-This module handles the Infrastructure Analysis tab functionality including:
-- Key metric cards
-- Instance analysis table
-- AWS Cost Explorer data
-- Runtime analysis data
+Complete Builder.io modernization with:
+- Modern CSS classes only
+- Clean component structure
+- Optimized performance
+- Academic presentation ready
 """
 
-from dash import html, dash_table
+from dash import html, dcc
 from typing import List, Dict
 import sys
 import os
@@ -19,815 +20,431 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from dashboard.components.components import DashboardCards, DashboardCharts
 
 class InfrastructureTab:
-    """Handles all Infrastructure Analysis tab functionality"""
+    """Modern Builder.io Infrastructure Tab - Completely redesigned"""
     
     def __init__(self):
         self.cards = DashboardCards()
         self.charts = DashboardCharts()
     
     def create_tab_layout(self) -> html.Div:
-        """
-        Create the complete Infrastructure Analysis tab layout with modern Builder.io design
-        
-        Returns:
-            html.Div: Complete modernized infrastructure tab layout
-        """
+        """Create modern Builder.io infrastructure layout"""
         return html.Div([
-            # Modern header section
+            # Modern Section Header
             html.Div([
-                html.Div([
-                    html.H1("Infrastructure Analysis", className="modern-title"),
-                    html.P("Deep-dive analytics for AWS infrastructure optimization and cost efficiency", 
-                          className="modern-subtitle")
-                ], className="modern-header")
-            ], className="tab-header-section"),
+                html.H2("🏗️ Infrastructure Analysis", className="section-title"),
+                html.P("Deep-dive analytics for AWS infrastructure optimization and carbon efficiency", 
+                       className="section-description")
+            ], className="section-header"),
             
-            # Key infrastructure metrics grid (4 cards)
+            # KPI Cards Grid (Builder.io style)
             html.Div([
-                html.Div(id='active-infrastructure-card', className="metric-card-container"),
-                html.Div(id='resource-efficiency-card', className="metric-card-container"),
-                html.Div(id='cost-per-hour-card', className="metric-card-container"),
-                html.Div(id='rightsizing-potential-card', className="metric-card-container")
-            ], className="metrics-grid-4"),
+                html.Div(id='infrastructure-active-card', className="metric-card"),
+                html.Div(id='infrastructure-efficiency-card', className="metric-card"),
+                html.Div(id='infrastructure-cost-hour-card', className="metric-card"),
+                html.Div(id='infrastructure-rightsizing-card', className="metric-card")
+            ], className="metrics-grid"),
             
-            # Cost Analysis Deep-Dive Section
+            # Cost Analysis Section (Builder.io grid)
             html.Div([
-                html.Div([
-                    html.H2("Cost Analysis Deep-Dive", className="section-title"),
-                    html.P("Historical trends, cost distribution and runtime correlation analysis", className="section-subtitle")
-                ], className="section-header"),
-                
-                # Historical analysis + cost distribution (asymmetric layout)
+                html.H3("💰 Cost Analysis Deep-Dive", className="subsection-title"),
                 html.Div([
                     html.Div([
-                        html.Div([
-                            html.H4("Historical vs Current Analysis", className="chart-title"),
-                            html.Div(id='cost-analysis-chart', className="modern-chart")
-                        ], className="modern-chart-card")
-                    ], className="chart-container-large"),
-                    
+                        html.H4("🕐 Historical Trends", className="chart-title"),
+                        dcc.Graph(id='infrastructure-cost-trends-chart', className="chart-container")
+                    ], className="chart-card"),
                     html.Div([
-                        html.Div([
-                            html.H4("Instance Type Distribution", className="chart-title"),
-                            html.Div(id='instance-type-cost-distribution', className="modern-chart")
-                        ], className="modern-chart-card")
-                    ], className="chart-container-small")
-                ], className="charts-row-asymmetric"),
-                
-                # Runtime correlation + efficiency matrix (symmetric)
-                html.Div([
-                    html.Div([
-                        html.Div([
-                            html.H4("Runtime vs Cost Correlation", className="chart-title"),
-                            html.Div(id='runtime-cost-correlation', className="modern-chart")
-                        ], className="modern-chart-card")
-                    ], className="chart-container-half"),
-                    
-                    html.Div([
-                        html.Div([
-                            html.H4("Resource Efficiency Matrix", className="chart-title"),
-                            html.Div(id='efficiency-matrix', className="modern-chart")
-                        ], className="modern-chart-card")
-                    ], className="chart-container-half")
-                ], className="charts-row-2")
+                        html.H4("📊 Instance Distribution", className="chart-title"),
+                        dcc.Graph(id='infrastructure-type-distribution-chart', className="chart-container")
+                    ], className="chart-card")
+                ], className="charts-grid-2")
             ], className="content-section"),
             
-            # Infrastructure Health Section
+            # Performance Section (Builder.io responsive)
             html.Div([
-                html.Div([
-                    html.H2("Infrastructure Health", className="section-title"),
-                    html.P("Right-sizing recommendations, health monitoring and utilization analysis", className="section-subtitle")
-                ], className="section-header"),
-                
-                # Right-sizing + health matrix (asymmetric)
+                html.H3("⚡ Performance Analysis", className="subsection-title"),
                 html.Div([
                     html.Div([
-                        html.Div([
-                            html.H4("Right-sizing Recommendations", className="chart-title"),
-                            html.Div(id='rightsizing-recommendations', className="modern-chart")
-                        ], className="modern-chart-card")
-                    ], className="chart-container-large"),
-                    
+                        html.H4("🔗 Runtime vs Cost", className="chart-title"),
+                        dcc.Graph(id='infrastructure-runtime-correlation-chart', className="chart-container")
+                    ], className="chart-card"),
                     html.Div([
-                        html.Div([
-                            html.H4("Instance Health Matrix", className="chart-title"),
-                            html.Div(id='instance-health-matrix', className="modern-chart")
-                        ], className="modern-chart-card")
-                    ], className="chart-container-small")
-                ], className="charts-row-asymmetric"),
-                
-                # Rightsizing + utilization analysis (symmetric)
-                html.Div([
-                    html.Div([
-                        html.Div([
-                            html.H4("Rightsizing Analysis", className="chart-title"),
-                            html.Div(id='rightsizing-analysis', className="modern-chart")
-                        ], className="modern-chart-card")
-                    ], className="chart-container-half"),
-                    
-                    html.Div([
-                        html.Div([
-                            html.H4("Utilization Analysis", className="chart-title"),
-                            html.Div(id='utilization-analysis', className="modern-chart")
-                        ], className="modern-chart-card")
-                    ], className="chart-container-half")
-                ], className="charts-row-2")
+                        html.H4("🎯 Efficiency Matrix", className="chart-title"),
+                        dcc.Graph(id='infrastructure-efficiency-matrix-chart', className="chart-container")
+                    ], className="chart-card")
+                ], className="charts-grid-2")
             ], className="content-section"),
             
-            # Instance Analysis Section
+            # Optimization Section (Builder.io layout)
             html.Div([
+                html.H3("🚀 Optimization Opportunities", className="subsection-title"),
                 html.Div([
-                    html.H2("Instance Analysis", className="section-title"),
-                    html.P("Detailed table analysis of individual instances", className="section-subtitle")
-                ], className="section-header"),
-                
-                html.Div([
-                    html.Div(id='instance-analysis-table', className="modern-table-container")
-                ], className="table-section")
+                    html.Div([
+                        html.H4("📈 Right-sizing Analysis", className="chart-title"),
+                        html.Div(id='infrastructure-rightsizing-analysis', className="analysis-content")
+                    ], className="analysis-card"),
+                    html.Div([
+                        html.H4("❤️ Infrastructure Health", className="chart-title"),
+                        html.Div(id='infrastructure-health-matrix', className="health-content")
+                    ], className="analysis-card")
+                ], className="analysis-grid-2")
             ], className="content-section"),
             
-            # API Data Sources & Methodology Section
+            # Data Sources Section (Builder.io modern)
             html.Div([
-                html.Div([
-                    html.H2("Data Sources & API Methodology", className="section-title"),
-                    html.P("AWS Cost Explorer integration, API limitations and scientific methodology", className="section-subtitle")
-                ], className="section-header"),
-                
-                # AWS Cost Explorer + Runtime analysis
+                html.H3("🔬 Data Sources & Methodology", className="subsection-title"),
                 html.Div([
                     html.Div([
-                        html.Div([
-                            html.H3("AWS Cost Explorer API", className="card-title"),
-                            html.Div(id='aws-cost-explorer-data', className="card-content")
-                        ], className="modern-info-card")
-                    ], className="info-card-container"),
-                    
+                        html.H4("☁️ AWS Cost Explorer", className="info-title"),
+                        html.Div(id='infrastructure-aws-data', className="info-content")
+                    ], className="info-card"),
                     html.Div([
-                        html.Div([
-                            html.H3("Runtime Analysis Data", className="card-title"),
-                            html.Div(id='runtime-analysis-data', className="card-content")
-                        ], className="modern-info-card")
-                    ], className="info-card-container")
-                ], className="info-cards-row-2"),
-                
-                # API limitations + methodology
-                html.Div([
+                        html.H4("⏱️ Runtime Analytics", className="info-title"),
+                        html.Div(id='infrastructure-runtime-data', className="info-content")
+                    ], className="info-card"),
                     html.Div([
-                        html.Div([
-                            html.H3("API Limitations & Research", className="card-title"),
-                            html.Div(id='api-limitations-research', className="card-content")
-                        ], className="modern-info-card")
-                    ], className="info-card-container"),
-                    
+                        html.H4("⚠️ API Limitations", className="info-title"),
+                        html.Div(id='infrastructure-api-limitations', className="info-content")
+                    ], className="info-card"),
                     html.Div([
-                        html.Div([
-                            html.H3("Scientific Methodology", className="card-title"),
-                            html.Div(id='scientific-methodology', className="card-content")
-                        ], className="modern-info-card")
-                    ], className="info-card-container")
-                ], className="info-cards-row-2")
+                        html.H4("🎓 Scientific Method", className="info-title"),
+                        html.Div(id='infrastructure-methodology', className="info-content")
+                    ], className="info-card")
+                ], className="info-grid-4")
             ], className="content-section")
-            
-        ], className="modern-tab-content")
+        ], className="content-section")
     
-    def create_active_infrastructure_card(self, data: List[Dict]) -> html.Div:
-        """Create active infrastructure card"""
-        return self.cards.create_active_infrastructure_card(data)
-    
-    def create_resource_efficiency_card(self, data: List[Dict]) -> html.Div:
-        """Create resource efficiency card"""
-        return self.cards.create_resource_efficiency_card(data)
-    
-    def create_cost_per_hour_card(self, data: List[Dict]) -> html.Div:
-        """Create cost per hour card"""
-        return self.cards.create_cost_per_hour_card(data)
-    
-    def create_rightsizing_potential_card(self, data: List[Dict]) -> html.Div:
-        """Create right-sizing potential card"""
-        return self.cards.create_rightsizing_potential_card(data)
-    
-    def create_cost_analysis_chart(self, data: List[Dict]):
-        """Create cost analysis chart showing historical vs current usage"""
-        return self.charts.create_cost_analysis_chart(data)
-    
-    def create_instance_type_cost_distribution(self, data: List[Dict]):
-        """Create instance type cost distribution chart"""
-        return self.charts.create_instance_type_cost_distribution(data)
-    
-    def create_runtime_cost_correlation(self, data: List[Dict]):
-        """Create runtime vs cost correlation chart"""
-        return self.charts.create_runtime_cost_correlation(data)
-    
-    def create_efficiency_matrix(self, data: List[Dict]):
-        """Create resource efficiency matrix chart"""
-        return self.charts.create_efficiency_matrix(data)
-    
-    # Infrastructure Health Section Methods
-    
-    def create_rightsizing_recommendations(self, data: List[Dict]) -> html.Div:
-        """Create right-sizing recommendations table"""
-        if not data:
-            return html.Div([
-                html.P("No instances available for right-sizing analysis", 
-                      style={'textAlign': 'center', 'color': '#666', 'fontSize': '16px', 'padding': '40px'}),
-                html.P("Deploy AWS infrastructure to see optimization recommendations", 
-                      style={'textAlign': 'center', 'color': '#999', 'fontSize': '14px'})
-            ], style={'backgroundColor': '#f8f9fa', 'borderRadius': '8px', 'border': '1px dashed #ccc'})
+    def create_active_infrastructure_card(self, instances: List[Dict]) -> html.Div:
+        """Create modern active infrastructure card with Builder.io styling"""
+        running_instances = len([i for i in instances if i.get('state') == 'running'])
+        total_instances = len(instances)
         
-        # Analyze instances for right-sizing recommendations
-        recommendations = []
+        return html.Div([
+            html.Div([
+                html.Div("🏗️", className="card-icon"),
+                html.Div([
+                    html.H3(str(total_instances), className="card-value"),
+                    html.P("Active Infrastructure", className="card-label"),
+                    html.Span(f"{running_instances} running now", className="card-detail")
+                ], className="card-content")
+            ], className="card-inner")
+        ], className="modern-card infrastructure-card")
+    
+    def create_efficiency_card(self, instances: List[Dict]) -> html.Div:
+        """Create modern efficiency card with Builder.io styling"""
+        if not instances:
+            return self._create_empty_card("⚡", "Resource Efficiency", "No data", "0%")
         
-        for item in data:
-            runtime_ratio = item['runtime_hours_month'] / 720  # 720 = max hours per month
-            cost_per_hour = item['monthly_cost_eur'] / item['runtime_hours_month'] if item['runtime_hours_month'] > 0 else 0
-            
-            # Generate recommendations based on usage patterns
-            if runtime_ratio < 0.3:
-                recommendation = "⬇️ Downsize or schedule"
-                reason = f"Only {runtime_ratio*100:.0f}% utilized"
-                potential_savings = item['monthly_cost_eur'] * 0.4
-                priority = "High"
-                priority_color = "#ff6b6b"
-            elif runtime_ratio > 0.9 and cost_per_hour > 0.15:
-                recommendation = "⬆️ Consider larger instance"
-                reason = f"High utilization ({runtime_ratio*100:.0f}%) with high cost/hour"
-                potential_savings = item['monthly_cost_eur'] * 0.2
-                priority = "Medium"
-                priority_color = "#ffd93d"
-            elif cost_per_hour > 0.2:
-                recommendation = "🔄 Review instance type"
-                reason = f"High cost per hour: €{cost_per_hour:.3f}"
-                potential_savings = item['monthly_cost_eur'] * 0.15
-                priority = "Medium"
-                priority_color = "#ffd93d"
-            else:
-                recommendation = "✅ Optimal"
-                reason = "Good utilization and cost efficiency"
-                potential_savings = 0
-                priority = "Low"
-                priority_color = "#2E8B57"
-            
-            recommendations.append({
-                'Instance': item['name'][:20] + '...' if len(item['name']) > 20 else item['name'],
-                'Type': item['instance_type'],
-                'Utilization': f"{runtime_ratio*100:.0f}%",
-                'Cost/Hour': f"€{cost_per_hour:.3f}",
-                'Recommendation': recommendation,
-                'Reason': reason,
-                'Potential Savings': f"€{potential_savings:.0f}/month",
-                'Priority': priority,
-                'priority_color': priority_color
-            })
-        
-        # Sort by potential savings (descending)
-        recommendations.sort(key=lambda x: float(x['Potential Savings'].replace('€', '').replace('/month', '')), reverse=True)
-        
-        # Create table
-        table_data = [{k: v for k, v in rec.items() if k != 'priority_color'} for rec in recommendations]
-        
-        return dash_table.DataTable(
-            data=table_data,
-            columns=[
-                {"name": col, "id": col} for col in table_data[0].keys() if col != 'priority_color'
-            ],
-            style_cell={
-                'textAlign': 'left',
-                'padding': '10px',
-                'fontSize': '12px',
-                'fontFamily': 'Arial'
-            },
-            style_header={
-                'backgroundColor': '#2E8B57',
-                'color': 'white',
-                'fontWeight': 'bold'
-            },
-            style_data_conditional=[
-                {
-                    'if': {'filter_query': '{Priority} = High'},
-                    'backgroundColor': '#ffebee',
-                    'color': 'black',
-                },
-                {
-                    'if': {'filter_query': '{Priority} = Medium'},
-                    'backgroundColor': '#fffbf0',
-                    'color': 'black',
-                },
-                {
-                    'if': {'filter_query': '{Priority} = Low'},
-                    'backgroundColor': '#f3f9f1',
-                    'color': 'black',
-                }
-            ],
-            style_table={'overflowX': 'auto', 'maxHeight': '400px', 'overflowY': 'auto'}
+        # Calculate average utilization
+        total_utilization = sum(
+            (instance.get('runtime_hours_month', 0) / 720) * 100 
+            for instance in instances
         )
+        avg_efficiency = total_utilization / len(instances) if instances else 0
+        
+        return html.Div([
+            html.Div([
+                html.Div("⚡", className="card-icon"),
+                html.Div([
+                    html.H3(f"{avg_efficiency:.0f}%", className="card-value"),
+                    html.P("Resource Efficiency", className="card-label"),
+                    html.Span("average utilization", className="card-detail")
+                ], className="card-content")
+            ], className="card-inner")
+        ], className="modern-card efficiency-card")
     
-    def create_instance_health_matrix(self, data: List[Dict]) -> html.Div:
-        """Create instance health matrix visualization"""
-        if not data:
+    def create_cost_hour_card(self, instances: List[Dict]) -> html.Div:
+        """Create modern cost per hour card with Builder.io styling"""
+        if not instances:
+            return self._create_empty_card("💸", "Cost per Hour", "No data", "€0.00")
+        
+        total_cost = sum(instance.get('monthly_cost_eur', 0) for instance in instances)
+        total_hours = sum(instance.get('runtime_hours_month', 0) for instance in instances)
+        avg_cost_hour = total_cost / total_hours if total_hours > 0 else 0
+        
+        return html.Div([
+            html.Div([
+                html.Div("💸", className="card-icon"),
+                html.Div([
+                    html.H3(f"€{avg_cost_hour:.3f}", className="card-value"),
+                    html.P("Average Cost per Hour", className="card-label"),
+                    html.Span("infrastructure average", className="card-detail")
+                ], className="card-content")
+            ], className="card-inner")
+        ], className="modern-card cost-hour-card")
+    
+    def create_rightsizing_card(self, instances: List[Dict]) -> html.Div:
+        """Create modern right-sizing potential card with Builder.io styling"""
+        if not instances:
+            return self._create_empty_card("🎯", "Right-sizing Potential", "No data", "€0.00")
+        
+        # Calculate potential savings from right-sizing
+        potential_savings = 0
+        for instance in instances:
+            utilization = instance.get('runtime_hours_month', 0) / 720
+            if utilization < 0.3:  # Low utilization
+                potential_savings += instance.get('monthly_cost_eur', 0) * 0.4
+            elif utilization < 0.5:  # Medium-low utilization
+                potential_savings += instance.get('monthly_cost_eur', 0) * 0.2
+        
+        return html.Div([
+            html.Div([
+                html.Div("🎯", className="card-icon"),
+                html.Div([
+                    html.H3(f"€{potential_savings:.0f}", className="card-value"),
+                    html.P("Right-sizing Potential", className="card-label"),
+                    html.Span("monthly savings", className="card-detail")
+                ], className="card-content")
+            ], className="card-inner")
+        ], className="modern-card rightsizing-card")
+    
+    def create_cost_trends_chart(self, instances: List[Dict]):
+        """Create modern cost trends chart"""
+        if not instances:
+            return self.charts.create_empty_chart("No cost trend data available")
+        
+        return self.charts.create_cost_analysis_chart(instances)
+    
+    def create_type_distribution_chart(self, instances: List[Dict]):
+        """Create modern instance type distribution chart"""
+        if not instances:
+            return self.charts.create_empty_chart("No type distribution data available")
+        
+        return self.charts.create_instance_type_distribution_chart(instances)
+    
+    def create_runtime_correlation_chart(self, instances: List[Dict]):
+        """Create modern runtime correlation chart"""
+        if not instances:
+            return self.charts.create_empty_chart("No runtime correlation data available")
+        
+        return self.charts.create_runtime_cost_correlation_chart(instances)
+    
+    def create_efficiency_matrix_chart(self, instances: List[Dict]):
+        """Create modern efficiency matrix chart"""
+        if not instances:
+            return self.charts.create_empty_chart("No efficiency matrix data available")
+        
+        return self.charts.create_efficiency_matrix_chart(instances)
+    
+    def create_rightsizing_analysis(self, instances: List[Dict]) -> html.Div:
+        """Create modern right-sizing analysis with Builder.io styling"""
+        if not instances:
             return html.Div([
-                html.P("No health data available", style={'textAlign': 'center', 'color': '#666'})
-            ])
+                html.H5("🎯 Right-sizing Analysis", className="analysis-subtitle"),
+                html.P("No instances available for analysis", className="empty-state")
+            ], className="analysis-section")
         
-        # Calculate health scores
-        healthy_count = 0
-        warning_count = 0
-        critical_count = 0
+        # Analyze instances for right-sizing opportunities
+        over_provisioned = []
+        under_provisioned = []
+        optimal = []
         
-        for item in data:
-            runtime_ratio = item['runtime_hours_month'] / 720
-            cost_per_hour = item['monthly_cost_eur'] / item['runtime_hours_month'] if item['runtime_hours_month'] > 0 else 0
+        for instance in instances:
+            utilization = instance.get('runtime_hours_month', 0) / 720
+            cost_per_hour = instance.get('monthly_cost_eur', 0) / instance.get('runtime_hours_month', 1)
             
-            if runtime_ratio > 0.7 and cost_per_hour < 0.1:
-                healthy_count += 1
-            elif runtime_ratio < 0.3 or cost_per_hour > 0.2:
-                critical_count += 1
+            if utilization < 0.3:
+                over_provisioned.append(instance)
+            elif utilization > 0.9 and cost_per_hour > 0.15:
+                under_provisioned.append(instance)
             else:
-                warning_count += 1
+                optimal.append(instance)
         
-        total = len(data)
-        health_percentage = (healthy_count / total * 100) if total > 0 else 0
-        
-        return html.Div([
-            # Health summary
-            html.Div([
-                html.H5("Infrastructure Health Score", style={'textAlign': 'center', 'color': '#333', 'marginBottom': '15px'}),
-                
-                # Health indicators
-                html.Div([
-                    html.Div([
-                        html.H4(f"{healthy_count}", style={'color': '#2E8B57', 'margin': '5px 0', 'fontSize': '24px'}),
-                        html.P("Healthy", style={'color': '#666', 'fontSize': '12px', 'margin': '0'})
-                    ], style={'textAlign': 'center', 'width': '30%', 'display': 'inline-block'}),
-                    
-                    html.Div([
-                        html.H4(f"{warning_count}", style={'color': '#ffd93d', 'margin': '5px 0', 'fontSize': '24px'}),
-                        html.P("Warning", style={'color': '#666', 'fontSize': '12px', 'margin': '0'})
-                    ], style={'textAlign': 'center', 'width': '30%', 'display': 'inline-block'}),
-                    
-                    html.Div([
-                        html.H4(f"{critical_count}", style={'color': '#ff6b6b', 'margin': '5px 0', 'fontSize': '24px'}),
-                        html.P("Critical", style={'color': '#666', 'fontSize': '12px', 'margin': '0'})
-                    ], style={'textAlign': 'center', 'width': '30%', 'display': 'inline-block'})
-                ], style={'marginBottom': '20px'}),
-                
-                # Overall health percentage
-                html.Div([
-                    html.H3(f"{health_percentage:.0f}%", style={'color': '#2E8B57', 'textAlign': 'center', 'margin': '10px 0'}),
-                    html.P("Overall Health Score", style={'textAlign': 'center', 'color': '#666', 'fontSize': '14px'})
-                ])
-            ], style={
-                'backgroundColor': 'white',
-                'borderRadius': '8px',
-                'padding': '20px',
-                'boxShadow': '0 2px 4px rgba(0,0,0,0.1)'
-            })
-        ])
-    
-    def create_optimization_actions(self, data: List[Dict]) -> html.Div:
-        """Create comprehensive optimization actions recommendations"""
-        if not data:
-            return html.Div([
-                html.H4("🎯 No Optimization Actions Available", style={'color': '#2E8B57', 'textAlign': 'center', 'margin': '20px 0'}),
-                html.P("No AWS instances found to optimize.", 
-                      style={'textAlign': 'center', 'color': '#666', 'fontSize': '14px'})
-            ], style={'padding': '30px', 'backgroundColor': '#f8f9fa', 'borderRadius': '8px'})
-        
-        # Generate comprehensive recommendations
-        recommendations = []
-        
-        # Calculate savings potential for each instance
-        for item in data:
-            office_savings = item['optimization_potential']['office_hours']['cost_savings']
-            weekday_savings = item['optimization_potential']['weekdays_only']['cost_savings']
-            carbon_savings = item['optimization_potential']['carbon_aware']['cost_savings']
-            
-            best_strategy = "office_hours" if office_savings >= max(weekday_savings, carbon_savings) else \
-                           "weekdays_only" if weekday_savings >= carbon_savings else "carbon_aware"
-            
-            strategy_names = {
-                "office_hours": "Office Hours Scheduling",
-                "weekdays_only": "Weekdays Only Scheduling", 
-                "carbon_aware": "Carbon-Aware Scheduling"
-            }
-            
-            strategy_descriptions = {
-                "office_hours": "Run 8am-6pm Mon-Fri (72% reduction)",
-                "weekdays_only": "Run Mon-Fri full day (28% reduction)",
-                "carbon_aware": "Optimize based on grid carbon intensity"
-            }
-            
-            best_savings = max(office_savings, weekday_savings, carbon_savings)
-            
-            if best_savings > 5:  # Only show significant savings
-                recommendations.append({
-                    'instance': item['name'][:20] + '...' if len(item['name']) > 20 else item['name'],
-                    'current_cost': item['monthly_cost_eur'],
-                    'strategy': strategy_names[best_strategy],
-                    'description': strategy_descriptions[best_strategy],
-                    'savings': best_savings,
-                    'effort': 'Low' if best_strategy in ['office_hours', 'weekdays_only'] else 'Medium',
-                    'timeframe': '1-2 weeks' if best_strategy in ['office_hours', 'weekdays_only'] else '2-4 weeks'
-                })
-        
-        if not recommendations:
-            return html.Div([
-                html.H4("✅ Infrastructure Already Optimized", style={'color': '#28a745', 'textAlign': 'center'}),
-                html.P("Current instances are running efficiently", style={'textAlign': 'center', 'color': '#666'})
-            ], style={'padding': '20px', 'backgroundColor': '#f8f9fa', 'borderRadius': '8px'})
-        
-        # Display top recommendations
-        recommendation_items = []
-        total_potential_savings = sum(rec['savings'] for rec in recommendations)
-        
-        for i, rec in enumerate(recommendations[:5]):  # Show top 5 recommendations
-            recommendation_items.append(
-                html.Div([
-                    html.Div([
-                        html.H5(f"🖥️ {rec['instance']}", style={'color': '#2E8B57', 'margin': '0 0 5px 0', 'fontSize': '14px'}),
-                        html.P(f"💰 Current: €{rec['current_cost']:.1f}/month", style={'margin': '0', 'fontSize': '12px', 'color': '#666'}),
-                        html.P(f"🎯 {rec['strategy']}", style={'margin': '0', 'fontSize': '12px', 'color': '#333', 'fontWeight': 'bold'}),
-                        html.P(f"📝 {rec['description']}", style={'margin': '0', 'fontSize': '11px', 'color': '#777'}),
-                    ], style={'width': '70%', 'display': 'inline-block', 'verticalAlign': 'top'}),
-                    
-                    html.Div([
-                        html.P(f"€{rec['savings']:.0f}", style={'color': '#28a745', 'fontSize': '16px', 'fontWeight': 'bold', 'margin': '0', 'textAlign': 'right'}),
-                        html.P("savings/month", style={'color': '#28a745', 'fontSize': '10px', 'margin': '0', 'textAlign': 'right'}),
-                        html.P(f"⚡{rec['effort']} effort", style={'color': '#666', 'fontSize': '10px', 'margin': '0', 'textAlign': 'right'}),
-                        html.P(f"⏱️ {rec['timeframe']}", style={'color': '#666', 'fontSize': '10px', 'margin': '0', 'textAlign': 'right'})
-                    ], style={'width': '28%', 'display': 'inline-block', 'verticalAlign': 'top'})
-                ], style={
-                    'padding': '12px', 
-                    'backgroundColor': 'white', 
-                    'borderRadius': '5px', 
-                    'marginBottom': '8px', 
-                    'border': '1px solid #ddd',
-                    'boxShadow': '0 1px 3px rgba(0,0,0,0.1)'
-                })
-            )
-        
-        # Summary header
-        summary_header = html.Div([
-            html.H4(f"🎯 {len(recommendations)} Optimization Opportunities", style={'color': '#2E8B57', 'margin': '0 0 10px 0'}),
-            html.P(f"💡 Total potential savings: €{total_potential_savings:.0f}/month", 
-                  style={'color': '#28a745', 'fontSize': '14px', 'fontWeight': 'bold', 'margin': '0'})
-        ], style={'marginBottom': '15px'})
-        
-        return html.Div([summary_header] + recommendation_items)
-    
-    def create_utilization_analysis(self, data: List[Dict]) -> html.Div:
-        """Create utilization analysis for infrastructure focus"""
-        if not data:
-            return html.Div([
-                html.P("📊 No utilization data available", style={'color': '#666', 'fontSize': '14px', 'textAlign': 'center', 'padding': '20px'})
-            ])
-        
-        # Calculate utilization metrics
-        low_utilization = []
-        medium_utilization = []
-        high_utilization = []
-        
-        for item in data:
-            runtime_ratio = item['runtime_hours_month'] / 720  # 720 = max hours per month
-            util_percentage = runtime_ratio * 100
-            
-            if util_percentage < 30:
-                low_utilization.append({'name': item['name'], 'util': util_percentage})
-            elif util_percentage < 70:
-                medium_utilization.append({'name': item['name'], 'util': util_percentage})
-            else:
-                high_utilization.append({'name': item['name'], 'util': util_percentage})
-        
-        total_instances = len(data)
-        avg_utilization = sum(item['runtime_hours_month'] / 720 * 100 for item in data) / len(data)
-        
-        return html.Div([
-            html.P("📊 Infrastructure Utilization Analysis", style={'fontWeight': 'bold', 'color': '#2E8B57', 'fontSize': '16px'}),
-            html.P(f"📈 Average Utilization: {avg_utilization:.1f}%", style={'fontSize': '14px', 'margin': '10px 0 5px 0'}),
-            html.P(f"🔴 Low (<30%): {len(low_utilization)} instances", style={'fontSize': '13px', 'margin': '2px 0', 'color': '#dc3545' if low_utilization else '#666'}),
-            html.P(f"🟡 Medium (30-70%): {len(medium_utilization)} instances", style={'fontSize': '13px', 'margin': '2px 0', 'color': '#ffc107' if medium_utilization else '#666'}),
-            html.P(f"🟢 High (>70%): {len(high_utilization)} instances", style={'fontSize': '13px', 'margin': '2px 0', 'color': '#28a745' if high_utilization else '#666'}),
-            html.P("🎓 Analysis Purpose:", style={'fontWeight': 'bold', 'fontSize': '14px', 'margin': '10px 0 5px 0'}),
-            html.P("Infrastructure pattern analysis for Bachelor thesis", style={'fontSize': '13px', 'margin': '2px 0', 'color': '#2E8B57'})
-        ])
-    
-    def create_cost_optimization_opportunities(self, data: List[Dict]) -> html.Div:
-        """Create cost optimization opportunities summary"""
-        if not data:
-            return html.Div("No cost data available")
-        
-        # Calculate optimization opportunities
-        total_monthly_cost = sum(item['monthly_cost_eur'] for item in data)
-        
-        opportunities = []
-        
-        # Right-sizing savings
-        rightsizing_savings = sum(item['monthly_cost_eur'] * 0.3 for item in data if item['runtime_hours_month'] / 720 < 0.4)
-        if rightsizing_savings > 0:
-            opportunities.append({
-                'opportunity': 'Right-sizing',
-                'savings': rightsizing_savings,
-                'percentage': (rightsizing_savings / total_monthly_cost * 100),
-                'description': 'Downsize underutilized instances'
-            })
-        
-        # Scheduling savings
-        scheduling_savings = sum(item['monthly_cost_eur'] * 0.6 for item in data if item['runtime_hours_month'] / 720 < 0.5)
-        if scheduling_savings > 0:
-            opportunities.append({
-                'opportunity': 'Automated Scheduling',
-                'savings': scheduling_savings,
-                'percentage': (scheduling_savings / total_monthly_cost * 100),
-                'description': 'Schedule instances for business hours only'
-            })
-        
-        # Reserved Instances (assume 40% savings on stable workloads)
-        stable_instances = [item for item in data if item['runtime_hours_month'] / 720 > 0.8]
-        if stable_instances:
-            reserved_savings = sum(item['monthly_cost_eur'] * 0.4 for item in stable_instances)
-            opportunities.append({
-                'opportunity': 'Reserved Instances',
-                'savings': reserved_savings,
-                'percentage': (reserved_savings / total_monthly_cost * 100),
-                'description': f'{len(stable_instances)} instances eligible for reservations'
-            })
-        
-        total_potential_savings = sum(opp['savings'] for opp in opportunities)
-        
-        if not opportunities:
-            return html.Div([
-                html.P("No major optimization opportunities identified", style={'color': '#666'})
-            ])
-        
-        return html.Div([
-            # Total potential savings
-            html.Div([
-                html.H4(f"€{total_potential_savings:.0f}/month", style={'color': '#2E8B57', 'textAlign': 'center', 'margin': '10px 0'}),
-                html.P("Total Potential Savings", style={'textAlign': 'center', 'color': '#666', 'fontSize': '14px', 'margin': '0'}),
-                html.P(f"{(total_potential_savings/total_monthly_cost*100):.0f}% of current costs", 
-                       style={'textAlign': 'center', 'color': '#999', 'fontSize': '12px', 'margin': '5px 0'})
-            ], style={'marginBottom': '20px', 'padding': '15px', 'backgroundColor': '#f8f9fa', 'borderRadius': '8px'}),
-            
-            # Individual opportunities
-            html.Div([
-                html.Div([
-                    html.Div([
-                        html.H6(opp['opportunity'], style={'color': '#333', 'margin': '0'}),
-                        html.P(opp['description'], style={'color': '#666', 'fontSize': '12px', 'margin': '5px 0'})
-                    ], style={'width': '60%', 'display': 'inline-block'}),
-                    html.Div([
-                        html.P(f"€{opp['savings']:.0f}", style={'color': '#2E8B57', 'fontWeight': 'bold', 'margin': '0', 'fontSize': '16px'}),
-                        html.P(f"{opp['percentage']:.0f}% savings", style={'color': '#999', 'fontSize': '11px', 'margin': '0'})
-                    ], style={'width': '40%', 'display': 'inline-block', 'textAlign': 'right'})
-                ], style={
-                    'backgroundColor': 'white',
-                    'borderRadius': '6px',
-                    'padding': '12px',
-                    'marginBottom': '10px',
-                    'boxShadow': '0 1px 2px rgba(0,0,0,0.1)'
-                }) for opp in opportunities
-            ])
-        ])
-    
-    def create_instance_analysis_table(self, data: List[Dict]) -> html.Div:
-        """Create instance analysis table"""
-        if not data:
-            return html.Div([
-                html.P("No instances available for analysis", 
-                      style={'textAlign': 'center', 'color': '#666', 'fontSize': '16px', 'padding': '40px'}),
-                html.P("Deploy AWS infrastructure to see detailed instance analysis", 
-                      style={'textAlign': 'center', 'color': '#999', 'fontSize': '14px'})
-            ], style={'backgroundColor': '#f8f9fa', 'borderRadius': '8px', 'border': '1px dashed #ccc'})
-        
-        # Prepare table data
-        table_data = []
-        for item in data:
-            table_data.append({
-                'Instance Name': item['name'],
-                'Type': item['instance_type'],
-                'State': item['state'],
-                'Monthly Cost (€)': f"€{item['monthly_cost_eur']:.2f}",
-                'Runtime (h/month)': f"{item['runtime_hours_month']:.0f}h",
-                'CO2 (kg/month)': f"{item['monthly_co2_kg']:.1f}kg",
-                'Power (W)': f"{item['power_consumption_watts']:.0f}W"
-            })
-        
-        return dash_table.DataTable(
-            data=table_data,
-            columns=[{"name": col, "id": col} for col in table_data[0].keys()],
-            style_cell={
-                'textAlign': 'left',
-                'padding': '12px',
-                'fontSize': '13px',
-                'fontFamily': 'Arial'
-            },
-            style_header={
-                'backgroundColor': '#2E8B57',
-                'color': 'white',
-                'fontWeight': 'bold'
-            },
-            style_data_conditional=[
-                {
-                    'if': {'row_index': 'odd'},
-                    'backgroundColor': '#f8f9fa'
-                }
-            ],
-            style_table={'overflowX': 'auto'}
+        total_savings = sum(
+            inst.get('monthly_cost_eur', 0) * 0.4 for inst in over_provisioned
+        ) + sum(
+            inst.get('monthly_cost_eur', 0) * 0.2 for inst in under_provisioned
         )
+        
+        return html.Div([
+            html.H5("🎯 Right-sizing Analysis", className="analysis-subtitle"),
+            html.Div([
+                html.Div([
+                    html.Div([
+                        html.Span("⬇️", className="insight-icon"),
+                        html.Span(f"{len(over_provisioned)} over-provisioned", className="insight-text")
+                    ], className="insight-item"),
+                    html.Div([
+                        html.Span("⬆️", className="insight-icon"),
+                        html.Span(f"{len(under_provisioned)} under-provisioned", className="insight-text")
+                    ], className="insight-item"),
+                    html.Div([
+                        html.Span("✅", className="insight-icon"),
+                        html.Span(f"{len(optimal)} optimally sized", className="insight-text")
+                    ], className="insight-item")
+                ], className="insights-list"),
+                html.Div([
+                    html.H4(f"€{total_savings:.0f}", className="savings-value"),
+                    html.P("potential monthly savings", className="savings-label")
+                ], className="savings-summary")
+            ], className="analysis-content")
+        ], className="analysis-section")
     
-    def create_aws_cost_explorer_data(self, data: List[Dict]) -> html.Div:
-        """Create enhanced AWS Cost Explorer data summary with API insights"""
-        if not data:
+    def create_health_matrix(self, instances: List[Dict]) -> html.Div:
+        """Create modern infrastructure health matrix with Builder.io styling"""
+        if not instances:
             return html.Div([
-                html.Div([
-                    html.P("🔍 Cost Explorer API Status", style={'fontSize': '14px', 'fontWeight': 'bold', 'color': '#2E8B57', 'margin': '0'}),
-                    html.P("No instances deployed", style={'color': '#666', 'fontSize': '13px', 'margin': '5px 0'}),
-                    html.P("Deploy AWS infrastructure to see real costs", style={'color': '#999', 'fontSize': '12px'})
-                ], style={'backgroundColor': '#f8f9fa', 'padding': '15px', 'borderRadius': '8px', 'border': '1px dashed #ccc'})
-            ])
+                html.H5("❤️ Infrastructure Health", className="analysis-subtitle"),
+                html.P("No health data available", className="empty-state")
+            ], className="analysis-section")
         
-        total_cost = sum(item.get('monthly_cost_eur', 0) for item in data)
-        instance_types = len(set(item['instance_type'] for item in data))
+        # Calculate health metrics
+        healthy = 0
+        warning = 0
+        critical = 0
+        
+        for instance in instances:
+            utilization = instance.get('runtime_hours_month', 0) / 720
+            cost_per_hour = instance.get('monthly_cost_eur', 0) / instance.get('runtime_hours_month', 1)
+            
+            if utilization > 0.3 and utilization < 0.8 and cost_per_hour < 0.2:
+                healthy += 1
+            elif utilization < 0.2 or cost_per_hour > 0.3:
+                critical += 1
+            else:
+                warning += 1
+        
+        total = len(instances)
+        health_score = (healthy / total * 100) if total > 0 else 0
         
         return html.Div([
-            # Cost summary card
+            html.H5("❤️ Infrastructure Health", className="analysis-subtitle"),
             html.Div([
                 html.Div([
-                    html.H5("💰 AWS Cost Data", style={'color': '#2E8B57', 'margin': '0 0 15px 0'}),
-                    
-                    # Key metrics
                     html.Div([
-                        html.Div([
-                            html.P(f"€{total_cost:.2f}", style={'fontSize': '20px', 'fontWeight': 'bold', 'color': '#333', 'margin': '0'}),
-                            html.P("Total Monthly Cost", style={'fontSize': '12px', 'color': '#666', 'margin': '0'})
-                        ], style={'width': '50%', 'display': 'inline-block', 'textAlign': 'center'}),
-                        
-                        html.Div([
-                            html.P(f"{instance_types}", style={'fontSize': '20px', 'fontWeight': 'bold', 'color': '#333', 'margin': '0'}),
-                            html.P("Instance Types", style={'fontSize': '12px', 'color': '#666', 'margin': '0'})
-                        ], style={'width': '50%', 'display': 'inline-block', 'textAlign': 'center'})
-                    ], style={'marginBottom': '15px'}),
-                    
-                    # API Details
+                        html.H4(str(healthy), className="health-value healthy"),
+                        html.P("Healthy", className="health-label")
+                    ], className="health-metric"),
                     html.Div([
-                        html.P("📊 Data Source: AWS Cost Explorer API", style={'fontSize': '12px', 'color': '#666', 'margin': '3px 0'}),
-                        html.P("🔄 Update Frequency: Real-time via AWS SDK", style={'fontSize': '12px', 'color': '#666', 'margin': '3px 0'}),
-                        html.P("💰 Includes: EC2, Storage, Network Transfer", style={'fontSize': '12px', 'color': '#666', 'margin': '3px 0'}),
-                        html.P("📈 Granularity: Daily cost aggregation", style={'fontSize': '12px', 'color': '#666', 'margin': '3px 0'})
-                    ])
-                ], style={
-                    'backgroundColor': 'white',
-                    'padding': '20px',
-                    'borderRadius': '8px',
-                    'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
-                    'borderLeft': '4px solid #2E8B57'
-                })
-            ])
-        ])
+                        html.H4(str(warning), className="health-value warning"),
+                        html.P("Warning", className="health-label")
+                    ], className="health-metric"),
+                    html.Div([
+                        html.H4(str(critical), className="health-value critical"),
+                        html.P("Critical", className="health-label")
+                    ], className="health-metric")
+                ], className="health-metrics"),
+                html.Div([
+                    html.H3(f"{health_score:.0f}%", className="health-score"),
+                    html.P("Overall Health Score", className="health-score-label")
+                ], className="health-summary")
+            ], className="health-content")
+        ], className="analysis-section")
     
-    def create_runtime_analysis_data(self, data: List[Dict]) -> html.Div:
-        """Create enhanced runtime analysis data summary"""
-        if not data:
+    def create_aws_data_summary(self, instances: List[Dict]) -> html.Div:
+        """Create modern AWS data summary with Builder.io styling"""
+        if not instances:
             return html.Div([
-                html.Div([
-                    html.P("⏱️ Runtime Analysis Status", style={'fontSize': '14px', 'fontWeight': 'bold', 'color': '#2E8B57', 'margin': '0'}),
-                    html.P("No runtime data available", style={'color': '#666', 'fontSize': '13px', 'margin': '5px 0'}),
-                    html.P("Deploy instances to see runtime analysis", style={'color': '#999', 'fontSize': '12px'})
-                ], style={'backgroundColor': '#f8f9fa', 'padding': '15px', 'borderRadius': '8px', 'border': '1px dashed #ccc'})
-            ])
+                html.P("☁️ AWS Cost Explorer", className="info-subtitle"),
+                html.P("No instances deployed", className="info-empty")
+            ], className="info-section")
         
-        total_runtime = sum(item.get('runtime_hours_month', 0) for item in data)
-        avg_runtime = total_runtime / len(data) if data else 0
-        max_runtime_instance = max(data, key=lambda x: x.get('runtime_hours_month', 0))
-        running_instances = len([item for item in data if item['state'] == 'running'])
+        total_cost = sum(instance.get('monthly_cost_eur', 0) for instance in instances)
+        instance_types = len(set(instance.get('instance_type', '') for instance in instances))
         
         return html.Div([
-            # Runtime summary card
+            html.P("☁️ AWS Cost Explorer", className="info-subtitle"),
             html.Div([
                 html.Div([
-                    html.H5("⏱️ Runtime Analytics", style={'color': '#2E8B57', 'margin': '0 0 15px 0'}),
-                    
-                    # Key metrics
-                    html.Div([
-                        html.Div([
-                            html.P(f"{total_runtime:.0f}h", style={'fontSize': '18px', 'fontWeight': 'bold', 'color': '#333', 'margin': '0'}),
-                            html.P("Total Runtime/Month", style={'fontSize': '11px', 'color': '#666', 'margin': '0'})
-                        ], style={'width': '33%', 'display': 'inline-block', 'textAlign': 'center'}),
-                        
-                        html.Div([
-                            html.P(f"{avg_runtime:.0f}h", style={'fontSize': '18px', 'fontWeight': 'bold', 'color': '#333', 'margin': '0'}),
-                            html.P("Avg per Instance", style={'fontSize': '11px', 'color': '#666', 'margin': '0'})
-                        ], style={'width': '33%', 'display': 'inline-block', 'textAlign': 'center'}),
-                        
-                        html.Div([
-                            html.P(f"{running_instances}", style={'fontSize': '18px', 'fontWeight': 'bold', 'color': '#333', 'margin': '0'}),
-                            html.P("Currently Running", style={'fontSize': '11px', 'color': '#666', 'margin': '0'})
-                        ], style={'width': '33%', 'display': 'inline-block', 'textAlign': 'center'})
-                    ], style={'marginBottom': '15px'}),
-                    
-                    # Top instance
-                    html.Div([
-                        html.P(f"🥇 Highest Usage: {max_runtime_instance['name'][:25]}{'...' if len(max_runtime_instance['name']) > 25 else ''}", 
-                               style={'fontSize': '12px', 'color': '#666', 'margin': '3px 0'}),
-                        html.P(f"     Runtime: {max_runtime_instance.get('runtime_hours_month', 0):.0f}h/month", 
-                               style={'fontSize': '12px', 'color': '#666', 'margin': '3px 0'})
-                    ], style={'borderTop': '1px solid #eee', 'paddingTop': '10px'}),
-                    
-                    # Data source info
-                    html.Div([
-                        html.P("📊 Data Source: AWS EC2 DescribeInstances API", style={'fontSize': '11px', 'color': '#999', 'margin': '3px 0'}),
-                        html.P("🔄 Calculation: Launch time → Current time analysis", style={'fontSize': '11px', 'color': '#999', 'margin': '3px 0'}),
-                        html.P("⚡ Precision: Real-time launch time tracking", style={'fontSize': '11px', 'color': '#999', 'margin': '3px 0'})
-                    ])
-                ], style={
-                    'backgroundColor': 'white',
-                    'padding': '20px',
-                    'borderRadius': '8px',
-                    'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
-                    'borderLeft': '4px solid #45b7d1'
-                })
-            ])
-        ])
+                    html.Span("💰", className="info-icon"),
+                    html.Span(f"€{total_cost:.2f} total monthly cost", className="info-text")
+                ], className="info-item"),
+                html.Div([
+                    html.Span("🔧", className="info-icon"),
+                    html.Span(f"{instance_types} different instance types", className="info-text")
+                ], className="info-item"),
+                html.Div([
+                    html.Span("📊", className="info-icon"),
+                    html.Span("Real-time API integration", className="info-text")
+                ], className="info-item")
+            ], className="info-list")
+        ], className="info-section")
     
-    def create_api_limitations_research(self, data: List[Dict]) -> html.Div:
-        """Create API limitations and research documentation"""
+    def create_runtime_data_summary(self, instances: List[Dict]) -> html.Div:
+        """Create modern runtime data summary with Builder.io styling"""
+        if not instances:
+            return html.Div([
+                html.P("⏱️ Runtime Analytics", className="info-subtitle"),
+                html.P("No runtime data available", className="info-empty")
+            ], className="info-section")
+        
+        total_runtime = sum(instance.get('runtime_hours_month', 0) for instance in instances)
+        avg_runtime = total_runtime / len(instances) if instances else 0
+        running_now = len([i for i in instances if i.get('state') == 'running'])
+        
+        return html.Div([
+            html.P("⏱️ Runtime Analytics", className="info-subtitle"),
+            html.Div([
+                html.Div([
+                    html.Span("⏰", className="info-icon"),
+                    html.Span(f"{total_runtime:.0f}h total monthly runtime", className="info-text")
+                ], className="info-item"),
+                html.Div([
+                    html.Span("📊", className="info-icon"),
+                    html.Span(f"{avg_runtime:.0f}h average per instance", className="info-text")
+                ], className="info-item"),
+                html.Div([
+                    html.Span("🟢", className="info-icon"),
+                    html.Span(f"{running_now} currently running", className="info-text")
+                ], className="info-item")
+            ], className="info-list")
+        ], className="info-section")
+    
+    def create_api_limitations_summary(self) -> html.Div:
+        """Create modern API limitations summary with Builder.io styling"""
+        return html.Div([
+            html.P("⚠️ API Limitations", className="info-subtitle"),
+            html.Div([
+                html.Div([
+                    html.Span("❌", className="info-icon"),
+                    html.Span("RESOURCE_ID not supported", className="info-text")
+                ], className="info-item"),
+                html.Div([
+                    html.Span("✅", className="info-icon"),
+                    html.Span("Proportional allocation used", className="info-text")
+                ], className="info-item"),
+                html.Div([
+                    html.Span("📚", className="info-icon"),
+                    html.Span("Research contribution validated", className="info-text")
+                ], className="info-item")
+            ], className="info-list")
+        ], className="info-section")
+    
+    def create_methodology_summary(self) -> html.Div:
+        """Create modern methodology summary with Builder.io styling"""
+        return html.Div([
+            html.P("🎓 Scientific Method", className="info-subtitle"),
+            html.Div([
+                html.Div([
+                    html.Span("1️⃣", className="info-icon"),
+                    html.Span("Real AWS API data collection", className="info-text")
+                ], className="info-item"),
+                html.Div([
+                    html.Span("2️⃣", className="info-icon"),
+                    html.Span("Precision runtime calculation", className="info-text")
+                ], className="info-item"),
+                html.Div([
+                    html.Span("3️⃣", className="info-icon"),
+                    html.Span("Validated cost allocation", className="info-text")
+                ], className="info-item"),
+                html.Div([
+                    html.Span("4️⃣", className="info-icon"),
+                    html.Span("Carbon-aware optimization", className="info-text")
+                ], className="info-item")
+            ], className="info-list")
+        ], className="info-section")
+    
+    def _create_empty_card(self, icon: str, title: str, subtitle: str, value: str) -> html.Div:
+        """Create empty state card with Builder.io styling"""
         return html.Div([
             html.Div([
-                html.H5("⚠️ API Research Findings", style={'color': '#ff6b6b', 'margin': '0 0 15px 0'}),
-                
-                # Key limitations
+                html.Div(icon, className="card-icon"),
                 html.Div([
-                    html.Div([
-                        html.P("❌ Instance-Level Costs", style={'fontSize': '12px', 'fontWeight': 'bold', 'color': '#333', 'margin': '5px 0'}),
-                        html.P("RESOURCE_ID dimension not supported", style={'fontSize': '11px', 'color': '#666', 'margin': '0'})
-                    ], style={'marginBottom': '10px'}),
-                    
-                    html.Div([
-                        html.P("✅ Proportional Allocation", style={'fontSize': '12px', 'fontWeight': 'bold', 'color': '#333', 'margin': '5px 0'}),
-                        html.P("Industry standard solution implemented", style={'fontSize': '11px', 'color': '#666', 'margin': '0'})
-                    ], style={'marginBottom': '10px'}),
-                    
-                    html.Div([
-                        html.P("📚 Research Contribution", style={'fontSize': '12px', 'fontWeight': 'bold', 'color': '#333', 'margin': '5px 0'}),
-                        html.P("First systematic AWS API limitation analysis", style={'fontSize': '11px', 'color': '#666', 'margin': '0'})
-                    ])
-                ]),
-                
-                # Documentation reference
-                html.Div([
-                    html.P("📄 Full documentation in AWS_API_RESEARCH.md", 
-                           style={'fontSize': '11px', 'color': '#999', 'fontStyle': 'italic', 'margin': '10px 0 0 0'})
-                ])
-            ], style={
-                'backgroundColor': 'white',
-                'padding': '20px',
-                'borderRadius': '8px',
-                'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
-                'borderLeft': '4px solid #ff6b6b'
-            })
-        ])
-    
-    def create_scientific_methodology(self, data: List[Dict]) -> html.Div:
-        """Create scientific methodology explanation"""
-        return html.Div([
-            html.Div([
-                html.H5("🔬 Scientific Method", style={'color': '#2E8B57', 'margin': '0 0 15px 0'}),
-                
-                # Methodology steps
-                html.Div([
-                    html.Div([
-                        html.P("1. Data Collection", style={'fontSize': '12px', 'fontWeight': 'bold', 'color': '#333', 'margin': '5px 0'}),
-                        html.P("Real AWS APIs: Cost Explorer, EC2, Pricing", style={'fontSize': '11px', 'color': '#666', 'margin': '0'})
-                    ], style={'marginBottom': '8px'}),
-                    
-                    html.Div([
-                        html.P("2. Runtime Calculation", style={'fontSize': '12px', 'fontWeight': 'bold', 'color': '#333', 'margin': '5px 0'}),
-                        html.P("Launch time → Current time precision", style={'fontSize': '11px', 'color': '#666', 'margin': '0'})
-                    ], style={'marginBottom': '8px'}),
-                    
-                    html.Div([
-                        html.P("3. Cost Allocation", style={'fontSize': '12px', 'fontWeight': 'bold', 'color': '#333', 'margin': '5px 0'}),
-                        html.P("Proportional by runtime (validated method)", style={'fontSize': '11px', 'color': '#666', 'margin': '0'})
-                    ], style={'marginBottom': '8px'}),
-                    
-                    html.Div([
-                        html.P("4. Carbon Calculation", style={'fontSize': '12px', 'fontWeight': 'bold', 'color': '#333', 'margin': '5px 0'}),
-                        html.P("Boavizta + ElectricityMap APIs", style={'fontSize': '11px', 'color': '#666', 'margin': '0'})
-                    ])
-                ]),
-                
-                # Validation
-                html.Div([
-                    html.P("✅ Mathematically validated • 📊 Real data only • 🎓 Thesis-ready", 
-                           style={'fontSize': '11px', 'color': '#2E8B57', 'fontWeight': 'bold', 'margin': '15px 0 0 0', 'textAlign': 'center'})
-                ])
-            ], style={
-                'backgroundColor': 'white',
-                'padding': '20px',
-                'borderRadius': '8px',
-                'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
-                'borderLeft': '4px solid #96ceb4'
-            })
-        ])
+                    html.H3(value, className="card-value empty"),
+                    html.P(title, className="card-label"),
+                    html.Span(subtitle, className="card-detail")
+                ], className="card-content")
+            ], className="card-inner")
+        ], className="modern-card empty-card")
 
-# Global instance for reuse
+# Create instance
 infrastructure_tab = InfrastructureTab()
