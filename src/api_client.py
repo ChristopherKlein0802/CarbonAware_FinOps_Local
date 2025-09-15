@@ -11,7 +11,7 @@ import json
 import requests
 import boto3
 from datetime import datetime, timedelta
-from typing import List, Optional, Dict
+from typing import Optional, Dict
 import logging
 from dataclasses import dataclass
 from dotenv import load_dotenv
