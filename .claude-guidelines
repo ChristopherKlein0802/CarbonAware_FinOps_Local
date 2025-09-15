@@ -9,7 +9,7 @@ WISSENSCHAFTLICHE PRINZIPIEN:
 CODE STANDARDS:
 - Method naming: calculate_theoretical_scenarios() (not validate_advantage)
 - Error handling: Explicit None returns, no dummy data
-- Documentation: Include academic disclaimers
+- Documentation: Include academic disclaimer
 - Testing: All features require test coverage
 
 THESIS COMPLIANCE:

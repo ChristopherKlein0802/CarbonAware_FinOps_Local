@@ -15,13 +15,14 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Import our modules
-from .api_client import unified_api_client
-from .data_processor import data_processor
-from .health_monitor import health_check_manager
-from .pages import (
+from api_client import unified_api_client
+from data_processor import data_processor
+from health_monitor import health_check_manager
+from pages import (
     render_overview_page,
     render_infrastructure_page,
     render_carbon_page,
+    render_competitive_analysis_page,
     render_research_methods_page
 )
 
@@ -36,7 +37,7 @@ st.set_page_config(
 def load_custom_css():
     """Load custom CSS for professional styling"""
     try:
-        with open("src/assets/modern-thesis-styles.css", "r") as f:
+        with open("assets/modern-thesis-styles.css", "r") as f:
             st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
     except FileNotFoundError:
         logger.warning("CSS file not found - using default Streamlit styles")
@@ -52,7 +53,10 @@ def load_infrastructure_data():
 
 def main():
     """Main application entry point"""
-    logger.info("🚀 Carbon-Aware FinOps Dashboard starting...")
+    # Initialize session state for startup logging
+    if 'dashboard_initialized' not in st.session_state:
+        logger.info("🚀 Carbon-Aware FinOps Dashboard starting...")
+        st.session_state.dashboard_initialized = True
 
     # Load custom styling
     load_custom_css()
@@ -64,7 +68,7 @@ def main():
     # Navigation menu
     page = st.sidebar.radio(
         "Navigation",
-        ["📊 Overview", "🏗️ Infrastructure", "🌍 Carbon Analysis", "🔬 Research Methods"],
+        ["🏆 Executive Summary", "🇩🇪 Carbon Optimization", "🔄 Competitive Analysis", "🏗️ Infrastructure", "🔬 Research Methods"],
         index=0
     )
 
@@ -82,12 +86,14 @@ def main():
 
     # Render selected page
     try:
-        if page == "📊 Overview":
+        if page == "🏆 Executive Summary":
             render_overview_page(dashboard_data)
+        elif page == "🇩🇪 Carbon Optimization":
+            render_carbon_page(dashboard_data)
+        elif page == "🔄 Competitive Analysis":
+            render_competitive_analysis_page(dashboard_data)
         elif page == "🏗️ Infrastructure":
             render_infrastructure_page(dashboard_data)
-        elif page == "🌍 Carbon Analysis":
-            render_carbon_page(dashboard_data)
         elif page == "🔬 Research Methods":
             render_research_methods_page(dashboard_data)
 

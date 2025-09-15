@@ -11,8 +11,8 @@ import time
 from datetime import datetime
 from typing import Dict, Any
 
-from .api_client import unified_api_client
-from .models import APIHealthStatus
+from api_client import unified_api_client
+from models import APIHealthStatus
 
 logger = logging.getLogger(__name__)
 

@@ -61,7 +61,7 @@ dashboard: ## Launch Streamlit dashboard
 		exit 1; \
 	fi
 	@echo "$(BLUE)📊 Opening at: http://localhost:$(STREAMLIT_PORT)$(NC)"
-	$(VENV_BIN)/streamlit run src/app.py --server.port=$(STREAMLIT_PORT)
+	cd src && ../$(VENV_BIN)/streamlit run app.py --server.port=$(STREAMLIT_PORT)
 
 test: ## Run all tests
 	@echo "$(YELLOW)🧪 Running tests...$(NC)"

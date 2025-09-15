@@ -11,7 +11,7 @@ import json
 import requests
 import boto3
 from datetime import datetime, timedelta
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 import logging
 from dataclasses import dataclass
 from dotenv import load_dotenv
@@ -105,9 +105,19 @@ class UnifiedAPIClient:
         logger.info("✅ Unified API Client initialized")
 
     def _init_cache_dir(self):
-        """Initialize cache directory"""
-        self.cache_dir = "/tmp/carbon_finops_cache"
+        """Initialize persistent cache directory for cross-session caching"""
+        # Use project directory for persistent cache (not /tmp which gets cleared)
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        self.cache_dir = os.path.join(project_root, ".cache", "api_data")
         os.makedirs(self.cache_dir, exist_ok=True)
+
+        # Create .gitignore for cache directory
+        gitignore_path = os.path.join(os.path.dirname(self.cache_dir), ".gitignore")
+        if not os.path.exists(gitignore_path):
+            with open(gitignore_path, "w") as f:
+                f.write("# API Cache - exclude from git\n")
+                f.write("api_data/\n")
+                f.write("*.json\n")
 
     def _is_cache_valid(self, cache_path: str, max_age_minutes: int) -> bool:
         """Check if cache file is still valid"""
@@ -118,11 +128,15 @@ class UnifiedAPIClient:
         return file_age < (max_age_minutes * 60)
 
     def get_current_carbon_intensity(self, region: str = "eu-central-1") -> Optional[CarbonIntensity]:
-        """Get current carbon intensity from ElectricityMap with 30-minute caching"""
+        """Get current carbon intensity from ElectricityMap with optimized 2-hour caching
+
+        Scientific rationale: ElectricityMap updates every 15-60 minutes.
+        2-hour cache reduces API costs while maintaining reasonable accuracy.
+        """
         cache_path = os.path.join(self.cache_dir, f"carbon_intensity_{region}.json")
 
-        # Check cache first (30 minutes)
-        if self._is_cache_valid(cache_path, 30):
+        # Check cache first (2 hours - optimized for cost vs accuracy)
+        if self._is_cache_valid(cache_path, 120):
             try:
                 with open(cache_path, "r") as f:
                     cached_data = json.load(f)
@@ -188,16 +202,107 @@ class UnifiedAPIClient:
             logger.error(f"❌ ElectricityMap API failed: {e} - NO FALLBACK used")
             return None
 
+    def get_carbon_intensity_24h(self, region: str = "eu-central-1") -> Optional[List[Dict]]:
+        """Get 24-hour historical carbon intensity from ElectricityMap with daily caching
+
+        Scientific rationale: Historical data doesn't change, so daily caching is appropriate.
+        Uses real API data instead of hard-coded patterns for academic integrity.
+
+        Returns: List of hourly data points with timestamp and carbon intensity
+        """
+        # Use date-based cache key since historical data doesn't change
+        today = datetime.now().strftime("%Y-%m-%d")
+        cache_path = os.path.join(self.cache_dir, f"carbon_intensity_24h_{region}_{today}.json")
+
+        # Check cache first (24 hours - historical data doesn't change)
+        if self._is_cache_valid(cache_path, 1440):  # 24 hours in minutes
+            try:
+                with open(cache_path, "r") as f:
+                    cached_data = json.load(f)
+                logger.info(f"✅ Using cached 24h carbon data for {region}")
+                return cached_data["history"]
+            except Exception as e:
+                logger.warning(f"⚠️ 24h carbon cache read failed: {e}")
+
+        # Fetch fresh 24h historical data from ElectricityMap API
+        api_key = os.getenv("ELECTRICITYMAP_API_KEY")
+        if not api_key:
+            logger.error("❌ ElectricityMap API key not available for 24h data - NO FALLBACK used")
+            return None
+
+        headers = {"auth-token": api_key}
+        zone = REGION_MAPPINGS.get(region, "DE")
+
+        # Calculate time range for past 24 hours
+        end_time = datetime.utcnow()
+        start_time = end_time - timedelta(hours=24)
+
+        try:
+            logger.info(f"🌿 Fetching 24h carbon history for {zone}")
+            response = requests.get(
+                "https://api-access.electricitymaps.com/v3/carbon-intensity/past-range",
+                headers=headers,
+                params={
+                    "zone": zone,
+                    "start": start_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "end": end_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "granularity": "hourly"
+                },
+                timeout=30
+            )
+            response.raise_for_status()
+
+            data = response.json()
+
+            if "history" not in data or not isinstance(data["history"], list):
+                logger.error(f"❌ ElectricityMap 24h API returned invalid data structure")
+                return None
+
+            # Process and validate the historical data
+            processed_history = []
+            for entry in data["history"]:
+                if "carbonIntensity" in entry and "datetime" in entry:
+                    processed_history.append({
+                        "carbonIntensity": float(entry["carbonIntensity"]),
+                        "datetime": entry["datetime"],
+                        "hour": parse_iso_datetime(entry["datetime"]).hour
+                    })
+
+            if len(processed_history) < 12:  # Minimum reasonable data points
+                logger.warning(f"⚠️ ElectricityMap returned insufficient 24h data: {len(processed_history)} points")
+                return None
+
+            # Cache the result with daily expiration
+            try:
+                cache_data = {
+                    "history": processed_history,
+                    "cached_at": datetime.now().isoformat(),
+                    "data_source": "electricitymap_24h_api",
+                    "region": region,
+                    "zone": zone
+                }
+                with open(cache_path, "w") as f:
+                    json.dump(cache_data, f)
+                logger.info(f"✅ 24h carbon history: {len(processed_history)} data points (cached 24h)")
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to cache 24h carbon data: {e}")
+
+            return processed_history
+
+        except requests.exceptions.RequestException as e:
+            logger.error(f"❌ ElectricityMap 24h API failed: {e} - NO FALLBACK used")
+            return None
+
     def get_power_consumption(self, instance_type: str) -> Optional[PowerConsumption]:
-        """Get power consumption from Boavizta API with 24h caching"""
+        """Get power consumption from Boavizta API with 7-day caching"""
         if not instance_type:
             logger.error("❌ Invalid instance_type")
             return None
 
         cache_path = os.path.join(self.cache_dir, f"boavizta_power_{instance_type}.json")
 
-        # Check cache first (24 hours)
-        if self._is_cache_valid(cache_path, 24 * 60):
+        # Check cache first (7 days - hardware specs don't change)
+        if self._is_cache_valid(cache_path, 7 * 24 * 60):
             try:
                 with open(cache_path, "r") as f:
                     cached_data = json.load(f)
@@ -276,12 +381,92 @@ class UnifiedAPIClient:
             logger.error(f"❌ Boavizta API failed for {instance_type}: {e} - NO FALLBACK used")
             return None
 
+    def get_instance_pricing(self, instance_type: str, region: str = "eu-central-1") -> Optional[float]:
+        """Get AWS EC2 instance pricing from AWS Pricing API with 7-day caching"""
+        cache_path = os.path.join(self.cache_dir, f"pricing_{instance_type}_{region}.json")
+
+        # Check cache first (7 days - AWS pricing changes rarely)
+        if self._is_cache_valid(cache_path, 7 * 24 * 60):
+            try:
+                with open(cache_path, "r") as f:
+                    cached_data = json.load(f)
+                logger.info(f"✅ Using cached pricing for {instance_type}")
+                return cached_data["hourly_price_usd"]
+            except Exception as e:
+                logger.warning(f"⚠️ Pricing cache read failed: {e}")
+
+        # Fetch fresh pricing from AWS Pricing API
+        try:
+            session = boto3.Session(profile_name=self.aws_profile)
+            pricing_client = session.client('pricing', region_name='us-east-1')
+
+            # Map region to pricing location
+            region_mapping = {
+                "eu-central-1": "EU (Frankfurt)",
+                "eu-west-1": "EU (Ireland)",
+                "us-east-1": "US East (N. Virginia)",
+                "us-west-2": "US West (Oregon)"
+            }
+            location = region_mapping.get(region, "EU (Frankfurt)")
+
+            logger.info(f"💰 Fetching fresh pricing for {instance_type} in {location}")
+
+            response = pricing_client.get_products(
+                ServiceCode='AmazonEC2',
+                Filters=[
+                    {'Type': 'TERM_MATCH', 'Field': 'location', 'Value': location},
+                    {'Type': 'TERM_MATCH', 'Field': 'instanceType', 'Value': instance_type},
+                    {'Type': 'TERM_MATCH', 'Field': 'tenancy', 'Value': 'Shared'},
+                    {'Type': 'TERM_MATCH', 'Field': 'operatingSystem', 'Value': 'Linux'},
+                    {'Type': 'TERM_MATCH', 'Field': 'preInstalledSw', 'Value': 'NA'},
+                    {'Type': 'TERM_MATCH', 'Field': 'capacitystatus', 'Value': 'Used'}
+                ]
+            )
+
+            if not response.get('PriceList'):
+                logger.error(f"❌ No pricing data found for {instance_type} in {location}")
+                return None
+
+            # Parse the complex pricing JSON structure
+            price_item = json.loads(response['PriceList'][0])
+            terms = price_item['terms']['OnDemand']
+
+            # Extract the hourly price
+            for term_key, term_value in terms.items():
+                for price_key, price_value in term_value['priceDimensions'].items():
+                    if 'Hrs' in price_value['unit']:
+                        hourly_price = float(price_value['pricePerUnit']['USD'])
+
+                        # Cache the result
+                        try:
+                            cache_data = {
+                                "hourly_price_usd": hourly_price,
+                                "instance_type": instance_type,
+                                "region": region,
+                                "location": location,
+                                "source": "AWS_Pricing_API"
+                            }
+                            with open(cache_path, "w") as f:
+                                json.dump(cache_data, f)
+                            logger.info(f"✅ Pricing: {instance_type} = ${hourly_price:.4f}/hour (cached 24h)")
+                        except Exception as e:
+                            logger.warning(f"⚠️ Failed to cache pricing data: {e}")
+
+                        return hourly_price
+
+            logger.error(f"❌ Could not parse pricing data for {instance_type}")
+            return None
+
+        except Exception as e:
+            logger.error(f"❌ AWS Pricing API failed for {instance_type}: {e} - NO FALLBACK used")
+            return None
+
     def get_monthly_costs(self) -> Optional[AWSCostData]:
-        """Get monthly AWS costs with 1-hour caching"""
+        """Get monthly AWS costs for validation with 6-hour caching"""
         cache_path = os.path.join(self.cache_dir, "cost_data.json")
 
-        # Check cache first (1 hour)
-        if self._is_cache_valid(cache_path, 60):
+        # Check cache first (6 hours - AWS Cost Explorer updates daily)
+        if self._is_cache_valid(cache_path, 6 * 60):
             try:
                 with open(cache_path, "r") as f:
                     cached_data = json.load(f)
@@ -290,16 +475,16 @@ class UnifiedAPIClient:
             except Exception as e:
                 logger.warning(f"⚠️ Cost cache read failed: {e}")
 
-        # Fetch fresh data from AWS Cost Explorer
+        # Fetch fresh data from AWS Cost Explorer for validation
         try:
             session = boto3.Session(profile_name=self.aws_profile)
             cost_client = session.client("ce", region_name="us-east-1")
 
-            logger.info("💰 Fetching fresh Cost Explorer data")
+            logger.info("💰 Fetching Cost Explorer data for validation")
 
-            # Get 30-day cost data
+            # Get current month cost data
             end_date = datetime.now().date()
-            start_date = end_date - timedelta(days=30)
+            start_date = end_date.replace(day=1)  # First day of current month
 
             response = cost_client.get_cost_and_usage(
                 TimePeriod={
@@ -330,11 +515,14 @@ class UnifiedAPIClient:
                         service_costs[service_name] = cost_amount
                         total_cost += cost_amount
 
+            # Focus on EC2 costs for validation
+            ec2_cost = service_costs.get("Amazon Elastic Compute Cloud - Compute", 0.0)
+
             cost_data = AWSCostData(
-                monthly_cost_usd=total_cost,
+                monthly_cost_usd=ec2_cost,  # Only EC2 costs for instance validation
                 service_costs=service_costs,
                 region="us-east-1",
-                source="AWS_Cost_Explorer_API"
+                source="AWS_Cost_Explorer_Validation"
             )
 
             # Cache the result
@@ -347,7 +535,7 @@ class UnifiedAPIClient:
                 }
                 with open(cache_path, "w") as f:
                     json.dump(cache_data, f)
-                logger.info(f"✅ AWS costs: ${total_cost:.2f} USD (cached 1h)")
+                logger.info(f"✅ AWS EC2 costs: ${ec2_cost:.2f} USD (validation data, cached 1h)")
             except Exception as e:
                 logger.warning(f"⚠️ Failed to cache cost data: {e}")
 

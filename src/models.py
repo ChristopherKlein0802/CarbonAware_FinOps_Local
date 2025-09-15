@@ -65,6 +65,7 @@ class DashboardData:
     data_freshness: Optional[datetime] = None
     uncertainty_ranges: Dict[str, float] = None
     academic_disclaimers: List[str] = None
+    api_health_status: Optional[Dict[str, 'APIHealthStatus']] = None
 
     def __post_init__(self):
         if self.uncertainty_ranges is None:
