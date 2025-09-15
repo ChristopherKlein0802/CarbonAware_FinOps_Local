@@ -32,9 +32,9 @@ def check_apis():
     try:
         # Add project paths for imports
         sys.path.append('dashboard')
-        from dashboard.utils.health_checks import health_checker
+        from dashboard.utils.health_checks import health_check_manager
 
-        health_status = health_checker.check_all_apis()
+        health_status = health_check_manager.check_all_apis()
 
         if health_status.get("all_healthy", False):
             print("✅ All APIs are healthy")

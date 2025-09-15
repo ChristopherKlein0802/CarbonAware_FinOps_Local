@@ -17,14 +17,23 @@
 ### 🔬 Academic Positioning
 This **Bachelor Thesis Prototype** explores the feasibility of integrated Carbon-aware FinOps optimization. All findings are preliminary and require extensive validation at production scale.
 
-### 🚀 **API Cost Optimization (September 2025)**
-**Optimization Implemented**: Reduced prototype dashboard costs from estimated $86+/month to $7/month through caching strategy for 4-instance test environment.
+### 🚀 **Professional Clean Architecture (September 2025)**
+**Architecture Enhancement**: Evolved from nested MVC structure to pragmatic professional architecture optimized for Bachelor thesis presentation.
 
+- **Clean Streamlit Dashboard**: Modern professional UI with comprehensive analytics
+- **Flat Module Structure**: Single `src/` directory with clear separation of concerns
+- **Type-safe Data Models**: Professional dataclass-based data structures
+- **Professional Launcher**: Validation and health checks on startup
+- **Unified API Client**: Clean, single-file API integration
+
+📊 **Performance**: Maintained API cost optimization ($7/month) while improving code clarity and maintainability.
+
+### 🔧 **API Cost Optimization**
 - **AWS Cost Explorer**: 1-hour caching (data updates daily)
-- **ElectricityMap**: 30-minute caching (German grid updates every 15-60min)  
+- **ElectricityMap**: 30-minute caching (German grid updates every 15-60min)
 - **Cache Strategy**: Based on official API update frequencies, not arbitrary intervals
 
-📊 See `docs/api-optimization-strategy.md` for complete technical rationale and Bachelor Thesis validation.
+📊 See `docs/api-optimization-strategy.md` for complete technical rationale.
 
 ## ⚡ Analysis-Focused Approach
 
@@ -43,41 +52,43 @@ This **Bachelor Thesis Prototype** explores the feasibility of integrated Carbon
 📋 **Technical**: Fully API-dependent, preliminary calculations with documented uncertainties
 📋 **Business**: ROI projections based on literature, not validated savings
 
-## 📁 Project Structure (Optimized for Bachelor Thesis)
+## 📁 Project Structure (Professional Clean Architecture)
 
 ```
 CarbonAware_FinOps_Local/
 ├── README.md                    # Main project documentation
-├── Makefile                     # Build and deployment commands  
+├── Makefile                     # Professional build and deployment commands
 ├── requirements.txt             # Python dependencies
+├── run_clean_dashboard.py       # 🚀 Professional launcher with validation
 │
-├── dashboard/                   # 🎯 Main Dashboard Application
-│   ├── dashboard_main.py        # Dashboard orchestration
-│   ├── api_clients/             # External API integrations
-│   │   └── unified_api_client.py # ElectricityMap + Boavizta + AWS APIs
-│   ├── components/              # Reusable UI components
-│   ├── tabs/                    # 3 focused dashboard tabs
-│   │   ├── overview_tab.py      # Management & ROI focus
-│   │   ├── infrastructure_tab.py # DevOps & analysis focus
-│   │   └── carbon_tab.py        # Pure carbon data science
-│   └── utils/                   # Business logic & data processing
+├── src/                         # 🎯 Clean Architecture Source Code
+│   ├── app.py                   # Main Streamlit application (entry point)
+│   ├── pages.py                 # All dashboard pages (Overview, Infrastructure, Carbon, Research)
+│   ├── api_client.py            # Unified API client (ElectricityMap + Boavizta + AWS)
+│   ├── data_processor.py        # Business logic and data processing
+│   ├── health_monitor.py        # System health monitoring
+│   ├── models.py                # Type-safe data models
+│   └── assets/
+│       └── modern-thesis-styles.css # Professional styling
+│
+├── dashboard/                   # 📁 Legacy Dashboard (Fallback)
+│   ├── dashboard_main.py        # Legacy Dash application
+│   └── [legacy files...]       # Maintained for compatibility
 │
 ├── terraform/                   # ☁️ AWS Infrastructure as Code
 │   ├── main.tf                  # EC2 test instances
 │   └── variables.tf             # Configuration
 │
-├── tests/                       # 🧪 Tests & Demos
-│   ├── test_carbon_api.py       # API integration tests
-│   ├── test_unified_api.py      # Comprehensive API testing
-│   └── demo_unified_api.py      # Complete API demo
+├── tests/                       # 🧪 Tests & Validation
+│   ├── test_api_clients.py      # API integration tests
+│   ├── test_data_processing.py  # Business logic testing
+│   └── test_health_checks.py    # System monitoring tests
 │
 ├── docs/                        # 📚 Academic Documentation
 │   ├── project-summary.md       # Detailed project overview
-│   ├── thesis-assessment.md     # Academic assessment criteria
 │   ├── competitive-analysis.md  # Comparison with existing tools
-│   ├── case-studies.md          # Business value demonstration
-│   ├── deployment-guide.md      # Setup instructions
-│   └── api-integration-guide.md # API configuration guide
+│   ├── api-optimization-strategy.md # Technical API optimization
+│   └── [thesis documentation...] # Complete academic documentation
 │
 └── config/                      # ⚙️ Configuration
     └── pyrightconfig.json       # Type checker settings
@@ -85,13 +96,20 @@ CarbonAware_FinOps_Local/
 
 ## 🚀 Quick Start
 
-### Quick Start (Recommended)
+### Quick Start (Clean Architecture - Recommended)
 ```bash
 # Clone repository
 git clone <your-repo>
 cd CarbonAware_FinOps_Local
+
+# Setup environment
 make setup
-make dashboard
+
+# Launch clean Streamlit dashboard
+make streamlit
+
+# Alternative: Professional launcher with validation
+python run_clean_dashboard.py
 ```
 
 ### Manual Setup

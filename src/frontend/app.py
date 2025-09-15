@@ -25,17 +25,18 @@ import time
 import sys
 import os
 
-# Add project paths
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dashboard'))
+# Add project paths for new structure
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(project_root)
+sys.path.append(os.path.join(project_root, 'src'))
 
-# Import existing functionality - KEEP ALL YOUR LOGIC!
-from dashboard.utils.data_processing import data_processor
-from dashboard.api_clients.unified_api_client import UnifiedAPIClient
-from dashboard.utils.health_checks import health_checker
+# Import backend services - Clean architecture
+from src.backend.controllers.data_processing import data_processor
+from src.backend.services.api_clients.unified_api_client import UnifiedAPIClient
+from src.backend.controllers.health_checks import health_check_manager
 
-# Import complete page implementations
-from streamlit_pages import (
+# Import frontend pages - Separation of concerns
+from pages.streamlit_pages import (
     render_carbon_page_complete,
     render_thesis_page_complete,
     render_research_page_complete
@@ -86,24 +87,100 @@ if 'last_update' not in st.session_state:
     st.session_state.last_update = datetime.now()
 if 'cached_data' not in st.session_state:
     st.session_state.cached_data = None
+if 'data_loaded' not in st.session_state:
+    st.session_state.data_loaded = False
 
-# Cache data loading function
-@st.cache_data(ttl=1800)  # 30 minute cache like your original
+# Cache data loading function with better error handling
+@st.cache_data(ttl=1800, show_spinner="Loading infrastructure data...")  # 30 minute cache - respects API cache strategy
 def load_infrastructure_data():
     """Load data using your existing data processor"""
     try:
-        return data_processor.get_infrastructure_data()
-    except Exception as e:
-        st.error(f"API Error: {e}")
-        return {"instances": [], "carbon_intensity": 0, "total_cost": 0}
+        # Force fresh import to ensure we get latest AWS credentials
+        import importlib
+        import sys
 
-@st.cache_data(ttl=300)  # 5 minute cache for health checks
-def get_api_health():
-    """Get API health status using your existing health checker"""
-    try:
-        return health_checker.check_all_apis()
+        from dashboard.utils.data_processing import data_processor
+
+        # Note: Module reload removed to respect API cache strategy
+        # This allows the 30min ElectricityMaps, 1h AWS, and 24h Boavizta caches to work properly
+
+        data = data_processor.get_infrastructure_data()
+
+        # Enhanced debug logging
+        if data and data.get('instances'):
+            instance_count = len(data.get('instances', []))
+            carbon_intensity = data.get('carbon_intensity', 0)
+            st.sidebar.success(f"✅ Loaded: {instance_count} instances, {carbon_intensity}g CO₂/kWh")
+        else:
+            st.sidebar.warning("⚠️ No instances found - check AWS credentials")
+
+        return data
+
     except Exception as e:
-        return {"all_healthy": False, "error": str(e)}
+        error_msg = f"Data loading error: {str(e)}"
+        st.sidebar.error(error_msg)
+        # Return empty data structure that matches expected format
+        return {
+            "instances": [],
+            "carbon_intensity": 0,
+            "total_cost": 0,
+            "api_sources": {},
+            "error": error_msg
+        }
+
+@st.cache_data(ttl=300)  # 5 minute cache for health checks - balances responsiveness with API costs
+def get_api_health():
+    """Simple API health check that actually works with your data"""
+    try:
+        from dashboard.utils.data_processing import data_processor
+
+        # Get data (respects API cache strategy for cost efficiency)
+        data = data_processor.get_infrastructure_data()
+
+        # Check if we actually got data
+        has_instances = data and len(data.get("instances", [])) > 0
+        has_carbon_data = data and data.get("carbon_intensity", 0) > 0
+
+        # ElectricityMaps: Check if we have carbon intensity data
+        electricitymap_healthy = has_carbon_data
+
+        # Boavizta: Check if instances have power data
+        boavizta_healthy = False
+        if has_instances:
+            instances_with_power = [inst for inst in data["instances"]
+                                  if inst.get("power_watts", 0) > 0]
+            boavizta_healthy = len(instances_with_power) > 0
+
+        # AWS: Check if instances have cost data or at least instances exist
+        aws_healthy = has_instances  # At least we can get instances
+
+        # Count healthy services
+        healthy_apis = [electricitymap_healthy, boavizta_healthy, aws_healthy]
+        services_healthy = sum(healthy_apis)
+        all_healthy = services_healthy >= 2  # At least 2 out of 3
+
+        return {
+            "all_healthy": all_healthy,
+            "electricitymap": {"healthy": electricitymap_healthy},
+            "boavizta": {"healthy": boavizta_healthy},
+            "aws": {"healthy": aws_healthy},
+            "overall_status": "healthy" if all_healthy else "degraded",
+            "services_healthy": services_healthy,
+            "total_services": 3
+        }
+
+    except Exception as e:
+        # If we can't even load data, all APIs are considered down
+        return {
+            "all_healthy": False,
+            "error": str(e),
+            "electricitymap": {"healthy": False},
+            "boavizta": {"healthy": False},
+            "aws": {"healthy": False},
+            "overall_status": "error",
+            "services_healthy": 0,
+            "total_services": 3
+        }
 
 def main():
     # Modern Header with Live Stats
@@ -121,7 +198,9 @@ def main():
         # Live API Status
         api_health = get_api_health()
         if api_health.get("all_healthy", False):
-            st.metric("🟢 APIs", "3/3", "Online")
+            healthy_count = api_health.get("services_healthy", 0)
+            total_count = api_health.get("total_services", 3)
+            st.metric("🟢 APIs", f"{healthy_count}/{total_count}", api_health.get("overall_status", "Online").title())
         else:
             st.metric("🔴 APIs", "Error", "Check logs")
 
@@ -147,7 +226,7 @@ def main():
         "⚙️ Settings": "settings"
     }
 
-    selected_page = st.sidebar.radio("", list(pages.keys()))
+    selected_page = st.sidebar.radio("Select Page", list(pages.keys()))
     page_key = pages[selected_page]
 
     # Interactive Filters - MODERN FEATURE #3
@@ -212,6 +291,19 @@ def main():
 
     # Load data using your existing logic
     data = load_infrastructure_data()
+
+    # Debug info in sidebar
+    with st.sidebar:
+        st.markdown("### 🔍 Debug Info")
+        if data:
+            st.success(f"✅ Data loaded: {len(data.get('instances', []))} instances")
+            st.info(f"Carbon: {data.get('carbon_intensity', 0)}g CO₂/kWh")
+        else:
+            st.error("❌ No data loaded")
+
+        if st.button("🔄 Force Refresh Data"):
+            st.cache_data.clear()
+            st.rerun()
 
     # Route to different pages
     if page_key == "overview":

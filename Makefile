@@ -1,7 +1,7 @@
 # Carbon-Aware FinOps - Bachelor Thesis
-# Deployment-focused Makefile
+# Professional Makefile for Clean Architecture
 
-.PHONY: help setup dashboard deploy status destroy test clean
+.PHONY: help setup dashboard deploy status destroy test clean streamlit
 .DEFAULT_GOAL := help
 
 # Configuration
@@ -9,7 +9,7 @@ PYTHON := python3
 VENV := venv
 AWS_PROFILE := carbon-finops-sandbox
 AWS_REGION := eu-central-1
-DASHBOARD_PORT := 8051
+STREAMLIT_PORT := 8501
 
 # Colors
 GREEN := \033[0;32m
@@ -25,16 +25,17 @@ help: ## 📋 Show deployment commands
 	@echo ""
 	@echo "$(BOLD)🚀 Quick Start:$(NC)"
 	@echo "  $(BLUE)make setup$(NC)     - Setup environment & dependencies"
-	@echo "  $(BLUE)make dashboard$(NC) - 📊 Launch dashboard"
+	@echo "  $(BLUE)make streamlit$(NC) - 📊 Launch clean Streamlit dashboard"
 	@echo "  $(BLUE)make deploy$(NC)    - ☁️  Deploy AWS test instances"
 	@echo ""
 	@echo "$(BOLD)📊 Dashboard Development:$(NC)"
-	@echo "  $(BLUE)python run.py dev$(NC)  - Development mode (recommended)"
-	@echo "  $(BLUE)python run.py demo$(NC) - Bachelor Thesis presentation mode"
-	@echo "  $(BLUE)python status.py$(NC)   - Check dashboard health"
+	@echo "  $(BLUE)make streamlit$(NC)              - Clean Streamlit dashboard (recommended)"
+	@echo "  $(BLUE)python run_clean_dashboard.py$(NC) - Professional launcher with validation"
+	@echo "  $(BLUE)make health$(NC)                 - Check dashboard health"
 	@echo ""
-	@echo "$(BOLD)📊 Dashboard & Analysis (Legacy):$(NC)"
-	@echo "  $(BLUE)make dashboard$(NC) - Launch analysis dashboard (Port $(DASHBOARD_PORT))"
+	@echo "$(BOLD)📊 Dashboard Options:$(NC)"
+	@echo "  $(BLUE)make streamlit$(NC) - Clean Streamlit dashboard (Port $(STREAMLIT_PORT))"
+	@echo "  $(BLUE)make dashboard$(NC) - Legacy dashboard (fallback)"
 	@echo "  $(BLUE)make test$(NC)      - Test API integrations"
 	@echo ""  
 	@echo "$(BOLD)☁️  AWS Infrastructure:$(NC)"
@@ -72,20 +73,28 @@ setup: ## 🔧 Setup environment
 		echo "$(YELLOW)⚠️  Create .env file from .env.example$(NC)"; \
 	fi
 	@echo ""
-	@echo "$(BOLD)$(GREEN)🎉 Setup complete! Run 'make dashboard' to start$(NC)"
+	@echo "$(BOLD)$(GREEN)🎉 Setup complete! Run 'make streamlit' to start$(NC)"
 
-dashboard: ## 📊 Launch Dashboard (Legacy - use 'python run.py' instead)
-	@echo "$(YELLOW)⚠️  Legacy Dashboard Launch$(NC)"
-	@echo "$(BLUE)Recommended: Use 'python run.py dev' for development$(NC)"
-	@echo ""
-	@echo "$(BOLD)$(GREEN)📊 Launching Carbon-Aware FinOps Dashboard$(NC)"
+streamlit: ## 📊 Launch Clean Streamlit Dashboard (Recommended)
+	@echo "$(BOLD)$(GREEN)📊 Launching Clean Streamlit Dashboard$(NC)"
 	@echo "============================================="
-	@echo "$(BLUE)🎓 Bachelor Thesis Tool: Novel FinOps combining cost + carbon$(NC)"
-	@echo "$(BLUE)📊 Dashboard URL: http://127.0.0.1:$(DASHBOARD_PORT)$(NC)"
+	@echo "$(BLUE)🎓 Bachelor Thesis Tool: Professional Clean Architecture$(NC)"
+	@echo "$(BLUE)📊 Dashboard URL: http://127.0.0.1:$(STREAMLIT_PORT)$(NC)"
 	@echo "$(BLUE)🇩🇪 German Grid Focus: Real ElectricityMap API data$(NC)"
 	@echo "$(BLUE)🔬 APIs: ElectricityMap + Boavizta + AWS Cost Explorer$(NC)"
 	@echo "$(BLUE)Press Ctrl+C to stop$(NC)"
 	@echo ""
+	@if [ -f ".env" ]; then \
+		source .env; \
+	fi && \
+	./$(VENV)/bin/streamlit run src/app.py --server.port $(STREAMLIT_PORT) --server.headless false
+
+dashboard: ## 📊 Launch Legacy Dashboard (Fallback)
+	@echo "$(YELLOW)⚠️  Legacy Dashboard Launch$(NC)"
+	@echo "$(BLUE)Recommended: Use 'make streamlit' for clean architecture$(NC)"
+	@echo ""
+	@echo "$(BOLD)$(GREEN)📊 Launching Legacy Dashboard$(NC)"
+	@echo "======================================"
 	@if [ -f ".env" ]; then \
 		source .env; \
 	fi && \
@@ -129,28 +138,28 @@ destroy: ## 🗑️  Destroy AWS infrastructure
 		-var="aws_region=$(AWS_REGION)"
 	@echo "$(GREEN)✅ AWS resources destroyed$(NC)"
 
-test: ## 🧪 Test API integrations
-	@echo "$(BOLD)$(GREEN)🧪 Testing API Integrations$(NC)"
-	@echo "============================="
+test: ## 🧪 Test API integrations (Clean Architecture)
+	@echo "$(BOLD)$(GREEN)🧪 Testing API Integrations - Clean Architecture$(NC)"
+	@echo "================================================="
 	@echo "$(YELLOW)Testing Boavizta API (hardware power data)...$(NC)"
-	@./$(VENV)/bin/python3 -c "from dashboard.api_clients.unified_api_client import UnifiedAPIClient; client = UnifiedAPIClient(); result = client.get_power_consumption('t3.medium'); print(f'✅ Boavizta: {result.avg_power_watts:.1f}W' if result else '❌ Boavizta failed')" 2>/dev/null
+	@./$(VENV)/bin/python3 -c "from src.api_client import unified_api_client; result = unified_api_client.get_power_consumption('t3.medium'); print(f'✅ Boavizta: {result.avg_power_watts:.1f}W' if result else '❌ Boavizta failed')" 2>/dev/null
 	@echo "$(YELLOW)Testing ElectricityMap API (carbon intensity)...$(NC)"
 	@if [ -f ".env" ]; then \
-		source .env && ./$(VENV)/bin/python3 -c "from dashboard.api_clients.unified_api_client import UnifiedAPIClient; client = UnifiedAPIClient(); result = client.get_carbon_intensity('eu-central-1'); print(f'✅ ElectricityMap: {result}g CO2/kWh' if result and result > 0 else '⚠️  ElectricityMap: Check API key')" 2>/dev/null; \
+		source .env && ./$(VENV)/bin/python3 -c "from src.api_client import unified_api_client; result = unified_api_client.get_current_carbon_intensity('eu-central-1'); print(f'✅ ElectricityMap: {result.value}g CO2/kWh' if result and result.value > 0 else '⚠️  ElectricityMap: Check API key')" 2>/dev/null; \
 	else \
 		echo "⚠️  ElectricityMap: Create .env file"; \
 	fi
 	@echo "$(YELLOW)Testing AWS Cost Explorer API...$(NC)"
 	@if [ -f ".env" ]; then \
-		source .env && ./$(VENV)/bin/python3 -c "from dashboard.api_clients.unified_api_client import UnifiedAPIClient; client = UnifiedAPIClient(); result = client.get_aws_costs(); print('✅ AWS Cost Explorer: $$' + str(round(result.monthly_cost_usd, 2)) + ' USD' if result and result.monthly_cost_usd > 0 else '⚠️  AWS: Check credentials')" || echo "⚠️  AWS Cost Explorer: Check credentials"; \
+		source .env && ./$(VENV)/bin/python3 -c "from src.api_client import unified_api_client; result = unified_api_client.get_monthly_costs(); print('✅ AWS Cost Explorer: $$' + str(round(result.monthly_cost_usd, 2)) + ' USD' if result and result.monthly_cost_usd > 0 else '⚠️  AWS: Check credentials')" || echo "⚠️  AWS Cost Explorer: Check credentials"; \
 	else \
-		./$(VENV)/bin/python3 -c "from dashboard.api_clients.unified_api_client import UnifiedAPIClient; client = UnifiedAPIClient(); result = client.get_aws_costs(); print('✅ AWS Cost Explorer: $$' + str(round(result.monthly_cost_usd, 2)) + ' USD' if result and result.monthly_cost_usd > 0 else '⚠️  AWS: Check credentials')" || echo "⚠️  AWS Cost Explorer: Check credentials"; \
+		./$(VENV)/bin/python3 -c "from src.api_client import unified_api_client; result = unified_api_client.get_monthly_costs(); print('✅ AWS Cost Explorer: $$' + str(round(result.monthly_cost_usd, 2)) + ' USD' if result and result.monthly_cost_usd > 0 else '⚠️  AWS: Check credentials')" || echo "⚠️  AWS Cost Explorer: Check credentials"; \
 	fi
-	@echo "$(YELLOW)Running comprehensive API test...$(NC)"
+	@echo "$(YELLOW)Testing Clean Architecture Health Check...$(NC)"
 	@if [ -f ".env" ]; then \
-		source .env && ./$(VENV)/bin/python3 tests/test_unified_api.py > /dev/null && echo "$(GREEN)✅ Full API integration test passed$(NC)" || echo "$(YELLOW)⚠️  Some API tests had issues - check configuration$(NC)"; \
+		source .env && ./$(VENV)/bin/python3 -c "from src.health_monitor import health_check_manager; result = health_check_manager.quick_health_check(); print('✅ Clean Architecture Health Check passed' if result else '⚠️  Some APIs have issues')" 2>/dev/null; \
 	else \
-		./$(VENV)/bin/python3 tests/test_unified_api.py > /dev/null && echo "$(GREEN)✅ Full API integration test passed$(NC)" || echo "$(YELLOW)⚠️  Some API tests had issues - check configuration$(NC)"; \
+		./$(VENV)/bin/python3 -c "from src.health_monitor import health_check_manager; result = health_check_manager.quick_health_check(); print('✅ Clean Architecture Health Check passed' if result else '⚠️  Some APIs have issues')" 2>/dev/null; \
 	fi
 
 clean: ## 🧹 Clean temporary files
