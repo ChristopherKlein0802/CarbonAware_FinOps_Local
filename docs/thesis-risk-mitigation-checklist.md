@@ -117,9 +117,9 @@
 
 ---
 
-## 🎓 **Thesis Grading Protection**
+## 🎓 **Academic Quality Assurance**
 
-### **Grade 1.0-1.3 Protection Factors:**
+### **Academic Excellence Factors:**
 1. **✅ Novel Contribution** - First integrated Carbon+Cost tool
 2. **✅ Technical Excellence** - Full AWS deployment + 3 APIs
 3. **✅ Scientific Rigor** - Conservative claims + confidence intervals  
@@ -127,7 +127,7 @@
 5. **✅ Academic Standards** - Systematic methodology + literature review
 
 ### **Risk Mitigation vs. Common Thesis Failures:**
-- ❌ **"Not novel enough"** → ✅ Competitive analysis proves uniqueness
+- ❌ **"Not novel enough"** → ✅ Competitive analysis suggests potential gap
 - ❌ **"Claims too strong"** → ✅ Conservative language throughout  
 - ❌ **"Methodology weak"** → ✅ Scientific APIs + documented formulas
 - ❌ **"Not practical"** → ✅ Real deployment + business case
@@ -205,6 +205,6 @@
 - 🇩🇪 **Market relevance** established for German SME scenarios
 - 📚 **Academic rigor** ensured through systematic literature framework
 
-**Grade potential: 1.0-1.3** with strong defense against common criticisms.
+**Academic assessment readiness** with methodological rigor and proper defense preparation.
 
 **Ready for thesis writing and submission!** 🎓✨

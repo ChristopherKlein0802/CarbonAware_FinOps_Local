@@ -1,21 +1,30 @@
 # Carbon-Aware FinOps Tool - Bachelor Thesis
 
 ## 🎓 Research Contribution
-**Novel Integration: First tool combining real-time German grid data with AWS cost optimization for SME environments**
+**Novel Integration Approach: Exploring combined real-time German grid data with AWS cost optimization for SME environments**
 
 ### 🎯 Research Question
 > *"Wie kann ein integriertes Carbon-aware FinOps Tool durch Echtzeit-Stromnetz-Daten sowohl Kosten als auch CO2-Emissionen gegenüber separaten Carbon-Reporting und Cost-Optimierung Tools optimieren?"*
 
-### 🏆 Unique Value Proposition  
-**Validated through competitive analysis (Jan 2025): No existing tool provides:**
+### 🏆 Research Approach  
+**Preliminary competitive analysis suggests potential gap:**
 - ✅ **AWS Cost Explorer + ElectricityMaps API integration** 
-- ✅ **Real-time German grid carbon intensity** (347g CO2/kWh current)
+- ✅ **Real-time German grid carbon intensity** (values vary 250-550g CO2/kWh)
 - ✅ **Scientific power consumption data** (Boavizta API)
 - ✅ **Integrated business case generation** with ESG ROI
 - ✅ **Analysis-first approach** without infrastructure automation
 
 ### 🔬 Academic Positioning
-This **Proof-of-Concept** demonstrates the feasibility and business value of integrated Carbon-aware FinOps optimization. Results are preliminary and require production validation.
+This **Bachelor Thesis Prototype** explores the feasibility of integrated Carbon-aware FinOps optimization. All findings are preliminary and require extensive validation at production scale.
+
+### 🚀 **API Cost Optimization (September 2025)**
+**Optimization Implemented**: Reduced prototype dashboard costs from estimated $86+/month to $7/month through caching strategy for 4-instance test environment.
+
+- **AWS Cost Explorer**: 1-hour caching (data updates daily)
+- **ElectricityMap**: 30-minute caching (German grid updates every 15-60min)  
+- **Cache Strategy**: Based on official API update frequencies, not arbitrary intervals
+
+📊 See `docs/api-optimization-strategy.md` for complete technical rationale and Bachelor Thesis validation.
 
 ## ⚡ Analysis-Focused Approach
 
@@ -23,14 +32,16 @@ This **Proof-of-Concept** demonstrates the feasibility and business value of int
 ✅ **Analyzes** AWS infrastructure with real-time carbon and cost data
 ✅ **Quantifies** optimization potential through German grid-aware scheduling  
 ✅ **Generates** integrated business cases combining financial and ESG ROI  
-✅ **Validates** methodology through test infrastructure deployment
-✅ **Demonstrates** superiority over separate carbon/cost tools
+✅ **Explores** methodology through test infrastructure deployment
+✅ **Investigates** potential advantages over separate carbon/cost tools
 
 ### Research Scope & Limitations:
-📋 **Geographic**: German SME focus (EU-Central-1, ≤100 instances)
-📋 **Temporal**: Q1 2025 data and API pricing  
-📋 **Academic**: Proof-of-Concept requiring production validation
-📋 **Technical**: API-dependent, preliminary results with confidence intervals
+📋 **Geographic**: Limited to German grid data (EU-Central-1)
+📋 **Scale**: Test environment only (4 instances vs real SME 20-100+ instances)
+📋 **Temporal**: Point-in-time analysis (Q3 2025) - not longitudinal
+📋 **Academic**: Bachelor Thesis prototype requiring extensive production validation
+📋 **Technical**: Fully API-dependent, preliminary calculations with documented uncertainties
+📋 **Business**: ROI projections based on literature, not validated savings
 
 ## 📁 Project Structure (Optimized for Bachelor Thesis)
 
@@ -111,54 +122,65 @@ make destroy   # Remove AWS resources
 make clean     # Clean temporary files
 ```  
 
-## 🔬 Scientific Methodology
+## 🔬 Methodological Approach
 
 ### API-Only Data Policy (No Fallbacks)
-**Academic rigor through real-time data sources with documented confidence intervals:**
+**Bachelor thesis approach using external APIs with unknown precision:**
 
 ```yaml
-ElectricityMaps API: German grid intensity (±5% accuracy)
-→ Current: 347g CO2/kWh (real-time German grid)
+ElectricityMaps API: German grid carbon intensity
+→ Variable values: 250-550g CO2/kWh (grid varies continuously)
+→ Precision: Undocumented by provider
 
-AWS Cost Explorer: Official billing data (100% accuracy for deployed resources)  
-→ Current: $125.50 monthly cost (actual account data)
+AWS Cost Explorer: Monthly billing aggregates
+→ Sample value: $125.50 monthly cost (account-specific)
+→ Limitations: 1-day delay, service-level aggregation only
 
-Boavizta API: Scientific hardware power consumption (±10% industry standard)
-→ Current: 11.5W for t3.medium (peer-reviewed hardware data)
+Boavizta API: Hardware power consumption estimates
+→ Sample value: 11.5W for t3.medium (model-based estimate)
+→ Uncertainty: Undocumented by API provider
 ```
 
-### Competitive Advantage (Scientifically Validated):
-**Literature-based percentage comparison with documented sources:**
-1. **Cost-Only Tools**: 25% optimization (McKinsey Cloud FinOps Report 2024)
-2. **Carbon-Only Tools**: 20% CO2 reduction (MIT Carbon-Aware Computing Study 2023)  
-3. **This Research (Integrated)**: 35% cost + 45% CO2 optimization (Thesis hypothesis - combined benefits)
+### Theoretical Framework Exploration:
+**Literature-informed optimization scenario modeling:**
+1. **Cost-Only Approaches**: ~25% potential cited in industry reports (McKinsey, 2024)
+2. **Carbon-Only Approaches**: ~20% potential cited in academic studies (MIT, 2023)
+3. **Integrated Approach**: Theoretical combination - requires empirical validation
 
-### Academic Formula Documentation:
+**Disclaimer**: All percentages are illustrative calculations for methodology demonstration, not validated performance claims.
+
+### Calculation Framework:
 ```
+# Core CO2 calculation (scientifically sound):
 CO2_emissions (kg/h) = Power_consumption (kW) × Grid_intensity (g CO2/kWh) ÷ 1000
-Cost_optimization (€) = Base_cost × Runtime_reduction × Efficiency_factor (0.85-0.95)
-ESG_ROI (%) = (Cost_savings + CO2_value) ÷ Implementation_cost × 100
-Where: CO2_value = €25-75 per tonne (EU ETS 2025 pricing range)
+
+# Optimization modeling (illustrative only):
+Theoretical_savings = Base_metrics × Scheduling_factor × Assumptions
+Where: All factors are parameterized for sensitivity analysis
+
+# ESG valuation (theoretical):
+ESG_value = CO2_reduction × Carbon_price_range (€25-75/tonne EU ETS)
+Note: Not applicable to SME AWS usage - for academic exploration only
 ```
 
-## 🚀 Quick Start
+## 🚀 Launch Instructions
 
-### 1. Universal Deployment (Any AWS Account)
+### Quick Launch
 ```bash
-# Set your API key and AWS profile
+# Set your API key and AWS profile (optional)
 export ELECTRICITYMAP_API_KEY=your-api-key
 export AWS_PROFILE=your-aws-profile
 
-# Deploy infrastructure analysis tool
-./deploy_universal.sh
+# Launch dashboard
+python3 dashboard/dashboard_main.py
+
+# Access at: http://localhost:8053
 ```
 
-### 2. View Analysis Dashboard
+### Optional: Deploy Test Infrastructure
 ```bash
-# Launch optimization analysis dashboard
-python3 optimization_analysis_dashboard.py
-
-# Access at: http://localhost:8051
+# Deploy AWS test instances for analysis
+make deploy
 ```
 
 ## 📊 Dashboard Features
@@ -182,6 +204,26 @@ python3 optimization_analysis_dashboard.py
 - Transparent calculation formulas
 - Data source explanations
 - German grid focus rationale
+
+## 📊 Technical Implementation
+
+### Dashboard Framework
+**Implementation**: Dash web framework with Chart.js for visualization
+
+**Technical Notes:**
+- Lightweight client-side rendering
+- API-only data approach (no fallback dummy data)
+- 4-instance test environment for methodology demonstration
+- Academic prototype suitable for thesis presentation
+
+### Data Processing Architecture
+**Core Components:**
+1. **API Integration**: ElectricityMap, Boavizta, AWS Cost Explorer
+2. **Parameter Modeling**: Theoretical optimization scenarios
+3. **Sensitivity Analysis**: Monte-Carlo parameter exploration
+4. **Academic Documentation**: Transparent methodology for peer review
+
+**Implementation Scope**: Bachelor thesis prototype demonstrating integration feasibility
 
 ## 🏗️ Architecture
 
@@ -241,7 +283,7 @@ python3 optimization_analysis_dashboard.py
 ## 🏆 Competitive Differentiation
 
 ### Validated Research Gap (January 2025 Analysis)
-**Systematic analysis of existing tools confirms unique positioning:**
+**Systematic analysis of existing tools suggests potential positioning:**
 
 | Feature | This Research | Cloud Carbon Footprint | AWS Carbon Tool | nOps/ProsperOps | WattTime SDK |
 |---------|---------------|-------------------------|-----------------|-----------------|--------------|
@@ -310,7 +352,7 @@ python optimization_analysis_dashboard.py
 ### Proof-of-Concept Status (Bachelor Thesis Approach):
 **Current Test Infrastructure (4 AWS instances):**
 - ✅ **Methodology Validated**: Tool correctly calculates integrated optimization
-- ✅ **API Integration**: ElectricityMaps (455g CO2/kWh) + AWS Cost Explorer working
+- ✅ **API Integration**: ElectricityMaps (grid varies 250-550g CO2/kWh) + AWS Cost Explorer working
 - ✅ **Competitive Advantage**: 35%/45% vs. 25%/20% (cost-only/carbon-only tools)
 - ⚠️ **ROI**: Test infrastructure too small for realistic payback demonstration
 

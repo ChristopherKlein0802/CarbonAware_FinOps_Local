@@ -20,57 +20,59 @@ This analysis compares our **Carbon-Aware FinOps Dashboard** against existing to
 
 ---
 
-## 📊 Detailed Competitive Comparison (Literature-Validated)
+## 📊 Detailed Competitive Comparison (Literature-Informed)
+
+**⚠️ ACADEMIC DISCLAIMER: All optimization percentages marked with * are theoretical estimates requiring empirical validation. This thesis explores integration potential rather than claiming proven performance.**
 
 ### **1. CloudHealth by VMware + Cost-Only Tools**
 **Market Leaders - Cost Management (McKinsey Cloud FinOps Report 2024)**
 
 | Feature | Cost-Only Tools | Our Tool | Scientific Source |
 |---------|-----------------|----------|-------------------|
-| **Cost Optimization** | ✅ 25% average | ✅ 35% integrated | McKinsey 2024 |
+| **Cost Optimization** | ✅ 25% average | ⚠️ 35% estimated* | McKinsey 2024 |
 | **Regional Carbon Data** | ❌ None | ✅ German grid (ElectricityMap) | - |
 | **Combined Optimization** | ❌ Cost only | ✅ Cost + Carbon | - |
 | **Business Case ROI** | ✅ Cost ROI | ✅ Proof-of-Concept + Scaling | - |
 | **Analysis Approach** | ✅ Production ready | ✅ Analysis-first (safer) | - |
 
 **Literature Basis**: McKinsey Cloud FinOps Report 2024 documents 20-30% cost reduction through scheduling optimization.
-**Verdict**: Cost-only tools achieve proven 25% optimization but **completely ignore carbon dimension**.
+**Assessment**: Cost-only tools achieve documented 25% optimization but do not include carbon considerations.
 
 ### **2. Cloud Carbon Footprint + Carbon-Only Tools**
-**Leading - Carbon Tracking (MIT Carbon-Aware Computing Study 2023)**
+**Representative - Carbon Tracking (MIT Carbon-Aware Computing Study 2023)**
 
 | Feature | Carbon-Only Tools | Our Tool | Scientific Source |
 |---------|-------------------|----------|-------------------|
-| **Carbon Optimization** | ✅ 20% average | ✅ 45% integrated | MIT 2023 |
+| **Carbon Optimization** | ✅ 20% average | ⚠️ 45% estimated* | MIT 2023 |
 | **AWS Cost Integration** | ❌ None | ✅ Real Cost Explorer data | - |
 | **Regional Grid Data** | ❌ Generic averages | ✅ Real-time German data | - |
 | **Optimization Recommendations** | ❌ Reporting only | ✅ Proof-of-Concept + Scaling | - |
 | **Business Value** | ❌ Technical only | ✅ Management-ready | - |
 
 **Literature Basis**: MIT Carbon-Aware Computing Study 2023 documents 15-25% CO2 reduction through temporal shifting.
-**Verdict**: Carbon-only tools achieve proven 20% CO2 reduction but **no cost-benefit analysis for business decisions**.
+**Assessment**: Carbon-only tools achieve documented 20% CO2 reduction but typically lack integrated cost analysis.
 
 ### **3. AWS Cost Explorer (Baseline)**
 **AWS Native - Cost Analysis**
 
 | Feature | AWS Cost Explorer | Our Tool |
 |---------|-------------------|----------|
-| **Cost Accuracy** | ✅ Perfect (native) | ✅ Same data source |
+| **Cost Accuracy** | ✅ Native (AWS) | ✅ Same data source |
 | **Carbon Footprint** | ❌ None | ✅ Scientific calculation |
 | **German Grid Integration** | ❌ None | ✅ ElectricityMap real-time |
 | **Optimization Scenarios** | ❌ Basic recommendations | ✅ Multiple strategies analyzed |
 | **Business Case Generation** | ❌ None | ✅ ROI + ESG metrics |
 
-**Verdict**: Perfect cost data but **zero environmental consideration**.
+**Assessment**: Native cost data accuracy but no integrated environmental metrics.
 
 ---
 
-## 🎯 **Our Unique Value Proposition (Literature-Validated)**
+## 🎯 **Distinctive Approach (Literature-Informed)**
 
 ### **Novel Contributions:**
 
-1. **First Integrated Tool**: Only tool combining 35% cost + 45% carbon optimization
-2. **Literature-Based Advantages**: 40% better cost savings, 125% better carbon reduction vs. separate tools
+1. **Novel Integration Approach**: Theoretical exploration of combined cost + carbon optimization
+2. **Literature-Informed Modeling**: Explores potential advantages over separate cost/carbon tools
 3. **Scientific Methodology**: Conservative Proof-of-Concept approach with scaling scenarios
 4. **German Market Focus**: Real-time ElectricityMaps API (455g CO2/kWh current)
 5. **Academic Honesty**: ROI limitations transparently addressed with SME scaling projections
@@ -98,7 +100,7 @@ This analysis compares our **Carbon-Aware FinOps Dashboard** against existing to
 | Advantage | Impact |
 |-----------|--------|
 | **First Mover** | No direct competition in cost+carbon space |
-| **German Focus** | Localized data provides superior accuracy |
+| **German Focus** | Localized data approach for regional analysis |
 | **Scientific Foundation** | Academic rigor builds trust |
 | **Business Integration** | ROI calculator enables executive adoption |
 
@@ -120,7 +122,7 @@ This analysis compares our **Carbon-Aware FinOps Dashboard** against existing to
 
 ## 🏆 **Conclusion**
 
-Our Carbon-Aware FinOps Dashboard represents a **blue ocean opportunity** in the intersection of cost management and environmental optimization.
+Our Carbon-Aware FinOps Dashboard explores the intersection of cost management and environmental optimization as a research contribution.
 
 **Key Differentiators:**
 - ✅ **Only tool combining real cost + carbon data**
@@ -129,7 +131,7 @@ Our Carbon-Aware FinOps Dashboard represents a **blue ocean opportunity** in the
 - ✅ **Business-ready ROI calculations**
 
 **Academic Contribution:**
-This tool fills a significant **research gap** and provides a **practical implementation** that bridges the divide between financial and environmental cloud optimization.
+This research explores a potential gap in integrated financial and environmental cloud optimization methodologies.
 
 ---
 

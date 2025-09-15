@@ -28,7 +28,12 @@ help: ## 📋 Show deployment commands
 	@echo "  $(BLUE)make dashboard$(NC) - 📊 Launch dashboard"
 	@echo "  $(BLUE)make deploy$(NC)    - ☁️  Deploy AWS test instances"
 	@echo ""
-	@echo "$(BOLD)📊 Dashboard & Analysis:$(NC)"
+	@echo "$(BOLD)📊 Dashboard Development:$(NC)"
+	@echo "  $(BLUE)python run.py dev$(NC)  - Development mode (recommended)"
+	@echo "  $(BLUE)python run.py demo$(NC) - Bachelor Thesis presentation mode"
+	@echo "  $(BLUE)python status.py$(NC)   - Check dashboard health"
+	@echo ""
+	@echo "$(BOLD)📊 Dashboard & Analysis (Legacy):$(NC)"
 	@echo "  $(BLUE)make dashboard$(NC) - Launch analysis dashboard (Port $(DASHBOARD_PORT))"
 	@echo "  $(BLUE)make test$(NC)      - Test API integrations"
 	@echo ""  
@@ -39,6 +44,9 @@ help: ## 📋 Show deployment commands
 	@echo ""
 	@echo "$(BOLD)🔧 Utilities:$(NC)"
 	@echo "  $(BLUE)make clean$(NC)     - Clean temporary files"
+	@echo "  $(BLUE)make dev$(NC)       - Quick development start (python run.py dev)"
+	@echo "  $(BLUE)make demo$(NC)      - Demo mode for presentations"
+	@echo "  $(BLUE)make health$(NC)    - Check dashboard health"
 
 setup: ## 🔧 Setup environment
 	@echo "$(BOLD)$(GREEN)🔧 Setting up Carbon-Aware FinOps environment$(NC)"
@@ -66,10 +74,13 @@ setup: ## 🔧 Setup environment
 	@echo ""
 	@echo "$(BOLD)$(GREEN)🎉 Setup complete! Run 'make dashboard' to start$(NC)"
 
-dashboard: ## 📊 Launch Carbon-Aware FinOps Dashboard  
+dashboard: ## 📊 Launch Dashboard (Legacy - use 'python run.py' instead)
+	@echo "$(YELLOW)⚠️  Legacy Dashboard Launch$(NC)"
+	@echo "$(BLUE)Recommended: Use 'python run.py dev' for development$(NC)"
+	@echo ""
 	@echo "$(BOLD)$(GREEN)📊 Launching Carbon-Aware FinOps Dashboard$(NC)"
 	@echo "============================================="
-	@echo "$(BLUE)🎓 Bachelor Thesis Tool: First FinOps combining cost + carbon$(NC)"
+	@echo "$(BLUE)🎓 Bachelor Thesis Tool: Novel FinOps combining cost + carbon$(NC)"
 	@echo "$(BLUE)📊 Dashboard URL: http://127.0.0.1:$(DASHBOARD_PORT)$(NC)"
 	@echo "$(BLUE)🇩🇪 German Grid Focus: Real ElectricityMap API data$(NC)"
 	@echo "$(BLUE)🔬 APIs: ElectricityMap + Boavizta + AWS Cost Explorer$(NC)"
@@ -150,3 +161,28 @@ clean: ## 🧹 Clean temporary files
 	@find . -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
 	@rm -rf .pytest_cache/ build/ dist/ 2>/dev/null || true
 	@echo "$(GREEN)✅ Cleanup complete$(NC)"
+
+# New Hybrid Integration Targets
+dev: ## 🚀 Quick development start (recommended)
+	@echo "$(BOLD)$(GREEN)🚀 Starting Development Mode$(NC)"
+	@echo "=============================="
+	@echo "$(BLUE)Using Python run.py for fast development$(NC)"
+	@$(PYTHON) run.py dev
+
+demo: ## 🎓 Demo mode for Bachelor Thesis presentations
+	@echo "$(BOLD)$(GREEN)🎓 Starting Demo Mode$(NC)"
+	@echo "========================="
+	@echo "$(BLUE)Optimized for Bachelor Thesis presentations$(NC)"
+	@$(PYTHON) run.py demo
+
+health: ## 🏥 Check dashboard health status
+	@echo "$(BOLD)$(GREEN)🏥 Dashboard Health Check$(NC)"
+	@echo "=========================="
+	@$(PYTHON) status.py
+
+quick: ## ⚡ Super quick start (setup + dev)
+	@echo "$(BOLD)$(GREEN)⚡ Quick Start$(NC)"
+	@echo "==============="
+	@make setup
+	@echo ""
+	@make dev

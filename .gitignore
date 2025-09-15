@@ -218,3 +218,4 @@ htmlcov/
 
 # Keep VS Code config but ignore user-specific settings
 # .vscode/ - We want to keep the project VS Code settings
+.config/

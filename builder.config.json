@@ -1,6 +1,6 @@
 {
-  "command": "",
-  "serverUrl": "http://127.0.0.1:8051",
+  "command": "python run.py dev",
+  "serverUrl": "http://127.0.0.1:8050",
   "authenticateProxy": false,
   "commitMode": "commits"
 }

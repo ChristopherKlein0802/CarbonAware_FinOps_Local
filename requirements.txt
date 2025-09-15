@@ -27,3 +27,9 @@ typing-extensions>=4.8.0
 
 # Monitoring and Logging (lightweight)
 structlog>=23.2.0
+
+# Testing Dependencies (Development)
+pytest>=7.4.0
+pytest-cov>=4.1.0
+pytest-mock>=3.11.0
+coverage>=7.3.0

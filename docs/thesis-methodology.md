@@ -16,7 +16,7 @@
 ```yaml
 Primary APIs:
 - ElectricityMaps API: Real-time German grid intensity (±5% accuracy claimed)
-- AWS Cost Explorer: Official billing data (100% accuracy for deployed resources)
+- AWS Cost Explorer: Official billing data (precision undocumented by AWS)
 - Boavizta API: Scientific hardware power data (±10% industry standard)
 
 Validation Approach:
@@ -191,4 +191,4 @@ Sustainability & ESG: 3-5 papers
 
 ---
 
-**This methodology framework ensures academic rigor while maintaining the innovative contribution of your Carbon-aware FinOps tool.** 🎓✨
+**This methodology framework ensures academic rigor for your Carbon-aware FinOps research approach.** 🎓
