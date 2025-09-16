@@ -31,8 +31,8 @@ class EC2Instance:
     monthly_co2_kg: Optional[float] = None
     monthly_cost_usd: Optional[float] = None
     monthly_cost_eur: Optional[float] = None
-    confidence_level: str = "medium"
-    data_sources: List[str] = None
+    confidence_level: str = "medium"  # "very_high" (CloudTrail), "high" (API), "medium" (estimates), "low" (fallback)
+    data_sources: List[str] = None  # Enhanced: includes "cloudtrail_audit" for precision tracking
     last_updated: Optional[datetime] = None
 
     def __post_init__(self):

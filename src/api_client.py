@@ -15,6 +15,8 @@ from typing import Optional, Dict, List
 import logging
 from dataclasses import dataclass
 from dotenv import load_dotenv
+from cache_utils import is_cache_valid, get_standard_cache_path, ensure_cache_dir, CacheTTL
+from error_utils import handle_api_requests, handle_cache_operations, handle_aws_operations, ErrorMessages
 
 # Load environment variables
 load_dotenv()
@@ -119,13 +121,6 @@ class UnifiedAPIClient:
                 f.write("api_data/\n")
                 f.write("*.json\n")
 
-    def _is_cache_valid(self, cache_path: str, max_age_minutes: int) -> bool:
-        """Check if cache file is still valid"""
-        if not os.path.exists(cache_path):
-            return False
-
-        file_age = datetime.now().timestamp() - os.path.getmtime(cache_path)
-        return file_age < (max_age_minutes * 60)
 
     def get_current_carbon_intensity(self, region: str = "eu-central-1") -> Optional[CarbonIntensity]:
         """Get current carbon intensity from ElectricityMap with optimized 2-hour caching
@@ -133,10 +128,11 @@ class UnifiedAPIClient:
         Scientific rationale: ElectricityMap updates every 15-60 minutes.
         2-hour cache reduces API costs while maintaining reasonable accuracy.
         """
-        cache_path = os.path.join(self.cache_dir, f"carbon_intensity_{region}.json")
+        cache_path = get_standard_cache_path("carbon_intensity", region)
+        ensure_cache_dir(cache_path)
 
         # Check cache first (2 hours - optimized for cost vs accuracy)
-        if self._is_cache_valid(cache_path, 120):
+        if is_cache_valid(cache_path, CacheTTL.CARBON_DATA * 4):
             try:
                 with open(cache_path, "r") as f:
                     cached_data = json.load(f)
@@ -147,8 +143,10 @@ class UnifiedAPIClient:
                     region=cached_data["region"],
                     source=cached_data["source"]
                 )
-            except Exception as e:
-                logger.warning(f"⚠️ Carbon cache read failed: {e}")
+            except (FileNotFoundError, PermissionError, OSError):
+                pass  # Cache miss - use fresh API call
+            except (ValueError, TypeError) as e:
+                logger.warning(f"📄 Carbon cache corrupted: {e} - using fresh API call")
 
         # Fetch fresh data from ElectricityMap API
         api_key = os.getenv("ELECTRICITYMAP_API_KEY")
@@ -193,14 +191,28 @@ class UnifiedAPIClient:
                 with open(cache_path, "w") as f:
                     json.dump(cache_data, f)
                 logger.info(f"✅ Carbon intensity: {carbon_data.value}g CO2/kWh (cached 30min)")
-            except Exception as e:
-                logger.warning(f"⚠️ Failed to cache carbon data: {e}")
+            except (PermissionError, OSError):
+                pass  # Cache write failed - data still available
 
             return carbon_data
 
-        except Exception as e:
-            logger.error(f"❌ ElectricityMap API failed: {e} - NO FALLBACK used")
-            return None
+        except requests.exceptions.Timeout:
+            logger.error(f"⏱️ ElectricityMap API timeout - check network connection")
+            return self._graceful_degradation_carbon(region, "API timeout")
+        except requests.exceptions.ConnectionError:
+            logger.error(f"🔌 ElectricityMap API connection failed - check internet connectivity")
+            return self._graceful_degradation_carbon(region, "Connection error")
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 401:
+                logger.error(f"🔐 ElectricityMap API authentication failed - check API key")
+            elif e.response.status_code == 429:
+                logger.warning(f"🚦 ElectricityMap API rate limited - reduce request frequency")
+            else:
+                logger.error(f"❌ ElectricityMap API HTTP error: {e.response.status_code}")
+            return self._graceful_degradation_carbon(region, f"HTTP {e.response.status_code}")
+        except requests.exceptions.RequestException as e:
+            logger.error(f"❌ ElectricityMap API request failed: {type(e).__name__}: {e}")
+            return self._graceful_degradation_carbon(region, str(e))
 
     def get_carbon_intensity_24h(self, region: str = "eu-central-1") -> Optional[List[Dict]]:
         """Get 24-hour historical carbon intensity from ElectricityMap with daily caching
@@ -212,10 +224,11 @@ class UnifiedAPIClient:
         """
         # Use date-based cache key since historical data doesn't change
         today = datetime.now().strftime("%Y-%m-%d")
-        cache_path = os.path.join(self.cache_dir, f"carbon_intensity_24h_{region}_{today}.json")
+        cache_path = get_standard_cache_path("carbon_intensity_24h", f"{region}_{today}")
+        ensure_cache_dir(cache_path)
 
         # Check cache first (24 hours - historical data doesn't change)
-        if self._is_cache_valid(cache_path, 1440):  # 24 hours in minutes
+        if is_cache_valid(cache_path, CacheTTL.CARBON_24H):
             try:
                 with open(cache_path, "r") as f:
                     cached_data = json.load(f)
@@ -333,7 +346,7 @@ class UnifiedAPIClient:
         Scientific approach: Collect real API data every hour to build our own 24h dataset
         This maintains academic integrity - all data points are real ElectricityMaps data
         """
-        collection_file = os.path.join(self.cache_dir, f"hourly_collection_{region}.json")
+        collection_file = get_standard_cache_path("hourly_collection", region)
 
         # Get current carbon data and store it
         self._store_hourly_carbon_data(region, collection_file)
@@ -394,6 +407,42 @@ class UnifiedAPIClient:
         except Exception as e:
             logger.warning(f"⚠️ Failed to store hourly carbon data: {e}")
 
+    def _graceful_degradation_carbon(self, region: str, error_msg: str) -> Optional[CarbonIntensity]:
+        """Enhanced error recovery with cached fallback and regional averages
+
+        Academic approach: Try cached data, then European grid average as last resort
+        Maintains scientific transparency by logging all fallback decisions
+        """
+        # Try most recent cache (even if expired)
+        cache_path = get_standard_cache_path("carbon_intensity", region)
+        if os.path.exists(cache_path):
+            try:
+                with open(cache_path, "r") as f:
+                    cached_data = json.load(f)
+                age_hours = (datetime.now().timestamp() - os.path.getmtime(cache_path)) / 3600
+                logger.warning(f"⚠️ Using expired cache ({age_hours:.1f}h old) due to API failure: {error_msg}")
+                return CarbonIntensity(
+                    value=cached_data["value"],
+                    timestamp=parse_iso_datetime(cached_data["timestamp"]),
+                    region=cached_data["region"],
+                    source=f"expired_cache_{cached_data['source']}"
+                )
+            except Exception as cache_error:
+                logger.warning(f"⚠️ Cache fallback also failed: {cache_error}")
+
+        # Final fallback: European grid average (conservative estimate)
+        if "Token has expired" in error_msg or "InvalidGrantException" in error_msg:
+            logger.error("💡 API authentication failed - check credentials")
+
+        # Conservative European average with clear academic disclaimer
+        logger.warning("⚠️ Using conservative EU grid average (350g CO₂/kWh) - academic transparency maintained")
+        return CarbonIntensity(
+            value=350.0,  # Conservative EU average
+            timestamp=datetime.now(),
+            region=region,
+            source="conservative_eu_average_fallback"
+        )
+
     def _read_collected_hourly_data(self, collection_file: str) -> Optional[List[Dict]]:
         """Read and process collected hourly data for 24h visualization"""
         try:
@@ -433,10 +482,11 @@ class UnifiedAPIClient:
             logger.error("❌ Invalid instance_type")
             return None
 
-        cache_path = os.path.join(self.cache_dir, f"boavizta_power_{instance_type}.json")
+        cache_path = get_standard_cache_path("boavizta_power", instance_type)
+        ensure_cache_dir(cache_path)
 
         # Check cache first (7 days - hardware specs don't change)
-        if self._is_cache_valid(cache_path, 7 * 24 * 60):
+        if is_cache_valid(cache_path, CacheTTL.POWER_DATA):
             try:
                 with open(cache_path, "r") as f:
                     cached_data = json.load(f)
@@ -503,31 +553,46 @@ class UnifiedAPIClient:
                     with open(cache_path, "w") as f:
                         json.dump(cache_data, f)
                     logger.info(f"✅ Power: {instance_type} = {avg_power:.1f}W (cached 24h)")
-                except Exception as e:
-                    logger.warning(f"⚠️ Failed to cache power data: {e}")
+                except (PermissionError, OSError):
+                    pass  # Cache write failed - data still available
 
                 return power_data
             else:
                 logger.error(f"❌ Boavizta API: missing power data for {instance_type}")
                 return None
 
-        except Exception as e:
-            logger.error(f"❌ Boavizta API failed for {instance_type}: {e} - NO FALLBACK used")
+        except requests.exceptions.Timeout:
+            logger.error(f"⏱️ Boavizta API timeout for {instance_type} - check network connection")
+            return None
+        except requests.exceptions.ConnectionError:
+            logger.error(f"🔌 Boavizta API connection failed for {instance_type} - check internet connectivity")
+            return None
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code >= 500:
+                logger.error(f"🏥 Boavizta API server error ({e.response.status_code}) for {instance_type} - try again later")
+            else:
+                logger.error(f"❌ Boavizta API HTTP error: {e.response.status_code} for {instance_type}")
+            return None
+        except requests.exceptions.RequestException as e:
+            logger.error(f"❌ Boavizta API request failed for {instance_type}: {type(e).__name__}: {e}")
             return None
 
     def get_instance_pricing(self, instance_type: str, region: str = "eu-central-1") -> Optional[float]:
         """Get AWS EC2 instance pricing from AWS Pricing API with 7-day caching"""
-        cache_path = os.path.join(self.cache_dir, f"pricing_{instance_type}_{region}.json")
+        cache_path = get_standard_cache_path("pricing", f"{instance_type}_{region}")
+        ensure_cache_dir(cache_path)
 
         # Check cache first (7 days - AWS pricing changes rarely)
-        if self._is_cache_valid(cache_path, 7 * 24 * 60):
+        if is_cache_valid(cache_path, CacheTTL.PRICING_DATA):
             try:
                 with open(cache_path, "r") as f:
                     cached_data = json.load(f)
                 logger.info(f"✅ Using cached pricing for {instance_type}")
                 return cached_data["hourly_price_usd"]
-            except Exception as e:
-                logger.warning(f"⚠️ Pricing cache read failed: {e}")
+            except (FileNotFoundError, PermissionError, OSError):
+                pass  # Cache miss - use fresh API call
+            except (ValueError, TypeError) as e:
+                logger.warning(f"📄 Pricing cache corrupted: {e} - using fresh API call")
 
         # Fetch fresh pricing from AWS Pricing API
         try:
@@ -583,24 +648,39 @@ class UnifiedAPIClient:
                             with open(cache_path, "w") as f:
                                 json.dump(cache_data, f)
                             logger.info(f"✅ Pricing: {instance_type} = ${hourly_price:.4f}/hour (cached 24h)")
-                        except Exception as e:
-                            logger.warning(f"⚠️ Failed to cache pricing data: {e}")
+                        except (PermissionError, OSError):
+                            pass  # Cache write failed - data still available
 
                         return hourly_price
 
             logger.error(f"❌ Could not parse pricing data for {instance_type}")
             return None
 
+        except boto3.session.Session.client('pricing').exceptions.ClientError as e:
+            error_code = e.response['Error']['Code']
+            if error_code == 'InvalidGrantException':
+                logger.error("🔄 AWS SSO session expired for Pricing API - re-authenticate required")
+                logger.info("💡 Fix: aws sso login")
+            elif error_code == 'AccessDenied':
+                logger.error(f"🚫 AWS access denied for Pricing API - check permissions")
+            else:
+                logger.error(f"❌ AWS Pricing API error: {error_code} for {instance_type}")
+            return None
         except Exception as e:
-            logger.error(f"❌ AWS Pricing API failed for {instance_type}: {e} - NO FALLBACK used")
+            if "Token has expired" in str(e) or "InvalidGrantException" in str(e):
+                logger.error("🔄 AWS SSO token expired for Pricing API - run 'aws sso login'")
+                logger.info("💡 Fix: aws sso login --profile carbon-finops-sandbox")
+            else:
+                logger.error(f"❌ AWS Pricing API failed for {instance_type}: {type(e).__name__}: {e}")
             return None
 
     def get_monthly_costs(self) -> Optional[AWSCostData]:
         """Get monthly AWS costs for validation with 6-hour caching"""
-        cache_path = os.path.join(self.cache_dir, "cost_data.json")
+        cache_path = get_standard_cache_path("cost_data", "monthly")
+        ensure_cache_dir(cache_path)
 
         # Check cache first (6 hours - AWS Cost Explorer updates daily)
-        if self._is_cache_valid(cache_path, 6 * 60):
+        if is_cache_valid(cache_path, CacheTTL.COST_DATA):
             try:
                 with open(cache_path, "r") as f:
                     cached_data = json.load(f)
