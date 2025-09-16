@@ -127,7 +127,7 @@ class DataProcessor:
 
             # Enhanced validation: Compare calculated costs with actual AWS spending
             # Pass original instance data for runtime analysis
-            validation_factor = self._validate_cost_calculations_enhanced(processed_instances, total_cost_eur, cost_data, instances)
+            validation_factor = self._calculate_theoretical_accuracy_enhanced(processed_instances, total_cost_eur, cost_data, instances)
 
             # Calculate business case with validation factor awareness
             business_case = self._calculate_business_case(total_cost_eur, total_co2_kg, validation_factor)
@@ -228,6 +228,9 @@ class DataProcessor:
 
         except Exception as e:
             logger.error(f"❌ Failed to get AWS instances: {e}")
+            # Check if it's an SSO token issue
+            if "Token has expired and refresh failed" in str(e) or "InvalidGrantException" in str(e):
+                logger.warning("💡 AWS SSO token expired. Please re-authenticate with 'aws sso login'")
             return []
 
 
@@ -402,9 +405,12 @@ class DataProcessor:
 
         except Exception as e:
             logger.warning(f"⚠️ CloudWatch CPU query failed for {instance_id}: {e}")
+            # Check if it's an SSO token issue
+            if "Token has expired and refresh failed" in str(e) or "InvalidGrantException" in str(e):
+                logger.warning("💡 AWS SSO token expired for CloudWatch. Please re-authenticate with 'aws sso login'")
             return 30.0  # Conservative default
 
-    def _validate_cost_calculations(self, calculated_cost_eur: float, cost_data) -> float:
+    def _calculate_theoretical_accuracy_factor(self, calculated_cost_eur: float, cost_data) -> float:
         """
         Hybrid validation: Compare calculated costs with actual AWS Cost Explorer data
 
@@ -439,7 +445,7 @@ class DataProcessor:
 
         return validation_factor
 
-    def _validate_cost_calculations_enhanced(self, instances: List, calculated_cost_eur: float, cost_data, original_instances: List = None) -> float:
+    def _calculate_theoretical_accuracy_enhanced(self, instances: List, calculated_cost_eur: float, cost_data, original_instances: List = None) -> float:
         """
         Enhanced validation with state-awareness and runtime factors
 

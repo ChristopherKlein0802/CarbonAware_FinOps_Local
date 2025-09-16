@@ -239,28 +239,57 @@ class UnifiedAPIClient:
 
         try:
             logger.info(f"🌿 Fetching 24h carbon history for {zone}")
+
+            # Debug log the full request
+            request_params = {
+                "zone": zone,
+                "start": start_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "end": end_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "granularity": "hourly"
+            }
+            logger.info(f"📊 API Request params: {request_params}")
+
             response = requests.get(
                 "https://api-access.electricitymaps.com/v3/carbon-intensity/past-range",
                 headers=headers,
-                params={
-                    "zone": zone,
-                    "start": start_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                    "end": end_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                    "granularity": "hourly"
-                },
+                params=request_params,
                 timeout=30
             )
+
+            # Log response status before raising
+            logger.info(f"📊 API Response status: {response.status_code}")
+
             response.raise_for_status()
 
             data = response.json()
 
-            if "history" not in data or not isinstance(data["history"], list):
-                logger.error(f"❌ ElectricityMap 24h API returned invalid data structure")
+            # Debug: Check what structure we actually get
+            logger.info(f"📊 ElectricityMap 24h API response keys: {list(data.keys())}")
+
+            # Show the actual error message for debugging
+            if "error" in data and "message" in data:
+                logger.info(f"📊 Full API error response: {data}")
+
+            # Check for API error responses first
+            if "error" in data and "message" in data:
+                logger.error(f"❌ ElectricityMap 24h API error: {data['error']} - {data['message']}")
+                logger.info("💡 Possible fixes: Check API key permissions, zone parameter, or time range")
+                return None
+
+            # Check for different possible response structures
+            if "history" in data and isinstance(data["history"], list):
+                history_data = data["history"]
+            elif "data" in data and isinstance(data["data"], list):
+                history_data = data["data"]
+            elif isinstance(data, list):
+                history_data = data
+            else:
+                logger.error(f"❌ ElectricityMap 24h API returned invalid data structure. Keys: {list(data.keys())}")
                 return None
 
             # Process and validate the historical data
             processed_history = []
-            for entry in data["history"]:
+            for entry in history_data:
                 if "carbonIntensity" in entry and "datetime" in entry:
                     processed_history.append({
                         "carbonIntensity": float(entry["carbonIntensity"]),
@@ -291,6 +320,111 @@ class UnifiedAPIClient:
 
         except requests.exceptions.RequestException as e:
             logger.error(f"❌ ElectricityMap 24h API failed: {e} - NO FALLBACK used")
+            return None
+
+        except Exception as e:
+            logger.error(f"❌ ElectricityMap 24h API processing failed: {e} - NO FALLBACK used")
+            return None
+
+    def get_self_collected_24h_data(self, region: str = "eu-central-1") -> Optional[List[Dict]]:
+        """
+        Get 24h carbon data from our own hourly collection system
+
+        Scientific approach: Collect real API data every hour to build our own 24h dataset
+        This maintains academic integrity - all data points are real ElectricityMaps data
+        """
+        collection_file = os.path.join(self.cache_dir, f"hourly_collection_{region}.json")
+
+        # Get current carbon data and store it
+        self._store_hourly_carbon_data(region, collection_file)
+
+        # Read and return available collected data
+        return self._read_collected_hourly_data(collection_file)
+
+    def _store_hourly_carbon_data(self, region: str, collection_file: str):
+        """Store current carbon data with timestamp for hourly collection"""
+        try:
+            current_data = self.get_current_carbon_intensity(region)
+            if not current_data:
+                return
+
+            current_hour = datetime.now().replace(minute=0, second=0, microsecond=0)
+
+            # Load existing data
+            collected_data = []
+            if os.path.exists(collection_file):
+                with open(collection_file, 'r') as f:
+                    try:
+                        collected_data = json.load(f)
+                    except json.JSONDecodeError:
+                        collected_data = []
+
+            # Check if we already have data for this hour
+            hour_key = current_hour.isoformat()
+            existing_entry = next((entry for entry in collected_data if entry.get('hour_key') == hour_key), None)
+
+            if not existing_entry:
+                # Add new hourly data point
+                new_entry = {
+                    'hour_key': hour_key,
+                    'carbonIntensity': current_data.value,
+                    'datetime': current_data.timestamp.isoformat(),
+                    'hour': current_hour.hour,
+                    'collected_at': datetime.now().isoformat(),
+                    'source': 'electricitymap_hourly_collection'
+                }
+                collected_data.append(new_entry)
+
+                # Keep only last 48 hours of data (for 24h + 24h buffer)
+                cutoff_time = datetime.now() - timedelta(hours=48)
+                collected_data = [
+                    entry for entry in collected_data
+                    if datetime.fromisoformat(entry['hour_key'].replace('Z', '')) > cutoff_time
+                ]
+
+                # Sort by hour_key
+                collected_data.sort(key=lambda x: x['hour_key'])
+
+                # Save updated data
+                with open(collection_file, 'w') as f:
+                    json.dump(collected_data, f, indent=2)
+
+                logger.info(f"📊 Stored hourly carbon data: {current_data.value}g CO₂/kWh for {current_hour.strftime('%H:00')}")
+
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to store hourly carbon data: {e}")
+
+    def _read_collected_hourly_data(self, collection_file: str) -> Optional[List[Dict]]:
+        """Read and process collected hourly data for 24h visualization"""
+        try:
+            if not os.path.exists(collection_file):
+                logger.info("📊 No hourly collection data yet - building dataset over time")
+                return None
+
+            with open(collection_file, 'r') as f:
+                collected_data = json.load(f)
+
+            if not collected_data:
+                return None
+
+            # Filter for last 24 hours
+            now = datetime.now()
+            cutoff_time = now - timedelta(hours=24)
+
+            recent_data = [
+                entry for entry in collected_data
+                if datetime.fromisoformat(entry['hour_key'].replace('Z', '')) > cutoff_time
+            ]
+
+            if len(recent_data) >= 6:  # At least 6 hours of data to show meaningful trend
+                logger.info(f"📊 Retrieved {len(recent_data)} hours of self-collected carbon data")
+                return recent_data
+            else:
+                logger.info(f"📊 Only {len(recent_data)} hours collected so far - need more time to build 24h dataset")
+                return None
+
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to read collected hourly data: {e}")
             return None
 
     def get_power_consumption(self, instance_type: str) -> Optional[PowerConsumption]:
@@ -543,6 +677,9 @@ class UnifiedAPIClient:
 
         except Exception as e:
             logger.error(f"❌ AWS Cost Explorer failed: {e} - NO FALLBACK used")
+            # Check if it's an SSO token issue
+            if "Token has expired and refresh failed" in str(e) or "InvalidGrantException" in str(e):
+                logger.warning("💡 AWS SSO token expired for Cost Explorer. Please re-authenticate with 'aws sso login'")
             return None
 
 # Global instance

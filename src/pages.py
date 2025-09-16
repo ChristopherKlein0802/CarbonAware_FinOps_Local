@@ -82,7 +82,8 @@ def render_overview_page(dashboard_data):
 
     # SME Scenario Calculator
     st.markdown("### 🏢 SME Scenario Calculator")
-    st.markdown("**Scale our validated methodology to your business size:**")
+    st.markdown("**Scale our preliminary methodology to your business size:**")
+    st.markdown("*⚠️ Academic Note: Extrapolation requires empirical validation*")
 
     col1, col2 = st.columns([2, 3])
 
@@ -101,15 +102,15 @@ def render_overview_page(dashboard_data):
         scenario_buttons = st.columns(3)
 
         with scenario_buttons[0]:
-            if st.button("Small SME\n(20 instances)", use_container_width=True):
+            if st.button("Small SME\n(20 instances)", width='stretch'):
                 instance_count = 20
 
         with scenario_buttons[1]:
-            if st.button("Medium SME\n(50 instances)", use_container_width=True):
+            if st.button("Medium SME\n(50 instances)", width='stretch'):
                 instance_count = 50
 
         with scenario_buttons[2]:
-            if st.button("Large SME\n(100 instances)", use_container_width=True):
+            if st.button("Large SME\n(100 instances)", width='stretch'):
                 instance_count = 100
 
     with col2:
@@ -140,7 +141,9 @@ def render_overview_page(dashboard_data):
         | 📈 **Annual Savings** | - | €{integrated_savings * 12:.0f}/year | - |
         | ⏱️ **ROI Payback** | - | {payback_months:.0f} months | - |
 
-        💡 **Methodology:** Extrapolated from validated {total_instances}-instance baseline with documented uncertainty ranges (±15%)
+        💡 **Methodology:** Theoretical extrapolation from {total_instances}-instance baseline with documented uncertainty ranges (±15%)
+
+        ⚠️ **Academic Disclaimer:** All projections require empirical validation at target scale
         """)
 
     # Current vs Optimized Comparison Chart
@@ -169,7 +172,7 @@ def render_overview_page(dashboard_data):
             height=400
         )
 
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
 
         business_col1, business_col2 = st.columns(2)
 
@@ -331,9 +334,13 @@ def render_carbon_page(dashboard_data):
     st.markdown("### 📊 German Grid 24h Carbon Intensity Pattern")
     st.markdown("*Real historical data from ElectricityMaps API (past 24 hours)*")
 
-    # Fetch real 24h historical data
+    # Try official 24h API first, fallback to our self-collected data
     unified_api_client = UnifiedAPIClient()
     historical_data = unified_api_client.get_carbon_intensity_24h("eu-central-1")
+
+    # If official API fails, use our self-collected hourly data
+    if not historical_data:
+        historical_data = unified_api_client.get_self_collected_24h_data("eu-central-1")
 
     current_hour = datetime.now().hour
 
@@ -365,11 +372,17 @@ def render_carbon_page(dashboard_data):
                 else:
                     grid_pattern.append(current_intensity)
 
-        st.success(f"✅ Using real ElectricityMaps data ({len(historical_data)} API data points)")
+        # Determine data source for transparency
+        data_source = historical_data[0].get('source', 'unknown')
+        if 'hourly_collection' in data_source:
+            st.success(f"✅ Using self-collected real ElectricityMaps data ({len(historical_data)} hourly data points)")
+            st.info("🔬 **Academic Note**: Data collected hourly from ElectricityMaps API to build our own 24h dataset")
+        else:
+            st.success(f"✅ Using official ElectricityMaps 24h API data ({len(historical_data)} data points)")
     else:
         # Fallback: Show clear disclaimer about data unavailability
-        st.warning("⚠️ Real-time 24h data temporarily unavailable from ElectricityMaps API")
-        st.info("📊 **Scientific Note**: Dashboard maintains NO-FALLBACK policy - no simulated data shown when API unavailable")
+        st.warning("⚠️ 24h data not yet available - building dataset over time")
+        st.info("📊 **Scientific Note**: Self-collecting hourly data from ElectricityMaps API to build our own 24h dataset. Check back in a few hours!")
 
         # Create minimal chart with only current data point
         hours = [current_hour]
@@ -555,6 +568,7 @@ def render_carbon_page(dashboard_data):
         st.subheader("📊 Current Grid Status")
 
         if dashboard_data.carbon_intensity:
+            carbon_intensity = dashboard_data.carbon_intensity.value
             grid_status = "Low" if carbon_intensity < 300 else "Medium" if carbon_intensity < 500 else "High"
             st.write(f"""
             **Real-time Grid Data:**
@@ -648,14 +662,16 @@ def render_research_methods_page(dashboard_data):
     st.dataframe(competitive_data, width='stretch')
 
 def render_competitive_analysis_page(dashboard_data):
-    """Competitive analysis and integration advantage demonstration"""
-    st.header("🔄 Competitive Analysis & Integration Advantage")
+    """Theoretical competitive analysis for academic research"""
+    st.header("🔄 Theoretical Competitive Analysis")
 
-    # Hero section - Our unique value proposition
+    # Hero section - Research positioning
     st.markdown("""
-    ### 🎯 Our Unique Value Proposition
+    ### 🎯 Academic Research Positioning
 
-    **First integrated Carbon-Aware FinOps tool with real-time German grid data**
+    **Prototype exploring integrated Carbon-Aware FinOps approach with real-time German grid data**
+
+    ⚠️ **Academic Disclaimer:** Competitive analysis based on public documentation review - not validated market research
     """)
 
     # Tool comparison matrix
@@ -709,11 +725,12 @@ def render_competitive_analysis_page(dashboard_data):
     }
 
     comparison_df = pd.DataFrame(comparison_data)
-    st.dataframe(comparison_df, use_container_width=True, height=400)
+    st.dataframe(comparison_df, width='stretch', height=400)
 
     # Integration advantage demonstration
     if dashboard_data and dashboard_data.instances:
-        st.markdown("### 📈 Quantified Integration Advantage")
+        st.markdown("### 📈 Theoretical Integration Scenarios")
+        st.markdown("*⚠️ Academic Note: Scenarios based on literature estimates - require empirical validation*")
 
         total_cost = dashboard_data.total_cost_eur
 
@@ -760,14 +777,24 @@ def render_competitive_analysis_page(dashboard_data):
                 advantage_vs_single = 999
 
             st.markdown(f"""
-            ### 🏆 **Integration Advantage Summary**
+            ### 🏆 **Theoretical Scenario Results**
 
-            **Our approach provides:**
-            - **{advantage_vs_separate:.0f}% better ROI** vs separate tools
-            - **{advantage_vs_single:.0f}% better ROI** vs single tool
-            - **90% faster implementation** (3 days vs weeks)
-            - **95% lower tool costs** (€20 vs €200+ monthly)
+            **Integrated approach theoretical benefits:**
+            - **{advantage_vs_separate:.0f}% projected ROI improvement** vs separate tools scenario
+            - **{advantage_vs_single:.0f}% projected ROI improvement** vs single tool scenario
+            - **Estimated 90% faster implementation** (3 days vs weeks - assumption)
+            - **95% lower API costs** (€20 vs €200+ monthly - estimated)
+
+            ⚠️ **Academic Note:** All percentages are theoretical projections requiring validation
             """)
+
+    st.markdown("### 📊 **Literature-Based Assumptions**")
+    st.markdown("""
+    - **25% optimization potential**: Based on industry reports (McKinsey, 2024)
+    - **20% carbon reduction**: Green Software Foundation guidelines
+    - **Cost factors**: Public pricing from tool websites
+    - **Implementation time**: Estimated from documentation complexity
+    """)
 
     # SME market positioning
     st.markdown("### 🏢 SME Market Positioning")

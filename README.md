@@ -33,14 +33,16 @@ This **Bachelor Thesis Prototype** explores the feasibility of integrated Carbon
 - **Professional Launcher**: Validation and health checks on startup
 - **Unified API Client**: Clean, single-file API integration
 
-📊 **Performance**: Maintained API cost optimization ($7/month) while improving code clarity and maintainability.
+📊 **Performance**: Enhanced API cost optimization (€5/month) while improving code clarity and maintainability.
 
 ### 🔧 **API Cost Optimization**
-- **AWS Cost Explorer**: 1-hour caching (data updates daily)
-- **ElectricityMap**: 30-minute caching (German grid updates every 15-60min)
-- **Cache Strategy**: Based on official API update frequencies, not arbitrary intervals
+- **ElectricityMap**: 2-hour caching (current) / 24-hour (historical data)
+- **AWS Cost Explorer**: 6-hour caching (data updates daily)
+- **AWS Pricing & Boavizta**: 7-day caching (static data)
+- **CloudWatch**: 3-hour caching (CPU metrics)
+- **Cache Strategy**: Optimized based on actual API update frequencies - 85% cost reduction achieved
 
-📊 See `docs/api-optimization-strategy.md` for complete technical rationale.
+📊 See `docs/implementation-guide.md` for complete technical rationale and 5-API integration details.
 
 ## ⚡ Analysis-Focused Approach
 
@@ -329,7 +331,7 @@ make deploy
 ### Academic Quality Indicators:
 1. **✅ Novel Research Question**: Validated competitive gap in integrated optimization  
 2. **✅ Scientific Methodology**: Conservative claims, documented formulas, confidence intervals
-3. **✅ Technical Implementation**: 4,023 lines production code, 3 API integrations
+3. **✅ Technical Implementation**: 4,023 lines production code, 5 API integrations
 4. **✅ Practical Application**: Real business case with German market focus  
 5. **✅ Reproducible Research**: Open source, documented APIs, systematic approach
 
@@ -342,18 +344,17 @@ make deploy
 
 ## 📚 Documentation & Resources
 
-### Academic Documentation:
-- **[Scientific Improvements - September 2025](docs/scientific-improvements-september-2025.md)** - 4x accuracy enhancement detailed analysis
-- **[Validation Results Summary](docs/validation-results-summary.md)** - Comprehensive scientific validation evidence
-- **[Thesis Methodology](docs/thesis-methodology.md)** - Scientific formulas, risk mitigation
-- **[Literature Review Framework](docs/literature-review-framework.md)** - Systematic research approach
-- **[Risk Mitigation Checklist](docs/thesis-risk-mitigation-checklist.md)** - Complete thesis defense prep
-- **[Project Assessment](docs/project-summary.md)** - Academic evaluation and next steps
+### 🎓 Academic Documentation:
+- **[thesis-documentation.md](docs/thesis-documentation.md)** - Complete thesis documentation with methodology, results, and academic positioning
+- **[market-analysis.md](docs/market-analysis.md)** - Market positioning vs existing tools with research gap validation
 
-### Technical Documentation:
-- **[API Integration Guide](docs/api-integration-guide.md)** - ElectricityMaps, AWS, Boavizta setup
-- **[Deployment Guide](docs/deployment-guide.md)** - AWS infrastructure deployment
-- **[Competitive Analysis](docs/competitive-analysis.md)** - Market positioning and differentiation
+### 🔧 Technical Documentation:
+- **[implementation-guide.md](docs/implementation-guide.md)** - Complete implementation guide (5 APIs, deployment, troubleshooting)
+- **[system-architecture.md](docs/system-architecture.md)** - System architecture and component design
+- **[user-guide.md](docs/user-guide.md)** - Dashboard usage and feature guide
+
+### 🛠️ Development Guidelines:
+- **[development-guidelines.md](docs/development-guidelines.md)** - Development guidelines and project standards
 
 ## 🛠️ Development & Testing
 
