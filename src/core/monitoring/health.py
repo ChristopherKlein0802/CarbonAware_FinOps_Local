@@ -8,11 +8,12 @@ No overengineering - focused on Bachelor thesis needs
 
 import logging
 import time
+import requests
 from datetime import datetime
 from typing import Dict, Any
 
-from api_client import unified_api_client
-from models import APIHealthStatus
+from ...api.client import unified_api_client
+from ...models.dashboard import APIHealthStatus
 
 logger = logging.getLogger(__name__)
 
@@ -83,15 +84,26 @@ class HealthMonitor:
                     healthy=False
                 )
 
-        except Exception as e:
+        except (ConnectionError, TimeoutError, requests.exceptions.RequestException) as e:
             response_time = (time.time() - start_time) * 1000
-            logger.error(f"❌ ElectricityMap API: {e}")
+            logger.error(f"❌ ElectricityMap API network error: {e}")
             return APIHealthStatus(
                 service="ElectricityMap API",
                 status="error",
                 response_time_ms=round(response_time, 2),
                 last_check=datetime.now(),
-                error_message=str(e),
+                error_message=f"Network error: {str(e)}",
+                healthy=False
+            )
+        except (RuntimeError, ValueError, TypeError) as e:
+            response_time = (time.time() - start_time) * 1000
+            logger.error(f"❌ ElectricityMap API runtime/validation error: {e}")
+            return APIHealthStatus(
+                service="ElectricityMap API",
+                status="error",
+                response_time_ms=round(response_time, 2),
+                last_check=datetime.now(),
+                error_message=f"Unexpected error: {str(e)}",
                 healthy=False
             )
 
@@ -124,15 +136,26 @@ class HealthMonitor:
                     healthy=False
                 )
 
-        except Exception as e:
+        except (ConnectionError, TimeoutError, requests.exceptions.RequestException) as e:
             response_time = (time.time() - start_time) * 1000
-            logger.error(f"❌ Boavizta API: {e}")
+            logger.error(f"❌ Boavizta API network error: {e}")
             return APIHealthStatus(
                 service="Boavizta API",
                 status="error",
                 response_time_ms=round(response_time, 2),
                 last_check=datetime.now(),
-                error_message=str(e),
+                error_message=f"Network error: {str(e)}",
+                healthy=False
+            )
+        except (RuntimeError, ValueError, TypeError) as e:
+            response_time = (time.time() - start_time) * 1000
+            logger.error(f"❌ Boavizta API runtime/validation error: {e}")
+            return APIHealthStatus(
+                service="Boavizta API",
+                status="error",
+                response_time_ms=round(response_time, 2),
+                last_check=datetime.now(),
+                error_message=f"Unexpected error: {str(e)}",
                 healthy=False
             )
 
@@ -165,15 +188,26 @@ class HealthMonitor:
                     healthy=False
                 )
 
-        except Exception as e:
+        except (ConnectionError, TimeoutError) as e:
             response_time = (time.time() - start_time) * 1000
-            logger.error(f"❌ AWS Cost Explorer: {e}")
+            logger.error(f"❌ AWS Cost Explorer network error: {e}")
             return APIHealthStatus(
                 service="AWS Cost Explorer API",
                 status="error",
                 response_time_ms=round(response_time, 2),
                 last_check=datetime.now(),
-                error_message=str(e),
+                error_message=f"AWS network error: {str(e)}",
+                healthy=False
+            )
+        except (RuntimeError, ValueError, TypeError) as e:
+            response_time = (time.time() - start_time) * 1000
+            logger.error(f"❌ AWS Cost Explorer runtime/validation error: {e}")
+            return APIHealthStatus(
+                service="AWS Cost Explorer API",
+                status="error",
+                response_time_ms=round(response_time, 2),
+                last_check=datetime.now(),
+                error_message=f"Unexpected error: {str(e)}",
                 healthy=False
             )
 
@@ -241,7 +275,7 @@ class HealthMonitor:
             results = self.check_all_apis()
             overall = self.get_overall_health(results)
             return overall["dashboard_ready"]
-        except Exception as e:
+        except (RuntimeError, ValueError, AttributeError) as e:
             logger.error(f"Quick health check failed: {e}")
             return False
 

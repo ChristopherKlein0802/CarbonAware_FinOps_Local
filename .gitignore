@@ -210,11 +210,16 @@ htmlcov/
 !examples/**/*.csv
 !tests/**/*.json
 
-# System and editor files  
+# System and editor files
 .DS_Store
 .idea/
 *.swp
 *.swo
+
+# Backup files
+*_backup.py
+*backup.py
+*.bak
 
 # Keep VS Code config but ignore user-specific settings
 # .vscode/ - We want to keep the project VS Code settings

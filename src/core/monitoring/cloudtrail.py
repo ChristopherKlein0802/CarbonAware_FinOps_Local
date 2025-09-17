@@ -15,7 +15,8 @@ import boto3
 import logging
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional
-from cache_utils import is_cache_valid, get_standard_cache_path, ensure_cache_dir, CacheTTL
+from ...utils.cache import is_cache_valid, get_standard_cache_path, ensure_cache_dir, CacheTTL
+from ...constants import ErrorConstants
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +58,7 @@ class CloudTrailTracker:
                     cached_data = json.load(f)
                 # Cache hit
                 return cached_data["runtime_hours"]
-            except Exception as e:
+            except (FileNotFoundError, PermissionError, json.JSONDecodeError, KeyError):
                 pass  # Cache miss
 
         try:
@@ -103,7 +104,7 @@ class CloudTrailTracker:
                     with open(cache_path, "w") as f:
                         json.dump(cache_data, f)
                     # Runtime cached successfully
-                except Exception as e:
+                except (OSError, PermissionError, json.JSONEncodeError) as e:
                     logger.warning(f"⚠️ CloudTrail cache write failed: {e}")
 
                 return runtime_hours
@@ -111,10 +112,21 @@ class CloudTrailTracker:
                 # Runtime calculation failed
                 return None
 
-        except Exception as e:
-            pass  # CloudTrail API failed
-            if "Token has expired" in str(e) or "InvalidGrantException" in str(e):
-                logger.warning("💡 AWS SSO token expired for CloudTrail. Re-authenticate: aws sso login")
+        except (ConnectionError, TimeoutError) as e:
+            logger.error(f"🔌 CloudTrail network error: {e}")
+            return None
+        except (ValueError, TypeError, KeyError) as e:
+            logger.error(f"❌ CloudTrail data validation error: {e}")
+            return None
+        except (RuntimeError, OSError) as e:
+            error_str = str(e)
+            if "Token has expired" in error_str or "InvalidGrantException" in error_str:
+                logger.warning(ErrorConstants.AWS_SSO_EXPIRED_MSG)
+                logger.info(ErrorConstants.AWS_SSO_FIX_MSG)
+            elif "AccessDenied" in error_str:
+                logger.error("🚫 AWS CloudTrail access denied - check permissions")
+            else:
+                logger.warning(f"⚠️ CloudTrail runtime error: {error_str}")
             return None
 
     def _calculate_precise_runtime_from_events(self, events: List, current_state: str) -> Optional[float]:

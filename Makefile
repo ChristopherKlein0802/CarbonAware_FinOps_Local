@@ -30,8 +30,11 @@ help: ## 📋 Show available commands
 	@echo ""
 	@echo "$(BOLD)🚀 Essential Commands:$(NC)"
 	@echo "  $(BLUE)make setup$(NC)     - Setup environment & install dependencies"
+	@echo "  $(BLUE)make validate$(NC)  - Validate system configuration"
 	@echo "  $(BLUE)make dashboard$(NC) - Launch Streamlit dashboard"
 	@echo "  $(BLUE)make test$(NC)      - Run all tests"
+	@echo "  $(BLUE)make test-unit$(NC) - Run only unit tests"
+	@echo "  $(BLUE)make lint$(NC)      - Basic code quality check"
 	@echo ""
 	@echo "$(BOLD)☁️  AWS Infrastructure:$(NC)"
 	@echo "  $(BLUE)make deploy$(NC)    - Deploy test infrastructure"
@@ -54,14 +57,24 @@ setup: ## Complete environment setup
 	@echo "$(GREEN)✅ Setup complete!$(NC)"
 	@echo "$(BLUE)💡 Next: Copy .env.example to .env and run 'make dashboard'$(NC)"
 
+validate: ## Validate system configuration
+	@echo "$(YELLOW)🔍 Validating system configuration...$(NC)"
+	@if [ "$(VENV_EXISTS)" = "no" ]; then \
+		echo "$(RED)❌ Run 'make setup' first$(NC)"; \
+		exit 1; \
+	fi
+	PYTHONPATH=. $(PYTHON_VENV) src/startup_validation.py
+
 dashboard: ## Launch Streamlit dashboard
 	@echo "$(YELLOW)🚀 Starting dashboard...$(NC)"
 	@if [ "$(VENV_EXISTS)" = "no" ]; then \
 		echo "$(RED)❌ Run 'make setup' first$(NC)"; \
 		exit 1; \
 	fi
+	@echo "$(BLUE)🔍 Running startup validation...$(NC)"
+	@PYTHONPATH=. $(PYTHON_VENV) src/startup_validation.py || (echo "$(RED)❌ Validation failed - check configuration$(NC)" && exit 1)
 	@echo "$(BLUE)📊 Opening at: http://localhost:$(STREAMLIT_PORT)$(NC)"
-	cd src && ../$(VENV_BIN)/streamlit run app.py --server.port=$(STREAMLIT_PORT)
+	PYTHONPATH=. $(VENV_BIN)/streamlit run src/app.py --server.port=$(STREAMLIT_PORT)
 
 test: ## Run all tests
 	@echo "$(YELLOW)🧪 Running tests...$(NC)"
@@ -71,6 +84,34 @@ test: ## Run all tests
 	fi
 	$(PYTHON_VENV) -m pytest tests/ -v
 	@echo "$(GREEN)✅ Tests completed$(NC)"
+
+test-unit: ## Run only unit tests
+	@echo "$(YELLOW)🧪 Running unit tests...$(NC)"
+	@if [ "$(VENV_EXISTS)" = "no" ]; then \
+		echo "$(RED)❌ Run 'make setup' first$(NC)"; \
+		exit 1; \
+	fi
+	$(PYTHON_VENV) -m pytest tests/unit/ -v
+	@echo "$(GREEN)✅ Unit tests completed$(NC)"
+
+test-coverage: ## Run tests with coverage report
+	@echo "$(YELLOW)🧪 Running tests with coverage...$(NC)"
+	@if [ "$(VENV_EXISTS)" = "no" ]; then \
+		echo "$(RED)❌ Run 'make setup' first$(NC)"; \
+		exit 1; \
+	fi
+	$(PYTHON_VENV) -m pytest tests/ --cov=src --cov-report=term-missing -v
+	@echo "$(GREEN)✅ Coverage tests completed$(NC)"
+
+lint: ## Basic code quality check
+	@echo "$(YELLOW)🔍 Running basic lint check...$(NC)"
+	@if [ "$(VENV_EXISTS)" = "no" ]; then \
+		echo "$(RED)❌ Run 'make setup' first$(NC)"; \
+		exit 1; \
+	fi
+	@echo "$(BLUE)📝 Checking Python syntax...$(NC)"
+	find src -name "*.py" -exec $(PYTHON_VENV) -m py_compile {} \;
+	@echo "$(GREEN)✅ Syntax check completed$(NC)"
 
 deploy: ## Deploy AWS infrastructure
 	@echo "$(YELLOW)☁️  Deploying AWS infrastructure...$(NC)"

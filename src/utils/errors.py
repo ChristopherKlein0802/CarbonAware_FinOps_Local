@@ -13,13 +13,17 @@ Academic Benefits:
 
 import logging
 import functools
-from typing import Optional, Callable, Any
+from typing import Optional, Callable, Any, TypeVar, ParamSpec
 from datetime import datetime
 import requests
 import boto3
-from botocore.exceptions import ClientError, NoCredentialsError, TokenRefreshError
+from botocore.exceptions import ClientError, NoCredentialsError, SSOError, UnauthorizedSSOTokenError
 
 logger = logging.getLogger(__name__)
+
+# Type variables for precise decorator typing
+P = ParamSpec('P')
+T = TypeVar('T')
 
 
 # Custom Exception Types for Better Error Handling
@@ -43,7 +47,27 @@ class DataValidationError(Exception):
     pass
 
 
-def handle_cache_operations(fallback_value=None):
+class CloudTrailException(Exception):
+    """CloudTrail-specific operations and data errors"""
+    pass
+
+
+class CarbonDataException(Exception):
+    """Carbon intensity API and data processing errors"""
+    pass
+
+
+class CostCalculationException(Exception):
+    """Cost calculation and AWS pricing errors"""
+    pass
+
+
+class PowerConsumptionException(Exception):
+    """Power consumption calculation and hardware data errors"""
+    pass
+
+
+def handle_cache_operations(fallback_value: Any = None) -> Callable[[Callable[P, T]], Callable[P, T | Any]]:
     """
     Decorator for handling cache read/write operations
 
@@ -66,7 +90,7 @@ def handle_cache_operations(fallback_value=None):
     return decorator
 
 
-def handle_api_requests(api_name: str):
+def handle_api_requests(api_name: str) -> Callable[[Callable[P, T]], Callable[P, T | None]]:
     """
     Decorator for handling external API requests with specific error types
 
@@ -108,7 +132,7 @@ def handle_api_requests(api_name: str):
     return decorator
 
 
-def handle_aws_operations(operation_type: str):
+def handle_aws_operations(operation_type: str) -> Callable:
     """
     Decorator for handling AWS API operations with specific error handling
 
@@ -123,7 +147,7 @@ def handle_aws_operations(operation_type: str):
         def wrapper(*args, **kwargs):
             try:
                 return func(*args, **kwargs)
-            except TokenRefreshError:
+            except (SSOError, UnauthorizedSSOTokenError):
                 logger.error("🔄 AWS SSO token expired - run 'aws sso login' to re-authenticate")
                 logger.info("💡 Fix: aws sso login --profile <your-profile>")
                 return None
@@ -152,7 +176,7 @@ def handle_aws_operations(operation_type: str):
     return decorator
 
 
-def safe_json_operation(operation: str, fallback_value=None):
+def safe_json_operation(operation: str, fallback_value: Any = None) -> Callable:
     """
     Handle JSON parsing and file operations safely
 
@@ -176,7 +200,7 @@ def safe_json_operation(operation: str, fallback_value=None):
     return decorator
 
 
-def log_function_entry_exit(func):
+def log_function_entry_exit(func: Callable[P, T]) -> Callable[P, T]:
     """
     Debug decorator for tracking function execution
     Useful for debugging complex data flows
@@ -218,7 +242,55 @@ class ErrorMessages:
     MISSING_REQUIRED_DATA = "Required data missing from API response"
 
 
-def get_error_context(error: Exception) -> dict:
+def handle_carbon_data_operations(operation_type: str) -> Callable:
+    """
+    Decorator for handling carbon intensity data operations
+
+    Specific handling for ElectricityMaps and carbon data processing
+    """
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except CarbonDataException as e:
+                logger.error(f"🌱 Carbon data error in {operation_type}: {e}")
+                return None
+            except requests.exceptions.RequestException as e:
+                logger.error(f"🌍 Carbon API request failed for {operation_type}: {e}")
+                return None
+            except (ValueError, KeyError) as e:
+                logger.error(f"📊 Carbon data validation error in {operation_type}: {e}")
+                return None
+        return wrapper
+    return decorator
+
+
+def handle_cost_calculations(calculation_type: str) -> Callable:
+    """
+    Decorator for handling cost calculation operations
+
+    Specific handling for AWS pricing and cost calculations
+    """
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except CostCalculationException as e:
+                logger.error(f"💰 Cost calculation error in {calculation_type}: {e}")
+                return None
+            except (ZeroDivisionError, ArithmeticError) as e:
+                logger.error(f"🔢 Mathematical error in {calculation_type}: {e}")
+                return None
+            except (ValueError, TypeError) as e:
+                logger.error(f"📈 Cost data validation error in {calculation_type}: {e}")
+                return None
+        return wrapper
+    return decorator
+
+
+def get_error_context(error: Exception) -> dict[str, Any]:
     """
     Extract useful context from exceptions for debugging
 
@@ -230,5 +302,26 @@ def get_error_context(error: Exception) -> dict:
         'timestamp': datetime.now().isoformat(),
         'is_retryable': isinstance(error, (requests.exceptions.Timeout,
                                          requests.exceptions.ConnectionError,
-                                         TokenRefreshError))
+                                         SSOError, UnauthorizedSSOTokenError)),
+        'category': _categorize_error(error)
     }
+
+
+def _categorize_error(error: Exception) -> str:
+    """Categorize errors for better monitoring and analysis"""
+    if isinstance(error, CarbonDataException):
+        return "carbon_data"
+    elif isinstance(error, (CostCalculationException, ArithmeticError)):
+        return "cost_calculation"
+    elif isinstance(error, (CloudTrailException, ClientError)):
+        return "aws_operations"
+    elif isinstance(error, (PowerConsumptionException,)):
+        return "power_calculation"
+    elif isinstance(error, (requests.exceptions.RequestException,)):
+        return "api_request"
+    elif isinstance(error, (ValueError, TypeError, KeyError)):
+        return "data_validation"
+    elif isinstance(error, (CacheOperationError, OSError, PermissionError)):
+        return "cache_operations"
+    else:
+        return "unknown"

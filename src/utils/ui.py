@@ -3,7 +3,14 @@ Utility functions for dashboard pages
 Clean separation of calculations and data processing logic
 """
 
-def calculate_cloudtrail_precision_metrics(instances):
+from typing import Dict, Any, Tuple, List
+from src.constants import (
+    AcademicConstants,
+    CarbonConstants,
+    UIConstants
+)
+
+def calculate_cloudtrail_precision_metrics(instances: List[Any]) -> Tuple[int, int, float]:
     """Calculate CloudTrail precision metrics from instance list"""
     if not instances:
         return 0, 0, 0
@@ -14,10 +21,10 @@ def calculate_cloudtrail_precision_metrics(instances):
 
     return total_instances, cloudtrail_instances, precision_ratio
 
-def calculate_baseline_metrics(dashboard_data):
+def calculate_baseline_metrics(dashboard_data: Any) -> Tuple[float, float]:
     """Calculate baseline cost and CO2 metrics per instance"""
     if not dashboard_data or not dashboard_data.instances:
-        return 5.20, 0.093  # Default values
+        return AcademicConstants.DEFAULT_COST_PER_INSTANCE_EUR, AcademicConstants.DEFAULT_CO2_PER_INSTANCE_KG
 
     total_instances = len(dashboard_data.instances)
     baseline_cost_per_instance = dashboard_data.total_cost_eur / total_instances if total_instances > 0 else 5.20
@@ -25,24 +32,24 @@ def calculate_baseline_metrics(dashboard_data):
 
     return baseline_cost_per_instance, baseline_co2_per_instance
 
-def calculate_scenario_savings(projected_cost):
+def calculate_scenario_savings(projected_cost: float) -> Tuple[float, float, float]:
     """Calculate demonstrative scenario savings"""
-    scenario_a_savings = projected_cost * 0.10  # 10% conservative scenario
-    scenario_b_savings = projected_cost * 0.20  # 20% moderate scenario
+    scenario_a_savings = projected_cost * AcademicConstants.CONSERVATIVE_SCENARIO_FACTOR
+    scenario_b_savings = projected_cost * AcademicConstants.MODERATE_SCENARIO_FACTOR
     integrated_savings = scenario_b_savings  # Using scenario B
 
     return scenario_a_savings, scenario_b_savings, integrated_savings
 
-def determine_grid_status(grid_intensity):
+def determine_grid_status(grid_intensity: float) -> Tuple[str, str, str]:
     """Determine grid status and recommendations from carbon intensity"""
-    if grid_intensity < 200:
+    if grid_intensity < CarbonConstants.OPTIMAL_THRESHOLD:
         return "🟢", "EXCELLENT (High Solar/Wind)", "⚡ OPTIMAL TIME: Run energy-intensive workloads NOW"
-    elif grid_intensity < 350:
+    elif grid_intensity < CarbonConstants.MODERATE_THRESHOLD:
         return "🟡", "MODERATE (Mixed Sources)", "⏱️ CONSIDER: Delay non-urgent workloads for 2-4 hours"
     else:
         return "🔴", "HIGH CARBON (Coal Peak)", "🚨 AVOID: Postpone batch jobs until grid improves"
 
-def create_instance_data_row(instance):
+def create_instance_data_row(instance: Any) -> Dict[str, Any]:
     """Create standardized instance data row for tables"""
     is_cloudtrail = "cloudtrail_audit" in (instance.data_sources or [])
     precision_badge = "🎯 Audit" if is_cloudtrail else "📋 Estimate"
@@ -60,7 +67,7 @@ def create_instance_data_row(instance):
         "CO₂ (kg/month)": instance.monthly_co2_kg or 0
     }
 
-def calculate_roi_metrics(projected_cost, implementation_cost=5000):
+def calculate_roi_metrics(projected_cost: float, implementation_cost: float = 5000) -> Tuple[float, float, float, float, float]:
     """Calculate ROI metrics with demonstrative scenarios"""
     scenario_a_savings, scenario_b_savings, integrated_savings = calculate_scenario_savings(projected_cost)
 
@@ -69,7 +76,7 @@ def calculate_roi_metrics(projected_cost, implementation_cost=5000):
 
     return scenario_a_savings, scenario_b_savings, integrated_savings, payback_months, implementation_cost
 
-def create_precision_data_row(instance):
+def create_precision_data_row(instance: Any) -> Dict[str, Any]:
     """Create precision analysis data row"""
     is_cloudtrail = "cloudtrail_audit" in (instance.data_sources or [])
     return {

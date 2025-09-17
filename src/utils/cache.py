@@ -142,8 +142,10 @@ def clean_old_cache_files(cache_dir: str, max_age_days: int = 7) -> int:
                     deleted_count += 1
                     logger.debug(f"🗑️ Cleaned old cache file: {filename}")
 
-    except Exception as e:
-        logger.warning(f"⚠️ Cache cleanup failed: {e}")
+    except (OSError, PermissionError) as e:
+        logger.warning(f"⚠️ Cache cleanup failed - file system error: {e}")
+    except (ValueError, TypeError) as e:
+        logger.warning(f"⚠️ Cache cleanup failed - data validation error: {e}")
 
     if deleted_count > 0:
         logger.info(f"🧹 Cache cleanup: {deleted_count} old files removed from {cache_dir}")

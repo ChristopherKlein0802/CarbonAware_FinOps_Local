@@ -13,7 +13,7 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 
-def safe_round(value, decimals=2):
+def safe_round(value: Optional[float], decimals: int = 2) -> Optional[float]:
     """Safe rounding function that handles None values"""
     if value is None:
         return None
