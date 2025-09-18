@@ -35,9 +35,8 @@ def render_carbon_page(dashboard_data: Optional[Any]) -> None:
     _render_current_grid_status(current_intensity)
 
     # Core feature: 24h pattern visualization with dynamic building from cached hourly data
-    from src.api.electricity import ElectricityMapsAPI
-    electricity_api = ElectricityMapsAPI()
-    historical_data = electricity_api.get_self_collected_24h_data("eu-central-1")
+    from src.api.client import unified_api_client
+    historical_data = unified_api_client.electricity_api.get_self_collected_24h_data("eu-central-1")
     _render_dynamic_carbon_chart(historical_data, current_intensity)
 
     # Simple optimization message (Business Impact is on Executive Summary)
@@ -64,31 +63,41 @@ def _render_current_grid_status(current_intensity: float) -> None:
 
 
 def _render_dynamic_carbon_chart(historical_data: list, current_intensity: float) -> None:
-    """Render progressive 24h carbon chart with dynamic building"""
+    """Render progressive 24h carbon chart with datetime axis"""
+    from datetime import datetime, timedelta
     st.markdown("### 📊 German Grid 24h Carbon Intensity")
 
-    current_hour = datetime.now().hour
+    current_time = datetime.now()
 
     # Always include current data point
-    chart_hours = [current_hour]
+    chart_datetimes = [current_time]
     chart_values = [current_intensity]
+    chart_labels = ["Now"]
 
     # Add historical data if available
     if historical_data and len(historical_data) > 0:
-        # Process and sort historical data by hour
+        # Process and sort historical data by actual datetime
         for data_point in historical_data:
-            hour = data_point["hour"]
+            # Parse the full datetime from hour_key
+            point_datetime = datetime.fromisoformat(data_point["hour_key"].replace('Z', ''))
             value = data_point["carbonIntensity"]
 
-            # Avoid duplicate current hour
-            if hour != current_hour:
-                chart_hours.append(hour)
+            # Only add if not the same hour as current (avoid duplicates)
+            if point_datetime.hour != current_time.hour or point_datetime.date() != current_time.date():
+                chart_datetimes.append(point_datetime)
                 chart_values.append(value)
 
-        # Sort by hour for proper line connection
-        combined_data = list(zip(chart_hours, chart_values))
+                # Create descriptive label
+                time_diff = current_time - point_datetime
+                if time_diff.days > 0:
+                    chart_labels.append(f"Yesterday {point_datetime.strftime('%H:00')}")
+                else:
+                    chart_labels.append(f"Today {point_datetime.strftime('%H:00')}")
+
+        # Sort by datetime for proper chronological order
+        combined_data = list(zip(chart_datetimes, chart_values, chart_labels))
         combined_data.sort(key=lambda x: x[0])
-        chart_hours, chart_values = zip(*combined_data)
+        chart_datetimes, chart_values, chart_labels = zip(*combined_data)
 
         data_points = len(historical_data)
         if data_points < 6:
@@ -103,57 +112,85 @@ def _render_dynamic_carbon_chart(historical_data: list, current_intensity: float
     # Create progressive chart
     fig = go.Figure()
 
-    # Progressive line chart - only connect available data points
-    if len(chart_hours) >= 2:
-        # Multiple points - show as connected line with current hour highlighted
-        marker_colors = ['red' if h == current_hour else '#2E8B57' for h in chart_hours]
-        marker_sizes = [12 if h == current_hour else 8 for h in chart_hours]
-        marker_symbols = ['star' if h == current_hour else 'circle' for h in chart_hours]
+    # Progressive line chart with datetime axis
+    if len(chart_datetimes) >= 2:
+        # Multiple points - show as connected line with colors by day
+        marker_colors = []
+        marker_sizes = []
+        marker_symbols = []
+
+        for dt, label in zip(chart_datetimes, chart_labels):
+            if label == "Now":
+                marker_colors.append('red')
+                marker_sizes.append(12)
+                marker_symbols.append('star')
+            elif "Yesterday" in label:
+                marker_colors.append('#FFA500')  # Orange for yesterday
+                marker_sizes.append(8)
+                marker_symbols.append('circle')
+            else:
+                marker_colors.append('#2E8B57')  # Green for today
+                marker_sizes.append(8)
+                marker_symbols.append('circle')
 
         fig.add_trace(go.Scatter(
-            x=list(chart_hours),
+            x=list(chart_datetimes),
             y=list(chart_values),
             mode='lines+markers',
             name='German Grid Carbon Intensity',
             line=dict(color='#2E8B57', width=3),
-            marker=dict(size=marker_sizes, color=marker_colors, symbol=marker_symbols)
+            marker=dict(size=marker_sizes, color=marker_colors, symbol=marker_symbols),
+            text=chart_labels,
+            hovertemplate='<b>%{text}</b><br>%{y}g CO₂/kWh<br>%{x|%d.%m %H:%M}<extra></extra>'
         ))
     else:
         # Single point - show as current hour marker
         fig.add_trace(go.Scatter(
-            x=list(chart_hours),
+            x=list(chart_datetimes),
             y=list(chart_values),
             mode='markers',
             name='Current Hour',
-            marker=dict(size=12, color='red', symbol='star')
+            marker=dict(size=12, color='red', symbol='star'),
+            text=chart_labels,
+            hovertemplate='<b>%{text}</b><br>%{y}g CO₂/kWh<extra></extra>'
         ))
 
     # Chart shows carbon intensity without zone lines (status already displayed above)
 
     # Dynamic chart title based on data availability
     if historical_data and len(historical_data) >= 18:
-        chart_title = f'German Grid Carbon Intensity - Complete 24h Pattern ({len(chart_hours)} hours)'
+        chart_title = f'German Grid Carbon Intensity - Complete 24h Pattern ({len(chart_datetimes)} hours)'
     elif historical_data and len(historical_data) > 0:
-        chart_title = f'German Grid Carbon Intensity - Building Pattern ({len(chart_hours)} hours collected)'
+        chart_title = f'German Grid Carbon Intensity - Building Pattern ({len(chart_datetimes)} hours collected)'
     else:
         chart_title = 'German Grid Carbon Intensity - Starting Collection'
 
-    # Update chart layout
+    # Update chart layout with datetime axis
     fig.update_layout(
         title=chart_title,
-        xaxis_title='Hour of Day',
+        xaxis_title='Time (Last 24 Hours)',
         yaxis_title='Carbon Intensity (g CO₂/kWh)',
         height=500,
         showlegend=True,
-        xaxis=dict(range=[0, 23], dtick=2)  # Show all 24 hours for reference
+        xaxis=dict(
+            type='date',
+            tickformat='%H:%M\n%d.%m',
+            dtick=3600000 * 2  # Show every 2 hours in milliseconds
+        )
     )
 
     st.plotly_chart(fig, width='stretch')
 
-    # Progressive status display
+    # Progressive status display with datetime information
     if historical_data and len(historical_data) > 0:
-        total_hours = len(chart_hours)
+        total_hours = len(chart_datetimes)
         coverage_pct = (total_hours / 24) * 100
-        st.caption(f"📊 Data Coverage: {total_hours}/24 hours ({coverage_pct:.0f}%) - Progressive building from ElectricityMaps API")
+
+        # Count today vs yesterday points
+        today_points = len([label for label in chart_labels if "Today" in label or label == "Now"])
+        yesterday_points = len([label for label in chart_labels if "Yesterday" in label])
+
+        st.caption(f"📊 Data Coverage: {total_hours}/24 hours ({coverage_pct:.0f}%) | Today: {today_points} | Yesterday: {yesterday_points}")
+        st.caption("🟢 Today • 🟠 Yesterday • ⭐ Current Hour")
     else:
         st.caption("📊 Starting hourly data collection - Chart will progressively build over 24 hours")

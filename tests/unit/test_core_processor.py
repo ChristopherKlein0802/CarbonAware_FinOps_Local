@@ -85,9 +85,9 @@ class TestDataProcessor(unittest.TestCase):
         self.assertIn("carbon_uncertainty", self.processor.ACADEMIC_CONSTANTS)
         self.assertIn("cost_uncertainty", self.processor.ACADEMIC_CONSTANTS)
 
-    @patch('src.core.monitoring.health.health_check_manager')
+    # Health monitoring removed after cleanup
     @patch('src.core.processor.unified_api_client')
-    def test_get_infrastructure_data_success(self, mock_api_client, mock_health_manager):
+    def test_get_infrastructure_data_success(self, mock_api_client):
         """Test successful infrastructure data retrieval"""
         # Mock API responses
         mock_api_client.get_current_carbon_intensity.return_value = self.sample_carbon_intensity
@@ -99,7 +99,7 @@ class TestDataProcessor(unittest.TestCase):
             with patch.object(self.processor.runtime_tracker, 'process_instance_enhanced', return_value=self.sample_instance):
                 with patch.object(self.processor.business_calculator, 'calculate_cloudtrail_enhanced_accuracy', return_value=1.0):
                     with patch.object(self.processor.business_calculator, 'calculate_business_case', return_value=self.sample_business_case):
-                        mock_health_manager.check_all_apis.return_value = {"test": "healthy"}
+                        # Health monitoring simplified after cleanup
 
                         result = self.processor.get_infrastructure_data()
 
@@ -112,12 +112,12 @@ class TestDataProcessor(unittest.TestCase):
         self.assertEqual(result.total_co2_kg, 4.5)
         self.assertIsInstance(result.business_case, BusinessCase)
 
-    @patch('src.core.monitoring.health.health_check_manager')
+    # Health monitoring removed after cleanup
     @patch('src.core.processor.unified_api_client')
     def test_get_infrastructure_data_no_carbon_intensity(self, mock_api_client, mock_health_manager):
         """Test infrastructure data retrieval without carbon intensity"""
         mock_api_client.get_current_carbon_intensity.return_value = None
-        mock_health_manager.check_all_apis.return_value = {"test": "healthy"}
+        # Health monitoring simplified after cleanup
 
         # Mock EC2 to avoid real AWS calls
         with patch.object(self.processor.runtime_tracker, 'get_all_ec2_instances', return_value=[]):
@@ -129,12 +129,12 @@ class TestDataProcessor(unittest.TestCase):
         self.assertEqual(result.total_co2_kg, 0.0)
         self.assertIn("No carbon data available", result.academic_disclaimers[0])
 
-    @patch('src.core.monitoring.health.health_check_manager')
+    # Health monitoring removed after cleanup
     @patch('src.core.processor.unified_api_client')
-    def test_get_infrastructure_data_no_instances(self, mock_api_client, mock_health_manager):
+    def test_get_infrastructure_data_no_instances(self, mock_api_client):
         """Test infrastructure data retrieval without EC2 instances"""
         mock_api_client.get_current_carbon_intensity.return_value = self.sample_carbon_intensity
-        mock_health_manager.check_all_apis.return_value = {"test": "healthy"}
+        # Health monitoring simplified after cleanup
 
         with patch.object(self.processor.runtime_tracker, 'get_all_ec2_instances', return_value=[]):
             result = self.processor.get_infrastructure_data()
@@ -144,12 +144,12 @@ class TestDataProcessor(unittest.TestCase):
         self.assertEqual(result.carbon_intensity.value, 350.0)  # Carbon data preserved
         self.assertTrue(any("No instances found" in disclaimer for disclaimer in result.academic_disclaimers))
 
-    @patch('src.core.monitoring.health.health_check_manager')
+    # Health monitoring removed after cleanup
     @patch('src.core.processor.unified_api_client')
-    def test_get_infrastructure_data_no_processable_instances(self, mock_api_client, mock_health_manager):
+    def test_get_infrastructure_data_no_processable_instances(self, mock_api_client):
         """Test infrastructure data retrieval when instances can't be processed"""
         mock_api_client.get_current_carbon_intensity.return_value = self.sample_carbon_intensity
-        mock_health_manager.check_all_apis.return_value = {"test": "healthy"}
+        # Health monitoring simplified after cleanup
 
         mock_instances_data = [{"instance_id": "i-test123", "instance_type": "t3.medium", "state": "running", "region": "eu-central-1"}]
         with patch.object(self.processor.runtime_tracker, 'get_all_ec2_instances', return_value=mock_instances_data):
@@ -174,10 +174,10 @@ class TestDataProcessor(unittest.TestCase):
         self.assertIn(error_message, result.academic_disclaimers)
         self.assertTrue(any("Academic integrity maintained" in disclaimer for disclaimer in result.academic_disclaimers))
 
-    @patch('src.core.monitoring.health.health_check_manager')
-    def test_create_minimal_response(self, mock_health_manager):
+    # Health monitoring removed after cleanup
+    def test_create_minimal_response(self):
         """Test minimal response creation with carbon data"""
-        mock_health_manager.check_all_apis.return_value = {"test": "healthy"}
+        # Health monitoring simplified after cleanup
         error_message = "Test minimal error"
 
         result = self.processor._create_minimal_response(self.sample_carbon_intensity, error_message)
@@ -189,45 +189,45 @@ class TestDataProcessor(unittest.TestCase):
         self.assertIn(error_message, result.academic_disclaimers)
         self.assertTrue(any("preserving available API data" in disclaimer for disclaimer in result.academic_disclaimers))
 
-    @patch('src.core.monitoring.health.health_check_manager')
+    # Health monitoring removed after cleanup
     @patch('src.core.processor.unified_api_client')
-    def test_get_infrastructure_data_value_error(self, mock_api_client, mock_health_manager):
+    def test_get_infrastructure_data_value_error(self, mock_api_client):
         """Test infrastructure data retrieval with ValueError"""
         mock_api_client.get_current_carbon_intensity.side_effect = ValueError("Test error")
-        mock_health_manager.check_all_apis.return_value = {"test": "healthy"}
+        # Health monitoring simplified after cleanup
 
         result = self.processor.get_infrastructure_data()
 
         self.assertIsInstance(result, DashboardData)
         self.assertTrue(any("Data validation error:" in disclaimer for disclaimer in result.academic_disclaimers))
 
-    @patch('src.core.monitoring.health.health_check_manager')
+    # Health monitoring removed after cleanup
     @patch('src.core.processor.unified_api_client')
-    def test_get_infrastructure_data_attribute_error(self, mock_api_client, mock_health_manager):
+    def test_get_infrastructure_data_attribute_error(self, mock_api_client):
         """Test infrastructure data retrieval with AttributeError"""
         mock_api_client.get_current_carbon_intensity.side_effect = AttributeError("Test error")
-        mock_health_manager.check_all_apis.return_value = {"test": "healthy"}
+        # Health monitoring simplified after cleanup
 
         result = self.processor.get_infrastructure_data()
 
         self.assertIsInstance(result, DashboardData)
         self.assertTrue(any("Module error:" in disclaimer for disclaimer in result.academic_disclaimers))
 
-    @patch('src.core.monitoring.health.health_check_manager')
+    # Health monitoring removed after cleanup
     @patch('src.core.processor.unified_api_client')
-    def test_get_infrastructure_data_connection_error(self, mock_api_client, mock_health_manager):
+    def test_get_infrastructure_data_connection_error(self, mock_api_client):
         """Test infrastructure data retrieval with ConnectionError"""
         mock_api_client.get_current_carbon_intensity.side_effect = ConnectionError("Test error")
-        mock_health_manager.check_all_apis.return_value = {"test": "healthy"}
+        # Health monitoring simplified after cleanup
 
         result = self.processor.get_infrastructure_data()
 
         self.assertIsInstance(result, DashboardData)
         self.assertTrue(any("Network error:" in disclaimer for disclaimer in result.academic_disclaimers))
 
-    @patch('src.core.monitoring.health.health_check_manager')
+    # Health monitoring removed after cleanup
     @patch('src.core.processor.unified_api_client')
-    def test_totals_calculation(self, mock_api_client, mock_health_manager):
+    def test_totals_calculation(self, mock_api_client):
         """Test totals calculation with multiple instances"""
         # Setup multiple instances
         instance1 = EC2Instance(
@@ -269,7 +269,7 @@ class TestDataProcessor(unittest.TestCase):
             with patch.object(self.processor.runtime_tracker, 'process_instance_enhanced', side_effect=[instance1, instance2]):
                 with patch.object(self.processor.business_calculator, 'calculate_cloudtrail_enhanced_accuracy', return_value=1.0):
                     with patch.object(self.processor.business_calculator, 'calculate_business_case', return_value=self.sample_business_case):
-                        mock_health_manager.check_all_apis.return_value = {"test": "healthy"}
+                        # Health monitoring simplified after cleanup
 
                         result = self.processor.get_infrastructure_data()
 

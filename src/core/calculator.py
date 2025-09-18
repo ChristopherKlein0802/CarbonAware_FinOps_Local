@@ -64,14 +64,21 @@ class BusinessCaseCalculator:
         # DYNAMIC SCENARIO CALCULATION based on data quality and validation
         # Adjust optimization potential based on validation factor and infrastructure characteristics
 
-        # Base optimization potential depends on data quality
-        if validation_factor <= 1.5:  # Good data quality
+        # Enhanced base optimization potential with development scenario handling
+        if baseline_cost < 1.0:  # Development scenario
+            base_conservative = 0.05  # 5% conservative for dev environments
+            base_moderate = 0.08      # 8% moderate for dev environments
+            logger.info("🧪 Development environment: Conservative optimization estimates")
+        elif validation_factor <= 1.5:  # Good data quality
             base_conservative = 0.08  # 8% conservative
             base_moderate = 0.15      # 15% moderate
         elif validation_factor <= 5.0:  # Moderate data quality
             base_conservative = 0.05  # 5% conservative
             base_moderate = 0.10      # 10% moderate
-        else:  # Limited data quality (high validation factor)
+        elif validation_factor <= 50.0:  # Building data quality
+            base_conservative = 0.04  # 4% conservative
+            base_moderate = 0.08      # 8% moderate
+        else:  # Very limited data quality (high validation factor)
             base_conservative = 0.03  # 3% conservative
             base_moderate = 0.06      # 6% moderate
 
@@ -166,7 +173,14 @@ class BusinessCaseCalculator:
 
         # Calculate state-based expectations
         running_ratio = len(running_instances) / total_instances
-        validation_factor = actual_cost_eur / calculated_cost_eur
+
+        # Robust validation factor calculation with development scenario handling
+        if calculated_cost_eur < 1.0:  # Less than €1 calculated (minimal runtime)
+            # Development/test scenario - use conservative assessment
+            validation_factor = min(actual_cost_eur / max(calculated_cost_eur, 0.10), 50.0)  # Cap at 50x
+            logger.info("📊 Development scenario detected: minimal calculated runtime")
+        else:
+            validation_factor = actual_cost_eur / calculated_cost_eur
 
         # Enhanced logging with state analysis (removed problematic runtime estimation)
         logger.info(f"🎯 Enhanced Cost Validation:")
@@ -177,11 +191,17 @@ class BusinessCaseCalculator:
         logger.info(f"   📈 Running Ratio: {running_ratio:.1%}")
         logger.info(f"   ⚡ Academic Note: Validation based on AWS Cost Explorer comparison")
 
-        # State-aware accuracy assessment with runtime diagnostics
-        if validation_factor > 100:  # Significantly underestimated
+        # Enhanced state-aware accuracy assessment with development scenario handling
+        if calculated_cost_eur < 1.0:  # Development scenario
+            logger.info("🧪 Development/Test Environment: Limited runtime data expected")
+            accuracy_status = "DEVELOPMENT - Building runtime history"
+        elif validation_factor > 50:  # Significantly underestimated
             logger.warning("⚠️ Runtime data insufficient - calculated hours too low")
             logger.info("💡 Recommendation: Allow more time for CloudTrail data collection")
             accuracy_status = "LIMITED - Runtime data incomplete"
+        elif validation_factor > 10:  # Moderately underestimated
+            logger.info("📈 Runtime data building - accuracy improving over time")
+            accuracy_status = "BUILDING - Data collection in progress"
         elif running_ratio > 0.8:  # Mostly running instances
             if 0.7 <= validation_factor <= 1.3:
                 logger.info("✅ Enhanced accuracy: EXCELLENT (±30% with mostly running instances)")

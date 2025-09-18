@@ -14,15 +14,15 @@ PYTHON_VENV := $(VENV_BIN)/python
 STREAMLIT_PORT := 8501
 AWS_PROFILE := carbon-finops-sandbox
 
-# AWS Account ID Detection Function
+# Simplified AWS Account Detection
 define get_aws_account
-echo "$(BLUE)🔍 Auto-detecting AWS Account ID from SSO...$(NC)" && \
-AWS_ACCOUNT_ID=$$(aws sts get-caller-identity --profile $(AWS_PROFILE) --query Account --output text 2>/dev/null) && \
-if [ -z "$$AWS_ACCOUNT_ID" ]; then \
-	echo "$(RED)❌ SSO session expired. Run: aws sso login --sso-session $(AWS_PROFILE)$(NC)"; \
-	exit 1; \
-fi && \
-echo "$(GREEN)✅ Using Account: $$AWS_ACCOUNT_ID$(NC)"
+	@echo "$(BLUE)🔍 Detecting AWS Account...$(NC)" && \
+	AWS_ACCOUNT_ID=$$(aws sts get-caller-identity --profile $(AWS_PROFILE) --query Account --output text 2>/dev/null) && \
+	if [ -z "$$AWS_ACCOUNT_ID" ]; then \
+		echo "$(RED)❌ AWS SSO expired. Run: aws sso login --profile $(AWS_PROFILE)$(NC)"; \
+		exit 1; \
+	fi && \
+	echo "$(GREEN)✅ Account: $$AWS_ACCOUNT_ID$(NC)"
 endef
 
 # Colors
@@ -35,6 +35,14 @@ NC := \033[0m
 
 # Check if virtual environment exists
 VENV_EXISTS := $(shell test -d $(VENV) && echo "yes" || echo "no")
+
+# Shared function for venv validation
+define check_venv
+	@if [ "$(VENV_EXISTS)" = "no" ]; then \
+		echo "$(RED)❌ Virtual environment not found. Run 'make setup' first$(NC)"; \
+		exit 1; \
+	fi
+endef
 
 help: ## 📋 Show available commands
 	@echo "$(BOLD)$(GREEN)🎓 Carbon-Aware FinOps Dashboard$(NC)"
@@ -74,99 +82,67 @@ setup: ## Complete environment setup
 
 validate: ## Validate system configuration
 	@echo "$(YELLOW)🔍 Validating system configuration...$(NC)"
-	@if [ "$(VENV_EXISTS)" = "no" ]; then \
-		echo "$(RED)❌ Run 'make setup' first$(NC)"; \
-		exit 1; \
-	fi
+	$(call check_venv)
 	@echo "$(GREEN)✅ System configuration validated$(NC)"
 
 dashboard: ## Launch Streamlit dashboard
 	@echo "$(YELLOW)🚀 Starting dashboard...$(NC)"
-	@if [ "$(VENV_EXISTS)" = "no" ]; then \
-		echo "$(RED)❌ Run 'make setup' first$(NC)"; \
-		exit 1; \
-	fi
-	@echo "$(BLUE)🔍 Starting Carbon-Aware FinOps Dashboard...$(NC)"
+	$(call check_venv)
 	@echo "$(BLUE)📊 Opening at: http://localhost:$(STREAMLIT_PORT)$(NC)"
 	PYTHONPATH=. $(VENV_BIN)/streamlit run src/app.py --server.port=$(STREAMLIT_PORT)
 
 test: ## Run all tests
 	@echo "$(YELLOW)🧪 Running tests...$(NC)"
-	@if [ "$(VENV_EXISTS)" = "no" ]; then \
-		echo "$(RED)❌ Run 'make setup' first$(NC)"; \
-		exit 1; \
-	fi
+	$(call check_venv)
 	$(PYTHON_VENV) -m pytest tests/ -v
 	@echo "$(GREEN)✅ Tests completed$(NC)"
 
 test-unit: ## Run only unit tests
 	@echo "$(YELLOW)🧪 Running unit tests...$(NC)"
-	@if [ "$(VENV_EXISTS)" = "no" ]; then \
-		echo "$(RED)❌ Run 'make setup' first$(NC)"; \
-		exit 1; \
-	fi
+	$(call check_venv)
 	$(PYTHON_VENV) -m pytest tests/unit/ -v
 	@echo "$(GREEN)✅ Unit tests completed$(NC)"
 
 test-coverage: ## Run tests with coverage report
 	@echo "$(YELLOW)🧪 Running tests with coverage...$(NC)"
-	@if [ "$(VENV_EXISTS)" = "no" ]; then \
-		echo "$(RED)❌ Run 'make setup' first$(NC)"; \
-		exit 1; \
-	fi
+	$(call check_venv)
 	$(PYTHON_VENV) -m pytest tests/ --cov=src --cov-report=term-missing -v
 	@echo "$(GREEN)✅ Coverage tests completed$(NC)"
 
 lint: ## Basic code quality check
 	@echo "$(YELLOW)🔍 Running basic lint check...$(NC)"
-	@if [ "$(VENV_EXISTS)" = "no" ]; then \
-		echo "$(RED)❌ Run 'make setup' first$(NC)"; \
-		exit 1; \
-	fi
+	$(call check_venv)
 	@echo "$(BLUE)📝 Checking Python syntax...$(NC)"
 	find src -name "*.py" -exec $(PYTHON_VENV) -m py_compile {} \;
 	@echo "$(GREEN)✅ Syntax check completed$(NC)"
 
 validate-aws: ## Validate AWS SSO session
 	@echo "$(YELLOW)🔍 Validating AWS SSO session...$(NC)"
-	@$(call get_aws_account)
+	$(call get_aws_account)
 	@echo "$(GREEN)✅ AWS SSO session active$(NC)"
 
 plan: ## Show deployment plan
 	@echo "$(YELLOW)📋 Generating Terraform plan...$(NC)"
-	@if [ ! -d "terraform" ]; then \
-		echo "$(RED)❌ Terraform directory not found$(NC)"; \
-		exit 1; \
-	fi
-	@$(call get_aws_account) && \
+	@test -d terraform || (echo "$(RED)❌ Terraform directory not found$(NC)" && exit 1)
+	$(call get_aws_account) && \
 	cd terraform && terraform init && terraform plan -var="aws_account_id=$$AWS_ACCOUNT_ID"
 
 deploy: ## Deploy AWS infrastructure
 	@echo "$(YELLOW)☁️  Deploying AWS infrastructure...$(NC)"
-	@if [ ! -d "terraform" ]; then \
-		echo "$(RED)❌ Terraform directory not found$(NC)"; \
-		exit 1; \
-	fi
-	@$(call get_aws_account) && \
+	@test -d terraform || (echo "$(RED)❌ Terraform directory not found$(NC)" && exit 1)
+	$(call get_aws_account) && \
 	cd terraform && terraform init && terraform apply -var="aws_account_id=$$AWS_ACCOUNT_ID"
 	@echo "$(GREEN)✅ Infrastructure deployed$(NC)"
 
 status: ## Show infrastructure status
 	@echo "$(YELLOW)📊 Infrastructure status...$(NC)"
-	@if [ ! -d "terraform" ]; then \
-		echo "$(RED)❌ Terraform directory not found$(NC)"; \
-		exit 1; \
-	fi
-	@$(call get_aws_account) && \
-	cd terraform && terraform show
+	@test -d terraform || (echo "$(RED)❌ Terraform directory not found$(NC)" && exit 1)
+	$(call get_aws_account) && cd terraform && terraform show
 
 refresh: ## Refresh infrastructure state
 	@echo "$(YELLOW)🔄 Refreshing Terraform state...$(NC)"
-	@if [ ! -d "terraform" ]; then \
-		echo "$(RED)❌ Terraform directory not found$(NC)"; \
-		exit 1; \
-	fi
-	@$(call get_aws_account) && \
+	@test -d terraform || (echo "$(RED)❌ Terraform directory not found$(NC)" && exit 1)
+	$(call get_aws_account) && \
 	cd terraform && terraform init && terraform refresh -var="aws_account_id=$$AWS_ACCOUNT_ID"
 	@echo "$(GREEN)✅ State refreshed$(NC)"
 

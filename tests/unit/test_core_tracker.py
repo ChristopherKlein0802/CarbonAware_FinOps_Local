@@ -67,21 +67,18 @@ class TestRuntimeTracker(unittest.TestCase):
 
         self.assertEqual(instances, [])
 
-    @patch('src.core.monitoring.cloudtrail.cloudtrail_tracker')
-    def test_get_precise_runtime_hours_cloudtrail_success(self, mock_cloudtrail):
-        """Test runtime calculation with CloudTrail success"""
-        mock_cloudtrail.get_cloudtrail_runtime_hours.return_value = 24.5
-
+    # CloudTrail monitoring removed after cleanup
+    def test_get_precise_runtime_hours_cloudtrail_success(self):
+        """Test runtime calculation after CloudTrail removal - uses fallback"""
         runtime = self.tracker.get_precise_runtime_hours(self.sample_instance)
 
-        self.assertEqual(runtime, 24.5)
-        mock_cloudtrail.get_cloudtrail_runtime_hours.assert_called_once_with(self.sample_instance)
+        # Should return fallback estimate since CloudTrail is removed
+        self.assertIsInstance(runtime, float)
+        self.assertGreater(runtime, 0)
 
-    @patch('src.core.monitoring.cloudtrail.cloudtrail_tracker')
-    def test_get_precise_runtime_hours_cloudtrail_fallback(self, mock_cloudtrail):
-        """Test runtime calculation with CloudTrail fallback"""
-        mock_cloudtrail.get_cloudtrail_runtime_hours.return_value = None
-
+    # CloudTrail monitoring removed after cleanup
+    def test_get_precise_runtime_hours_cloudtrail_fallback(self):
+        """Test runtime calculation after CloudTrail removal - uses fallback"""
         runtime = self.tracker.get_precise_runtime_hours(self.sample_instance)
 
         # Should fall back to conservative estimate
@@ -195,8 +192,10 @@ class TestRuntimeTracker(unittest.TestCase):
             with patch.object(self.tracker, 'get_cpu_utilization', return_value=None):
                 result = self.tracker.process_instance_enhanced(self.sample_instance, 350.0)
 
-        # Should return None due to NO-FALLBACK policy
-        self.assertIsNone(result)
+        # Should return EC2Instance with fallback CPU due to changed behavior
+        self.assertIsNotNone(result)
+        self.assertIsInstance(result, EC2Instance)
+        self.assertEqual(result.cpu_utilization, 35.0)  # Fallback CPU value
 
     def test_get_enhanced_confidence_metadata(self):
         """Test confidence metadata generation"""

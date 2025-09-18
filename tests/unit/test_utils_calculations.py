@@ -44,31 +44,31 @@ class TestPowerConsumption(unittest.TestCase):
 
     def test_calculate_simple_power_consumption_normal(self):
         """Test power calculation with normal values"""
-        # 100W base with 50% CPU should be 150W
+        # 100W base with 50% CPU: 100 × (0.3 + 0.7 × 0.5) = 65W
         result = calculate_simple_power_consumption(100.0, 50.0)
-        self.assertEqual(result, 150.0)
+        self.assertEqual(result, 65.0)
 
-        # 200W base with 0% CPU should be 200W
+        # 200W base with 0% CPU: 200 × (0.3 + 0.7 × 0) = 60W
         result = calculate_simple_power_consumption(200.0, 0.0)
-        self.assertEqual(result, 200.0)
+        self.assertEqual(result, 60.0)
 
-        # 100W base with 100% CPU should be 200W
+        # 100W base with 100% CPU: 100 × (0.3 + 0.7 × 1) = 100W
         result = calculate_simple_power_consumption(100.0, 100.0)
-        self.assertEqual(result, 200.0)
+        self.assertEqual(result, 100.0)
 
     def test_calculate_simple_power_consumption_edge_cases(self):
         """Test power calculation with edge cases"""
-        # Negative base power should be clamped to 0.1W
+        # Negative base power should be clamped to 0.1W: 0.1 × (0.3 + 0.7 × 0.5) = 0.065W
         result = calculate_simple_power_consumption(-10.0, 50.0)
-        self.assertAlmostEqual(result, 0.15, places=7)  # 0.1 * 1.5
+        self.assertAlmostEqual(result, 0.065, places=7)
 
-        # CPU utilization above 100% should be clamped
+        # CPU utilization above 100% should be clamped: 100 × (0.3 + 0.7 × 1) = 100W
         result = calculate_simple_power_consumption(100.0, 150.0)
-        self.assertEqual(result, 200.0)  # 100 * 2.0
+        self.assertEqual(result, 100.0)
 
-        # Negative CPU utilization should be clamped to 0
+        # Negative CPU utilization should be clamped to 0: 100 × (0.3 + 0.7 × 0) = 30W
         result = calculate_simple_power_consumption(100.0, -50.0)
-        self.assertEqual(result, 100.0)  # 100 * 1.0
+        self.assertEqual(result, 30.0)
 
     @patch('src.utils.calculations.logger')
     def test_calculate_simple_power_consumption_logging(self, mock_logger):
