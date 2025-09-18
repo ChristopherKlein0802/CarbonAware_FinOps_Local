@@ -111,14 +111,18 @@ def get_runtime_hours(instance_id: str) -> Optional[float]:
 
 ### **24h-Datensammlung:**
 ```python
-# Stündliche Sammlung für 24h-Sliding-Window
-current_hour = datetime.now().replace(minute=0, second=0, microsecond=0)
-new_entry = {
-    'carbonIntensity': api_data.value,
-    'datetime': current_hour.isoformat(),
-    'full_date': current_hour.strftime('%d.%m.%Y'),
-    'display_time': current_hour.strftime('%d.%m.%Y %H:00')
-}
+# Free-Tier: ElectricityMaps "history" Endpoint (letzte 24 Stunden)
+params = {"zone": "DE"}
+response = requests.get(f"{BASE_URL}/carbon-intensity/history", params=params, headers=headers)
+
+if response.ok:
+    hourly_points = response.json()["history"]  # Liste mit datetime & carbonIntensity
+else:
+    hourly_points = None
+
+# Fallback – lokale Sammlung auf Basis von /latest:
+if not hourly_points:
+    hourly_points = cache.read("hourly_collection_de")  # aus stündlichen Latest-Messungen
 ```
 
 ---

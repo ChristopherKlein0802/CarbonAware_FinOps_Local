@@ -167,7 +167,7 @@ class ElectricityMapsAPI:
             except (FileNotFoundError, PermissionError, json.JSONDecodeError, KeyError) as e:
                 logger.warning(f"⚠️ 24h carbon cache read failed: {e}")
 
-        # Fetch fresh 24h historical data from ElectricityMap API
+        # Fetch fresh 24h historical data from ElectricityMap API (history endpoint → free tier)
         if not self.api_key:
             logger.error("❌ ElectricityMap API key not available for 24h data - NO FALLBACK used")
             return None
@@ -175,28 +175,12 @@ class ElectricityMapsAPI:
         headers = {"auth-token": self.api_key}
         zone = AWSConstants.REGION_MAPPINGS.get(region, "DE")
 
-        # Calculate time range for past 24 hours
-        end_time = datetime.now(timezone.utc)
-        start_time = end_time - timedelta(hours=24)
-
         try:
             logger.info(f"🌿 Fetching 24h carbon history for {zone}")
 
-            # Debug log the full request
-            request_params = {
-                "zone": zone,
-                "start": start_time.isoformat(timespec="seconds").replace("+00:00", "Z"),
-                "end": end_time.isoformat(timespec="seconds").replace("+00:00", "Z"),
-                "granularity": "hourly"
-            }
-            logger.info(f"📊 API Request params: {request_params}")
-
-            response = requests.get(
-                f"{self.base_url}/carbon-intensity/past-range",
-                headers=headers,
-                params=request_params,
-                timeout=30
-            )
+            history_url = f"{self.base_url}/carbon-intensity/history"
+            request_params = {"zone": zone}
+            response = requests.get(history_url, headers=headers, params=request_params, timeout=30)
 
             # Log response status before raising
             logger.info(f"📊 API Response status: {response.status_code}")
@@ -218,35 +202,61 @@ class ElectricityMapsAPI:
                 logger.info("💡 Possible fixes: Check API key permissions, zone parameter, or time range")
                 return None
 
-            # Check for different possible response structures
-            if "history" in data and isinstance(data["history"], list):
-                history_data = data["history"]
-            elif "data" in data and isinstance(data["data"], list):
-                history_data = data["data"]
+            history_candidates: List[List[Dict]] = []
+            if isinstance(data, dict):
+                for key in ("history", "data", "points"):
+                    value = data.get(key)
+                    if isinstance(value, list):
+                        history_candidates.append(value)
+                # ElectricityMaps sometimes nests the list under "history" -> {"values": []}
+                if "history" in data and isinstance(data["history"], dict):
+                    nested_values = data["history"].get("values")
+                    if isinstance(nested_values, list):
+                        history_candidates.append(nested_values)
             elif isinstance(data, list):
-                history_data = data
-            else:
-                logger.error(f"❌ ElectricityMap 24h API returned invalid data structure. Keys: {list(data.keys())}")
-                return None
+                history_candidates.append(data)
 
-            # Process and validate the historical data
-            processed_history = []
-            for entry in history_data:
-                if "carbonIntensity" in entry and "datetime" in entry:
+            processed_history: List[Dict] = []
+
+            def _normalise_entries(entries: List[Dict]) -> None:
+                for raw_entry in entries:
+                    if not isinstance(raw_entry, dict):
+                        continue
+                    intensity = raw_entry.get("carbonIntensity")
+                    if intensity is None:
+                        intensity = raw_entry.get("value")
+                    timestamp = raw_entry.get("datetime") or raw_entry.get("time") or raw_entry.get("timestamp")
+                    if intensity is None or timestamp is None:
+                        continue
+                    try:
+                        intensity_value = float(intensity)
+                    except (TypeError, ValueError):
+                        continue
+                    dt = parse_iso_datetime(str(timestamp))
                     processed_history.append({
-                        "carbonIntensity": float(entry["carbonIntensity"]),
-                        "datetime": entry["datetime"],
-                        "hour": parse_iso_datetime(entry["datetime"]).hour
+                        "carbonIntensity": intensity_value,
+                        "datetime": dt.isoformat(),
+                        "hour": dt.hour,
+                        "source": raw_entry.get("source", "electricitymap_24h_api")
                     })
+
+            for candidate in history_candidates:
+                _normalise_entries(candidate)
 
             if len(processed_history) < 12:  # Minimum reasonable data points
                 logger.warning(f"⚠️ ElectricityMap returned insufficient 24h data: {len(processed_history)} points")
                 return None
 
+            # Remove duplicates and sort chronologically
+            unique_history = {
+                entry["datetime"]: entry for entry in processed_history
+            }
+            ordered_history = [unique_history[key] for key in sorted(unique_history.keys())]
+
             # Cache the result with daily expiration
             try:
                 cache_data = {
-                    "history": processed_history,
+                    "history": ordered_history,
                     "cached_at": datetime.now().isoformat(),
                     "data_source": "electricitymap_24h_api",
                     "region": region,
@@ -254,11 +264,11 @@ class ElectricityMapsAPI:
                 }
                 with open(cache_path, "w") as f:
                     json.dump(cache_data, f)
-                logger.info(f"✅ 24h carbon history: {len(processed_history)} data points (cached 24h)")
+                logger.info(f"✅ 24h carbon history: {len(ordered_history)} data points (cached 24h)")
             except (OSError, PermissionError, json.JSONDecodeError) as e:
                 logger.warning(f"⚠️ Failed to cache 24h carbon data: {e}")
 
-            return processed_history
+            return ordered_history
 
         except requests.exceptions.RequestException as e:
             logger.error(f"❌ ElectricityMap 24h API failed: {e} - NO FALLBACK used")
@@ -290,13 +300,8 @@ class ElectricityMapsAPI:
             if not current_data:
                 return
 
-            # Ensure we use the correct current year (2024, not 2025)
             current_time = datetime.now()
-            if current_time.year != 2024:
-                logger.warning(f"⚠️ System time shows year {current_time.year}, forcing to 2024 for academic consistency")
-                current_hour = current_time.replace(year=2024, minute=0, second=0, microsecond=0)
-            else:
-                current_hour = current_time.replace(minute=0, second=0, microsecond=0)
+            current_hour = current_time.replace(minute=0, second=0, microsecond=0)
 
             # Load existing data
             collected_data = []

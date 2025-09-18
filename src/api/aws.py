@@ -7,6 +7,7 @@ import json
 import boto3
 from datetime import datetime
 from typing import Optional
+from botocore.exceptions import ClientError
 
 from ..utils.cache import is_cache_valid, get_standard_cache_path, ensure_cache_dir, CacheTTL
 from ..utils.errors import handle_aws_operations, ErrorMessages
@@ -102,7 +103,7 @@ class AWSAPIClient:
             logger.error(f"❌ Could not parse pricing data for {instance_type}")
             return None
 
-        except boto3.session.Session.client('pricing').exceptions.ClientError as e:
+        except ClientError as e:
             error_code = e.response['Error']['Code']
             if error_code == 'InvalidGrantException':
                 logger.error("🔄 AWS SSO session expired for Pricing API - re-authenticate required")
@@ -199,7 +200,7 @@ class AWSAPIClient:
                 with open(cache_path, "w") as f:
                     json.dump(cache_data, f)
                 logger.info(f"✅ AWS EC2 costs: ${ec2_cost:.2f} USD (validation data, cached 1h)")
-            except (OSError, PermissionError, json.JSONEncodeError) as e:
+            except (OSError, PermissionError, TypeError, ValueError) as e:
                 logger.warning(f"⚠️ Failed to cache cost data: {e}")
 
             return cost_data

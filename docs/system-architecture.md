@@ -20,73 +20,52 @@
 
 ```
 CarbonAware_FinOps_Local/
-├── 🚀 run_dashboard.py              # Professional startup script
-├── 📋 ARCHITECTURE.md               # This documentation
-├── 🔧 CLAUDE.md                     # Development guidelines
-│
-├── 📁 src/                          # Source code (Clean Architecture)
-│   ├── 📁 frontend/                 # Presentation Layer
-│   │   ├── 🎯 app.py               # Main Streamlit application
-│   │   ├── 📁 pages/               # Page components
-│   │   │   └── streamlit_pages.py  # All dashboard pages
-│   │   ├── 📁 components/          # Reusable UI components
-│   │   ├── 📁 utils/               # Frontend utilities
-│   │   └── 📁 assets/              # CSS and static resources
-│   │
-│   ├── 📁 backend/                  # Business Logic Layer
-│   │   ├── 📁 services/            # External service integrations
-│   │   │   └── api_clients/        # ElectricityMaps, Boavizta, AWS APIs
-│   │   ├── 📁 controllers/         # Business logic controllers
-│   │   │   ├── data_processing.py  # Core FinOps calculations
-│   │   │   └── health_checks.py    # API health monitoring
-│   │   └── 📁 models/              # Domain models & data structures
-│   │       └── data_models.py      # Type-safe data classes
-│   │
-│   └── 📁 shared/                   # Shared utilities
-│       ├── 📁 components/          # Reusable business components
-│       └── performance_monitor.py  # Performance tracking
-│
-├── 📁 tests/                        # Comprehensive test suite
-├── 📁 docs/                         # Academic documentation
-├── 📦 requirements.txt              # Production dependencies
-└── 🔧 .env                         # Environment configuration
+├── src/
+│   ├── api/           # External integrations (ElectricityMaps, AWS, Boavizta)
+│   ├── app.py         # Streamlit entrypoint and layout configuration
+│   ├── core/          # Data processor, calculators, trackers
+│   ├── models/        # Typed dataclasses for dashboard payloads
+│   ├── utils/         # Shared utilities (cache, logging, validation)
+│   └── views/         # Streamlit page components
+├── docs/              # Academic documentation set
+├── tests/             # Unit and integration tests
+├── terraform/         # Optional AWS validation environment
+├── requirements*.txt  # Dependency specifications
+├── Makefile           # Reproducible automation targets
+└── .env.example       # Environment variable template
 ```
 
 ---
 
 ## 🎯 **Layer Responsibilities**
 
-### **🎨 Frontend Layer** (`src/frontend/`)
-**Responsibility:** User interface and presentation logic
-- **Streamlit** application with modern UI/UX
-- **Sidebar navigation** with professional design
-- **Interactive filters** and real-time updates
-- **Export functionality** (CSV/JSON)
-- **Responsive design** for academic presentations
+### **🎨 Presentation Layer** (`src/app.py`, `src/views/`)
+**Responsibility:** Streamlit UI and thesis narration
+- Sidebar navigation with academic context
+- Executive, carbon, and infrastructure pages assembled from modular view helpers
+- Lightweight CSS styling from `src/assets/`
 
-### **🧠 Backend Layer** (`src/backend/`)
-**Responsibility:** Business logic and data processing
+### **🧠 Processing Layer** (`src/core/`)
+**Responsibility:** Data orchestration and business logic
+- `DataProcessor` composes API clients, calculators, and trackers
+- CloudTrail-enhanced runtime tracking and validation logic
+- Carbon and business-case calculators with documented uncertainty ranges
 
-#### **Services** (`services/`)
-- **API Integration:** ElectricityMaps, Boavizta, AWS Cost Explorer
-- **Intelligent Caching:** 30min/1h/24h strategies for cost optimization
-- **Rate Limiting:** Production-ready API management
+### **🌐 Integration Layer** (`src/api/`)
+**Responsibility:** External data acquisition with caching and error handling
+- ElectricityMaps carbon intensity client with graceful degradation
+- Boavizta power model retrieval
+- AWS Pricing, Cost Explorer, CloudWatch, and CloudTrail accessors
 
-#### **Controllers** (`controllers/`)
-- **Data Processing:** FinOps calculations with academic rigor
-- **Health Monitoring:** Comprehensive API health checks
-- **Business Logic:** Conservative calculations with uncertainty ranges
+### **🧱 Domain Layer** (`src/models/`)
+**Responsibility:** Typed payloads for thesis-grade traceability
+- Dataclasses for EC2 instances, carbon metrics, business cases, and dashboard payload
+- Centralised uncertainty metadata and validation factors
 
-#### **Models** (`models/`)
-- **Type Safety:** Comprehensive dataclasses with validation
-- **Domain Models:** EC2Instance, CarbonIntensity, BusinessCase
-- **Academic Standards:** Uncertainty documentation and disclaimers
-
-### **🔗 Shared Layer** (`src/shared/`)
-**Responsibility:** Cross-cutting concerns
-- **Performance Monitoring:** API response time tracking
-- **Chart Components:** Reusable visualization utilities
-- **Common Utilities:** Shared business logic
+### **🔗 Shared Utilities** (`src/utils/`)
+**Responsibility:** Cross-cutting helpers
+- Cache helpers, structured logging, validation scoring, and UI shortcuts
+- Streamlit performance utilities for consistent chart rendering
 
 ---
 
@@ -151,11 +130,9 @@ graph TB
 
 ### **Quick Start**
 ```bash
-# Professional launch with architecture validation
-python run_dashboard.py
-
-# Manual launch (development)
-streamlit run src/frontend/app.py --server.port 8051
+make setup       # optional: create virtualenv and install dependencies
+make dashboard   # launches `streamlit run src/app.py`
+# or manually: streamlit run src/app.py --server.port 8501
 ```
 
 ### **Production Features**

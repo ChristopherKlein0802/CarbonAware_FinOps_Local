@@ -121,6 +121,7 @@ class DataProcessor:
 
             # Enhanced validation: Compare calculated costs with actual AWS spending
             validation_factor = self.business_calculator.calculate_cloudtrail_enhanced_accuracy(processed_instances, total_cost_eur, cost_data, instances)
+            accuracy_status = getattr(self.business_calculator, '_last_accuracy_status', None)
 
             # Calculate business case with validation factor awareness
             business_case = self.business_calculator.calculate_business_case(total_cost_eur, total_co2_kg, validation_factor)
@@ -146,7 +147,9 @@ class DataProcessor:
                     "Conservative estimates with ±15% uncertainty range",
                     "Theoretical scenarios for methodology demonstration"
                 ],
-                api_health_status=api_health_status
+                api_health_status=api_health_status,
+                validation_factor=validation_factor,
+                accuracy_status=accuracy_status
             )
 
             logger.info(f"✅ Infrastructure analysis complete: {len(processed_instances)} instances, €{total_cost_eur:.2f} monthly")
@@ -175,7 +178,9 @@ class DataProcessor:
             academic_disclaimers=[
                 error_message,
                 "Academic integrity maintained - no fallback data used"
-            ]
+            ],
+            validation_factor=None,
+            accuracy_status=None
         )
 
     def _create_minimal_response(self, carbon_intensity, error_message: str) -> DashboardData:
@@ -199,7 +204,9 @@ class DataProcessor:
                 error_message,
                 "Academic integrity maintained - preserving available API data"
             ],
-            api_health_status=api_health_status
+            api_health_status=api_health_status,
+            validation_factor=None,
+            accuracy_status=None
         )
 
     # All specialized functionality now properly delegated to dedicated modules:

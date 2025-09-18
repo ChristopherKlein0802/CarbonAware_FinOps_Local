@@ -244,11 +244,8 @@ def _render_precision_insights(dashboard_data: Any) -> None:
     # Calculate basic metrics
     total_instances = len(dashboard_data.instances)
 
-    # Get validation status from calculator if available
-    from src.core.calculator import BusinessCaseCalculator
-    calculator = BusinessCaseCalculator()
-    validation_factor = getattr(calculator, '_last_validation_factor', None)
-    accuracy_status = getattr(calculator, '_last_accuracy_status', 'UNKNOWN')
+    validation_factor = getattr(dashboard_data, 'validation_factor', None)
+    accuracy_status = getattr(dashboard_data, 'accuracy_status', 'UNKNOWN') or 'UNKNOWN'
 
     col1, col2, col3, col4 = st.columns(4)
 

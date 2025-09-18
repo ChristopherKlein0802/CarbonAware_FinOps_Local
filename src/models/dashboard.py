@@ -24,6 +24,8 @@ class DashboardData:
     uncertainty_ranges: Dict[str, float] = None
     academic_disclaimers: List[str] = None
     api_health_status: Optional[Dict[str, 'APIHealthStatus']] = None
+    validation_factor: Optional[float] = None
+    accuracy_status: Optional[str] = None
 
     def __post_init__(self):
         if self.uncertainty_ranges is None:

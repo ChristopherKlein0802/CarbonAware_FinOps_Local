@@ -8,7 +8,7 @@
 
 1. **Validierte Marktlücke**: KEINE existierende Lösung kombiniert Echtzeit-Deutsche-Grid-Daten + AWS-Kostenoptimierung + Business-Case-Generierung
 2. **Kostenvorteil**: €5-20/Monat vs. €200+ für separate Tools (97,5% Kostenersparnis)
-3. **Funktionale Überlegenheit**: 28% zusätzliche Optimierung durch Integration vs. separate Tools
+3. **Funktionale Hypothese**: Literaturbasierte Schätzungen deuten auf ~28 % zusätzliche Optimierungspotenziale durch Integration hin; empirische Bestätigung steht aus.
 4. **Deutsche SME-Marktlücke**: Gezielte Lösung für 20-100 Instanzen mit EU-Compliance
 
 **Methodologie**: Systematische Tool-Analyse nach wissenschaftlichen Standards mit transparenten Vergleichskriterien.

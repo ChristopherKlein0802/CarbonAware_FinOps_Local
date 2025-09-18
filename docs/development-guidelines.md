@@ -98,13 +98,12 @@ def calculate_carbon_footprint(instance, carbon_intensity, cpu_utilization):
 ### **Current Structure (Streamlit App)**
 ```
 src/
-├── app.py              # Main Streamlit application
-├── pages.py            # All dashboard pages (800+ lines)
-├── api_client.py       # Unified 5-API client (400+ lines)
-├── data_processor.py   # Business logic & calculations
-├── models.py           # Type-safe data structures
-├── health_monitor.py   # API health checking
-└── assets/modern-thesis-styles.css
+├── app.py            # Streamlit entrypoint and global layout
+├── api/              # ElectricityMaps, AWS, Boavizta integrations
+├── core/             # Data processor, calculators, runtime tracker
+├── models/           # Dataclasses for EC2, carbon, business, dashboard
+├── utils/            # Cache, logging, validation, UI helpers
+└── views/            # Streamlit page components (overview, carbon, infra)
 ```
 
 ### **API Integration Standards**
@@ -147,12 +146,10 @@ make status    # Infrastructure health check
 ## 📊 **Testing Standards**
 
 ### **Test Categories**
-```bash
+```
 tests/
-├── test_api_clients.py      # API integration testing
-├── test_data_processing.py  # Business logic validation
-├── test_health_checks.py    # System monitoring
-└── test_unified_api.py      # End-to-end integration
+├── unit/           # calculators, tracker, constants, processor
+└── integration/    # pipeline exercise with real APIs (optional)
 ```
 
 ### **Academic Testing Requirements**
@@ -198,10 +195,10 @@ Expected Challenges & Responses:
 
 ```bash
 # Setup and launch
-cd src && streamlit run app.py
+streamlit run src/app.py
 
 # API health check
-python -c "from api_client import UnifiedAPIClient; print(UnifiedAPIClient().health_check())"
+python -c "from src.api.client import UnifiedAPIClient; print(UnifiedAPIClient().get_current_carbon_intensity('eu-central-1'))"
 
 # Run comprehensive tests
 python -m pytest tests/ -v
