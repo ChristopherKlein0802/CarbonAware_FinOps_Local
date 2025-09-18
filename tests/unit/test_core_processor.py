@@ -114,7 +114,7 @@ class TestDataProcessor(unittest.TestCase):
 
     # Health monitoring removed after cleanup
     @patch('src.core.processor.unified_api_client')
-    def test_get_infrastructure_data_no_carbon_intensity(self, mock_api_client, mock_health_manager):
+    def test_get_infrastructure_data_no_carbon_intensity(self, mock_api_client):
         """Test infrastructure data retrieval without carbon intensity"""
         mock_api_client.get_current_carbon_intensity.return_value = None
         # Health monitoring simplified after cleanup

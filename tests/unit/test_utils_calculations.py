@@ -46,7 +46,7 @@ class TestPowerConsumption(unittest.TestCase):
         """Test power calculation with normal values"""
         # 100W base with 50% CPU: 100 × (0.3 + 0.7 × 0.5) = 65W
         result = calculate_simple_power_consumption(100.0, 50.0)
-        self.assertEqual(result, 65.0)
+        self.assertAlmostEqual(result, 65.0, places=10)  # Use assertAlmostEqual for floating point comparison
 
         # 200W base with 0% CPU: 200 × (0.3 + 0.7 × 0) = 60W
         result = calculate_simple_power_consumption(200.0, 0.0)

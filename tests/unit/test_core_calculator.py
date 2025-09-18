@@ -87,14 +87,16 @@ class TestBusinessCaseCalculator(unittest.TestCase):
         self.assertEqual(result.baseline_cost_eur, 100.0)
         self.assertEqual(result.baseline_co2_kg, 10.0)
 
-        # Check scenario calculations (10% and 20%)
-        self.assertEqual(result.office_hours_savings_eur, 10.0)  # 10% of 100
-        self.assertEqual(result.carbon_aware_savings_eur, 20.0)  # 20% of 100
-        self.assertEqual(result.integrated_savings_eur, 20.0)    # Using scenario B
+        # Check scenario calculations (dynamic based on validation factor)
+        # For validation_factor=1.0, baseline_cost=100: base_conservative=8%, cost_scaling=0.8 (small infrastructure)
+        # scenario_a_factor = 8% * 0.8 = 6.4%, scenario_b_factor = 15% * 0.8 = 12%
+        self.assertEqual(result.office_hours_savings_eur, 6.4)   # 6.4% of 100
+        self.assertEqual(result.carbon_aware_savings_eur, 12.0)  # 12% of 100
+        self.assertEqual(result.integrated_savings_eur, 12.0)    # Using scenario B
 
-        self.assertEqual(result.office_hours_co2_reduction_kg, 1.0)  # 10% of 10
-        self.assertEqual(result.carbon_aware_co2_reduction_kg, 2.0)  # 20% of 10
-        self.assertEqual(result.integrated_co2_reduction_kg, 2.0)    # Using scenario B
+        self.assertEqual(result.office_hours_co2_reduction_kg, 0.64)  # 6.4% of 10
+        self.assertEqual(result.carbon_aware_co2_reduction_kg, 1.2)  # 12% of 10
+        self.assertEqual(result.integrated_co2_reduction_kg, 1.2)    # Using scenario B
 
     def test_calculate_business_case_zero_baseline(self):
         """Test business case with zero baseline values"""
@@ -225,9 +227,15 @@ class TestBusinessCaseCalculator(unittest.TestCase):
         result = self.calculator.calculate_business_case(baseline_cost, baseline_co2, 1.0)
 
         # Check that values are properly rounded (approximately)
-        self.assertAlmostEqual(result.office_hours_savings_eur, 12.35, places=1)  # 10% of 123.46
-        self.assertAlmostEqual(result.carbon_aware_savings_eur, 24.69, places=1)  # 20% of 123.46
-        self.assertAlmostEqual(result.office_hours_co2_reduction_kg, 1.235, places=2)  # 10% of 12.346
+        # For validation_factor=1.0, baseline_cost=123.456789: base_conservative=8%, cost_scaling=1.1 (medium infrastructure)
+        # scenario_a_factor = 8% * 1.1 = 8.8%
+        # office_hours_savings = 123.456789 * 0.088 = 10.864...
+        self.assertAlmostEqual(result.office_hours_savings_eur, 10.864, places=1)  # 8.8% of 123.46
+        # scenario_b_factor = 15% * 1.1 = 16.5%
+        # carbon_aware_savings = 123.456789 * 0.165 = 20.37...
+        self.assertAlmostEqual(result.carbon_aware_savings_eur, 20.37, places=1)   # 16.5% of 123.46
+        # office_hours_co2_reduction = 12.3456789 * 0.088 = 1.086...
+        self.assertAlmostEqual(result.office_hours_co2_reduction_kg, 1.086, places=2)  # 8.8% of 12.346
 
 
 if __name__ == '__main__':

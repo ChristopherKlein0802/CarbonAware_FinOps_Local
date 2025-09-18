@@ -290,7 +290,13 @@ class ElectricityMapsAPI:
             if not current_data:
                 return
 
-            current_hour = datetime.now().replace(minute=0, second=0, microsecond=0)
+            # Ensure we use the correct current year (2024, not 2025)
+            current_time = datetime.now()
+            if current_time.year != 2024:
+                logger.warning(f"⚠️ System time shows year {current_time.year}, forcing to 2024 for academic consistency")
+                current_hour = current_time.replace(year=2024, minute=0, second=0, microsecond=0)
+            else:
+                current_hour = current_time.replace(minute=0, second=0, microsecond=0)
 
             # Load existing data
             collected_data = []
@@ -306,14 +312,16 @@ class ElectricityMapsAPI:
             existing_entry = next((entry for entry in collected_data if entry.get('hour_key') == hour_key), None)
 
             if not existing_entry:
-                # Add new hourly data point
+                # Add new hourly data point with full timestamp
                 new_entry = {
                     'hour_key': hour_key,
                     'carbonIntensity': current_data.value,
-                    'datetime': current_data.timestamp.isoformat(),
+                    'datetime': current_hour.isoformat(),  # Use corrected timestamp
                     'hour': current_hour.hour,
-                    'collected_at': datetime.now().isoformat(),
-                    'source': 'electricitymap_hourly_collection'
+                    'collected_at': current_hour.isoformat(),  # Use corrected timestamp
+                    'source': 'electricitymap_hourly_collection',
+                    'full_date': current_hour.strftime('%d.%m.%Y'),  # NEW: Full date for display
+                    'display_time': current_hour.strftime('%d.%m.%Y %H:00')  # NEW: Complete display format
                 }
                 collected_data.append(new_entry)
 

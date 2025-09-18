@@ -69,10 +69,10 @@ def _render_dynamic_carbon_chart(historical_data: list, current_intensity: float
 
     current_time = datetime.now()
 
-    # Always include current data point
+    # Always include current data point with full timestamp
     chart_datetimes = [current_time]
     chart_values = [current_intensity]
-    chart_labels = ["Now"]
+    chart_labels = [f"{current_time.strftime('%d.%m.%Y %H:00')} (Jetzt)"]
 
     # Add historical data if available
     if historical_data and len(historical_data) > 0:
@@ -87,12 +87,12 @@ def _render_dynamic_carbon_chart(historical_data: list, current_intensity: float
                 chart_datetimes.append(point_datetime)
                 chart_values.append(value)
 
-                # Create descriptive label
+                # Create descriptive label with full date
                 time_diff = current_time - point_datetime
                 if time_diff.days > 0:
-                    chart_labels.append(f"Yesterday {point_datetime.strftime('%H:00')}")
+                    chart_labels.append(f"{point_datetime.strftime('%d.%m.%Y %H:00')} (Gestern)")
                 else:
-                    chart_labels.append(f"Today {point_datetime.strftime('%H:00')}")
+                    chart_labels.append(f"{point_datetime.strftime('%d.%m.%Y %H:00')} (Heute)")
 
         # Sort by datetime for proper chronological order
         combined_data = list(zip(chart_datetimes, chart_values, chart_labels))
@@ -120,11 +120,11 @@ def _render_dynamic_carbon_chart(historical_data: list, current_intensity: float
         marker_symbols = []
 
         for dt, label in zip(chart_datetimes, chart_labels):
-            if label == "Now":
+            if "(Jetzt)" in label:
                 marker_colors.append('red')
                 marker_sizes.append(12)
                 marker_symbols.append('star')
-            elif "Yesterday" in label:
+            elif "(Gestern)" in label:
                 marker_colors.append('#FFA500')  # Orange for yesterday
                 marker_sizes.append(8)
                 marker_symbols.append('circle')
@@ -141,7 +141,7 @@ def _render_dynamic_carbon_chart(historical_data: list, current_intensity: float
             line=dict(color='#2E8B57', width=3),
             marker=dict(size=marker_sizes, color=marker_colors, symbol=marker_symbols),
             text=chart_labels,
-            hovertemplate='<b>%{text}</b><br>%{y}g CO₂/kWh<br>%{x|%d.%m %H:%M}<extra></extra>'
+            hovertemplate='<b>%{text}</b><br>%{y}g CO₂/kWh<extra></extra>'
         ))
     else:
         # Single point - show as current hour marker
@@ -174,7 +174,7 @@ def _render_dynamic_carbon_chart(historical_data: list, current_intensity: float
         showlegend=True,
         xaxis=dict(
             type='date',
-            tickformat='%H:%M\n%d.%m',
+            tickformat='%d.%m.%Y\n%H:%M',
             dtick=3600000 * 2  # Show every 2 hours in milliseconds
         )
     )

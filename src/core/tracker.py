@@ -80,34 +80,16 @@ class RuntimeTracker:
             logger.error(f"❌ Runtime calculation error for {instance_id}: {e}")
             return self._get_minimal_conservative_estimate(instance)
 
-    def _get_minimal_conservative_estimate(self, instance: Dict) -> float:
-        """Realistic fallback when CloudTrail unavailable"""
+    def _get_minimal_conservative_estimate(self, instance: Dict) -> None:
+        """NO-FALLBACK POLICY: Return None when CloudTrail unavailable
+
+        Academic integrity requires transparent data absence rather than estimated values.
+        This maintains the NO-FALLBACK policy for scientific rigor.
+        """
         instance_id = instance.get("instance_id", "unknown")
-        state = instance.get("state", "unknown")
-        instance_type = instance.get("instance_type", "unknown")
-
-        logger.warning(f"⚠️ FALLBACK ESTIMATE for {instance_id} - CloudTrail unavailable")
-
-        # More realistic estimates for demonstration
-        HOURS_PER_MONTH = 730
-
-        if state == "running":
-            # Running instances: assume significant usage (50-80% of month)
-            if "nano" in instance_type or "micro" in instance_type:
-                final_hours = HOURS_PER_MONTH * 0.8  # Small instances often run continuously
-            elif "large" in instance_type or "xlarge" in instance_type:
-                final_hours = HOURS_PER_MONTH * 0.6  # Large instances used selectively
-            else:
-                final_hours = HOURS_PER_MONTH * 0.7  # Medium instances moderate usage
-        elif state == "stopped":
-            # Stopped instances: minimal previous usage
-            final_hours = HOURS_PER_MONTH * 0.2
-        else:
-            # Other states: moderate usage
-            final_hours = HOURS_PER_MONTH * 0.4
-
-        logger.warning(f"📊 Fallback estimate {instance_id}: {final_hours:.1f}h (demo values)")
-        return final_hours
+        logger.warning(f"⚠️ NO-FALLBACK POLICY: Runtime data unavailable for {instance_id} - CloudTrail API failed")
+        logger.info("💡 Academic integrity: Returning None instead of estimated values")
+        return None
 
     def get_cpu_utilization(self, instance_id: str) -> Optional[float]:
         """Get average CPU utilization from CloudWatch with 3-hour caching"""
@@ -213,23 +195,20 @@ class RuntimeTracker:
             # Get actual runtime hours
             actual_runtime_hours = self.get_precise_runtime_hours(instance)
 
+            # NO-FALLBACK POLICY: Runtime hours must come from CloudTrail
+            if actual_runtime_hours is None:
+                logger.warning(f"⚠️ NO-FALLBACK POLICY: Runtime data unavailable for {instance['instance_id']} - CloudTrail data missing")
+                logger.info("💡 Academic integrity: Cannot proceed without real CloudTrail data")
+                return None
+
             # Get CPU utilization for power calculation
             cpu_utilization = self.get_cpu_utilization(instance["instance_id"])
 
-            # Fallback for demonstration: Use reasonable default CPU utilization
+            # NO-FALLBACK POLICY: CPU utilization must come from CloudWatch
             if cpu_utilization is None:
-                # Use realistic default based on instance type and state
-                if instance["state"] == "running":
-                    if "micro" in instance["instance_type"] or "nano" in instance["instance_type"]:
-                        cpu_utilization = 25.0  # Small instances: light usage
-                    elif "large" in instance["instance_type"] or "xlarge" in instance["instance_type"]:
-                        cpu_utilization = 45.0  # Large instances: moderate usage
-                    else:
-                        cpu_utilization = 35.0  # Medium instances: typical usage
-                else:
-                    cpu_utilization = 10.0  # Stopped instances: minimal usage
-
-                logger.warning(f"⚠️ Using fallback CPU utilization for {instance['instance_id']}: {cpu_utilization}%")
+                logger.warning(f"⚠️ NO-FALLBACK POLICY: CPU utilization unavailable for {instance['instance_id']} - CloudWatch data missing")
+                logger.info("💡 Academic integrity: Cannot proceed without real CloudWatch metrics")
+                return None
 
             # Enhanced CO2 calculation with CloudTrail-verified runtime and simple power scaling
             effective_power_watts = calculate_simple_power_consumption(power_data.avg_power_watts, cpu_utilization)
