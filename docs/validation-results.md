@@ -1,42 +1,42 @@
-# Validation Results: Carbon-Aware FinOps Prototype
+# Validierungsergebnisse: Carbon-Aware FinOps Prototyp
 
-## 1. Integration Test Overview
-| Date | Command | Artefacts | Notes |
-|------|---------|-----------|-------|
-| 2025-09-18 | `make test-integration` | `artifacts/integration/20250918T145619/` | Live run with ElectricityMaps + AWS APIs |
+## 1. Integrationstest im Überblick
+| Datum | Kommando | Artefakte | Anmerkungen |
+|-------|----------|-----------|-------------|
+| 18.09.2025 | `make test-integration` | `artifacts/integration/20250918T145619/` | Lauf mit ElectricityMaps- und AWS-APIs |
 
-Required credentials: `AWS_PROFILE=carbon-finops-sandbox`, `ELECTRICITYMAP_API_KEY`.
+Voraussetzung: `AWS_PROFILE=carbon-finops-sandbox`, `ELECTRICITYMAP_API_KEY`.
 
-## 2. Key Metrics from Artefacts
-| Metric | Value | Source |
-|--------|-------|--------|
-| Instances processed | 4 | `metadata.json` |
-| Carbon intensity (g CO₂/kWh) | 78.0 | `dashboard_data.json → carbon_intensity.value` |
-| Total monthly cost (EUR) | 0.74 | `dashboard_data.json → total_cost_eur` |
-| Total monthly CO₂ (kg) | 0.004 | `dashboard_data.json → total_co2_kg` |
-| Runtime data availability | 4/4 instances with CloudTrail runtime | `dashboard_data.json → instances[*].runtime_hours` |
+## 2. Kennzahlen aus den Artefakten
+| Kennzahl | Wert | Quelle |
+|----------|------|--------|
+| Verarbeitete Instanzen | 4 | `metadata.json` |
+| Carbon-Intensität (g CO₂/kWh) | 78,0 | `dashboard_data.json → carbon_intensity.value` |
+| Monatliche Gesamtkosten (EUR) | 0,74 | `dashboard_data.json → total_cost_eur` |
+| Monatlicher CO₂-Ausstoß (kg) | 0,004 | `dashboard_data.json → total_co2_kg` |
+| Laufzeitdaten verfügbar | 4/4 Instanzen | `dashboard_data.json → instances[*].runtime_hours` |
 
 ## 3. Interpretation
-- CloudTrail runtime events were present for all four test instances, enabling measured runtime hours rather than estimates.
-- ElectricityMaps returned a valid carbon intensity for `eu-central-1` (76 g CO₂/kWh) during the run.
-- The small total cost reflects the limited runtime during the measurement window; values serve as proof of data flow rather than extrapolated SME scenarios.
+- CloudTrail lieferte Laufzeitereignisse für alle vier Testinstanzen, sodass Messwerte statt Schätzungen vorliegen.
+- ElectricityMaps stellte eine gültige Intensität für `eu-central-1` bereit (78 g CO₂/kWh zum Messzeitpunkt).
+- Die geringen Gesamtwerte spiegeln die kurze Messdauer wider; sie dienen als Nachweis der Datenpipeline, nicht als belastbare Extrapolation.
 
-## 4. Comparison with Literature Expectations
-| Aspect | Literature reference | Observation |
-|--------|----------------------|-------------|
-| Runtime accuracy | Target ±5 % once sufficient CloudTrail data collected ([13]) | Runtime recorded, but no longitudinal evaluation yet |
-| Cost optimisation potential | 15–25 % for office-hours scheduling ([7]) | Not assessed in this run; business-case logic remains literature-derived |
-| Carbon reduction potential | 15–35 % through temporal shifting ([6], [15]) | Requires scenario execution; not part of this measurement |
+## 4. Abgleich mit Literaturerwartungen
+| Aspekt | Literatur | Beobachtung |
+|--------|-----------|-------------|
+| Laufzeitgenauigkeit | Ziel ±5 % bei ausreichender Datengrundlage [13] | Daten vorhanden, noch keine Langzeitanalyse |
+| Kosteneffekte | 15–25 % Einsparpotenzial durch Office-Hours-Scheduling [7] | In diesem Lauf nicht bewertet, da Szenarien fehlen |
+| CO₂-Reduktion | 15–35 % durch zeitliche Verschiebung [6], [15] | Noch nicht getestet, Szenario erforderlich |
 
-## 5. Limitations
-- Single data point; no longitudinal comparison.
-- Hardware power models and cost estimates rely on literature-derived assumptions pending empirical calibration.
-- Artefacts are stored locally; to support peer review, include them (or anonymised extracts) in the thesis appendix.
+## 5. Limitationen
+- Einzelmessung ohne Zeitreihe.
+- Hardwaremodelle und Kosteneinschätzungen sind weiterhin literaturbasiert.
+- Artefakte werden lokal gespeichert; für Peer Review sollten relevante Ausschnitte als Anhang bereitgestellt werden.
 
-## 6. Next Steps
-1. Schedule repeated integration runs (e.g., daily for one week) to observe carbon/cost variance.
-2. Capture scenario-based experiments (e.g., deliberate shutdowns) to quantify optimisation effects.
-3. Link artefacts in the written thesis and document processing scripts for external replication.
+## 6. Nächste Schritte
+1. Wiederholte Messungen (z. B. täglich) zur Analyse von Kosten- und Carbon-Schwankungen.
+2. Szenarioexperimente (gezielte Start-/Stop-Zyklen) zur Quantifizierung der Literaturannahmen.
+3. Einbindung der Artefakte und Auswertungen in die schriftliche Arbeit.
 
-## 7. References
-Literature citations correspond to the numbering in `docs/references.md`.
+## 7. Quellen
+Die Nummerierung verweist auf `docs/references.md`.

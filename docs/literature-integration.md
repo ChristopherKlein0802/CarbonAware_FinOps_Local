@@ -1,30 +1,30 @@
-# Literature Integration: Carbon-Aware FinOps
+# Literaturintegration: Carbon-Aware FinOps
 
-## 1. Overview
-This document summarises the sources that inform the design of the Carbon-Aware FinOps prototype and maps each literature strand to concrete implementation decisions. All references correspond to the numbering in `docs/references.md`.
+## 1. Überblick
+Das Dokument bündelt die wichtigsten Literaturstränge und ordnet sie den Implementierungsentscheidungen des Prototyps zu. Die Quellenangaben verweisen auf `docs/references.md`.
 
-## 2. Cloud Cost Optimisation
-- **AWS Well-Architected Framework** emphasises right-sizing, workload scheduling, and accurate monitoring. These recommendations justify the collection of AWS Pricing, Cost Explorer, CloudTrail, and CloudWatch data for visibility and governance [7], [8], [13].
-- **Industry studies** such as McKinsey and Deloitte quantify achievable cost reductions (15–25 %) and highlight organisational requirements for FinOps practices. The business case calculator therefore uses conservative optimisation factors derived from these studies [7], [9].
-- **Gartner market analyses** indicate a fragmented tool landscape and motivate an integrated solution for SMEs with limited budgets [8].
+## 2. Cloud-Kostenoptimierung
+- **AWS Well-Architected Framework:** Empfiehlt Right-Sizing, Workload-Scheduling und präzises Monitoring. Daraus leitet sich die Erfassung von AWS Pricing, Cost Explorer, CloudTrail und CloudWatch ab [7], [8], [13].
+- **Branchenstudien (McKinsey, Deloitte):** Quantifizieren Einsparpotenziale von 15–25 % und betonen organisatorische Voraussetzungen für FinOps. Die Business-Case-Berechnungen nutzen konservative Faktoren aus diesen Studien [7], [9].
+- **Gartner Marktanalysen:** Identifizieren eine fragmentierte Werkzeuglandschaft und begründen das integrierte Vorgehen für KMU [8].
 
-## 3. Carbon Accounting and Energy Models
-- **Energy-proportional computing literature** supplies the 30/70 idle-to-load power scaling used in `calculate_simple_power_consumption` [1], [2], [3].
-- **Emission standards** from the IEA, EPA, and Green Software Foundation provide the methodological baseline for converting power consumption and grid intensity into CO₂ equivalents [4]–[6].
-- **Carbon-aware scheduling research** (MIT, Microsoft, Google) demonstrates the value of temporal load shifting and motivates the dashboard’s optimisation scenarios [14], [15], [20].
+## 3. Carbon Accounting und Energiemodelle
+- **Energy-Proportional Computing:** Liefert das 30/70-Leistungsmodell, das in `calculate_simple_power_consumption` umgesetzt ist [1], [2], [3].
+- **Emissionsstandards (IEA, EPA, GSF):** Dienen als Grundlage für die Umrechnung von Leistungsaufnahme und Netzintensität in CO₂-Äquivalente [4]–[6].
+- **Carbon-aware Scheduling (MIT, Microsoft, Google):** Belegt den Nutzen zeitlicher Lastverschiebung und motiviert entsprechende Dashboardszenarien [14], [15], [20].
 
-## 4. Regional and Regulatory Context
-- **German energy market reports** (Agora Energiewende, Fraunhofer ISE, BDEW) describe the national carbon intensity profile, enabling the localisation of ElectricityMaps data and the interpretation of scheduling windows [16]–[18].
-- **EU policy documents** (Fit for 55) and SME digitalisation studies substantiate the compliance and adoption pressures faced by German SMEs, reinforcing the market focus of the prototype [11], [12], [19].
+## 4. Regionaler und regulatorischer Kontext
+- **Energiemarktberichte (Agora Energiewende, Fraunhofer ISE, BDEW):** Beschreiben die deutsche Netzcharakteristik und unterstützen die Lokalisierung der ElectricityMaps-Daten [16]–[18].
+- **EU-Politik und KMU-Digitalisierung:** Dokumente wie „Fit for 55“ sowie Studien zur Digitalisierungsreife liefern den regulatorischen Rahmen und begründen den KMU-Fokus [11], [12], [19].
 
-## 5. Monitoring and Runtime Measurement
-- **AWS CloudTrail documentation** motivates the use of audit logs for runtime reconstruction, while highlighting the need for explicit configuration and data retention management [13].
-- **NIST and related infrastructure monitoring guidelines** support the multi-source approach to measurement and verification, combining CloudTrail with CloudWatch metrics for triangulation [20].
+## 5. Monitoring und Laufzeitmessung
+- **AWS CloudTrail:** Begründet den Audit-Ansatz für Laufzeiten, weist aber auf Konfigurations- und Aufbewahrungsanforderungen hin [13].
+- **Standards zur Infrastrukturüberwachung:** Ergänzende Leitlinien (z. B. NIST-nahe Ansätze) stützen die Kombination von CloudTrail und CloudWatch zur Verifikation [20].
 
-## 6. Synthesis for the Prototype
-- The integration of five APIs operationalises the literature’s call for accurate, real-time data across cost and carbon domains.
-- Conservative uncertainty intervals reflect scientific caution where empirical validation is pending.
-- The documentation and software architecture aim to bridge academic rigour with practical SME applicability by ensuring reproducibility, transparency, and explicit limitation statements.
+## 6. Ableitung für den Prototyp
+- Die Verknüpfung von fünf APIs setzt die Literaturforderung nach integrierten, aktuellen Daten für Kosten und Carbon um.
+- Dokumentierte Unsicherheitsintervalle spiegeln wissenschaftliche Vorsicht wider, solange empirische Validierung aussteht.
+- Architektur und Dokumentation verbinden akademische Nachvollziehbarkeit mit praxisnaher KMU-Ausrichtung.
 
-## 7. References
-Alle Literaturangaben befinden sich in `docs/references.md`.
+## 7. Quellen
+Vollständige Angaben siehe `docs/references.md`.

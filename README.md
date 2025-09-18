@@ -1,21 +1,21 @@
-# Carbon-Aware FinOps Tool – Bachelor Thesis
+# Carbon-Aware FinOps Tool – Bachelorarbeit
 
-## Research Question
-"Wie kann ein integriertes Carbon-aware FinOps Tool durch die Kombination von Echtzeit-Stromnetz-Daten sowohl Kosten als auch CO2-Emissionen optimieren – im Vergleich zu separaten Tools?"
+## Forschungsfrage
+„Wie kann ein integriertes Carbon-aware FinOps Tool durch die Kombination von Echtzeit-Stromnetz-Daten sowohl Kosten als auch CO₂-Emissionen optimieren – im Vergleich zu separaten Tools?“
 
-## Problem Context
-Small and medium sized enterprises (SMEs) in Germany increasingly rely on cloud infrastructures, yet available optimisation tools address either financial visibility or environmental reporting in isolation [7], [8], [10]. Current offerings rarely incorporate regional grid characteristics or high fidelity runtime telemetry, which limits their suitability for EU climate compliance and SME budget constraints [11], [12], [19].
+## Problemstellung
+Deutsche kleine und mittlere Unternehmen (KMU) nutzen Cloud-Infrastrukturen zunehmend intensiv, jedoch adressieren verfügbare Werkzeuge meist nur entweder Kosten- oder CO₂-Transparenz [7], [8], [10]. Regionale Netzcharakteristika und präzise Laufzeittelemetrie fehlen häufig, wodurch EU-Compliance-Anforderungen und Budgetgrenzen deutscher KMU nur unzureichend berücksichtigt werden [11], [12], [19].
 
-## Proposed Contribution
-The prototype implements a unified monitoring and optimisation workflow that combines:
-- ElectricityMaps based German grid carbon intensity data with two hour caching [4], [16], [17].
-- Boavizta hardware power models for utilisation sensitive energy estimates [1], [2], [6].
-- AWS Cost Explorer, Pricing, CloudTrail and CloudWatch interfaces for billing validation, pricing data, runtime audits, and CPU metrics [7], [13].
+## Beitrag des Prototyps
+Der Prototyp implementiert einen integrierten Monitoring- und Optimierungs-Workflow mit:
+- ElectricityMaps für die deutsche Netz-Carbon-Intensität (2-Stunden-Cache) [4], [16], [17].
+- Boavizta-Hardwaremodellen zur nutzungsabhängigen Energieeinschätzung [1], [2], [6].
+- AWS Cost Explorer, Pricing, CloudTrail und CloudWatch für Kostenvalidierung, Preisdaten, Laufzeitaudits und CPU-Metriken [7], [13].
 
-This integration aims to provide a reproducible reference implementation for carbon-aware FinOps in SME-scale environments (20–100 instances) while maintaining academic transparency.
+Die Integration dient als reproduzierbare Referenzimplementierung für carbon-aware FinOps im KMU-Skalierungsbereich (ca. 20–100 Instanzen) mit wissenschaftlicher Nachvollziehbarkeit.
 
-## System Overview
-The Streamlit dashboard (`src/app.py`) acts as presentation layer and orchestrates data acquisition through the `DataProcessor` controller (`src/core/processor.py`). The processor coordinates API clients, runtime tracking, and business case calculations. Dataclasses model the resulting measurements (`src/models`). Auxiliary utilities cover caching, logging, validation, and scientific calculations. Infrastructure-as-code artefacts inside `terraform/` provision a representative AWS testbed.
+## Systemüberblick
+Das Streamlit-Dashboard (`src/app.py`) bildet die Präsentationsschicht und orchestriert Datenerhebung über den `DataProcessor` (`src/core/processor.py`). Dieser koordiniert API-Clients, Laufzeit-Tracking und Business-Case-Berechnungen. Dataclasses modellieren die Messwerte (`src/models`), während Utilities Caching, Logging, Validierung und Berechnungen kapseln. Terraform-Artefakte (`terraform/`) stellen eine repräsentative AWS-Testumgebung bereit.
 
 ```
 CarbonAware_FinOps_Local/
@@ -33,13 +33,13 @@ CarbonAware_FinOps_Local/
 └── requirements-frozen.txt # Locked environment for reproducibility
 ```
 
-## Scientific Methodology
-- **No-Fallback Policy:** API failures surface to the dashboard instead of being masked by synthetic data to maintain traceability.
-- **Carbon Calculations:** Monthly emissions derive from standard power-intensity runtime models endorsed by the IEA and GSF [4], [6]. Power scaling adopts the literature-backed 30/70 idle-to-load approximation for servers [1], [2].
-- **Cost and Business Cases:** Scenario factors use conservative ranges reported in recent FinOps and cloud cost optimisation studies [7], [8], [9].
-- **Uncertainty Reporting:** Each dashboard response contains explicit uncertainty annotations describing data provenance and estimated accuracy bands.
+## Wissenschaftliche Methodik
+- **No-Fallback-Policy:** API-Ausfälle werden sichtbar gemacht, anstatt durch synthetische Daten kaschiert zu werden.
+- **CO₂-Berechnung:** Monatswerte basieren auf etablierten Leistungs- und Intensitätsmodellen (IEA, GSF) [4], [6]; die Leistungs-Skalierung nutzt das 30/70-Modell für Serverlast [1], [2].
+- **Kosten- und Business-Case-Modellierung:** Szenariofaktoren stützen sich auf konservative Werte aus jüngeren FinOps-Studien [7], [8], [9].
+- **Unsicherheiten:** Jede Dashboard-Antwort weist explizite Unsicherheiten und Datenquellen aus.
 
-## Quick Start
+## Schnellstart
 ```bash
 # 1. Repository klonen
 git clone <your-repo-url>
@@ -69,11 +69,11 @@ cp .env.example .env
 make deploy
 ```
 
-## Documentation
-Detailed background on methodology, validation procedure, and market positioning is available in `docs/thesis-documentation.md`, `docs/literature-integration.md`, and related documents. A consolidated bibliography is maintained in `docs/references.md`.
+## Dokumentation
+Ausführliche Hintergründe zu Methodik, Validierung und Marktanalyse finden sich in `docs/thesis-documentation.md`, `docs/literature-integration.md` und weiteren Dokumenten. Das vollständige Literaturverzeichnis steht in `docs/references.md`.
 
-## Licence
-Das Projekt wurde im Rahmen einer Bachelorarbeit erstellt. Die Nutzung unterliegt den Richtlinien der jeweiligen Hochschule. Bitte beachten Sie ergänzende Hinweise in `LICENSE`.
+## Lizenz
+Das Projekt entstand im Rahmen einer Bachelorarbeit. Die Nutzung ist an die Richtlinien der jeweiligen Hochschule gebunden; ergänzende Hinweise stehen in `LICENSE`.
 
-## References
-Alle Quellenangaben befinden sich in `docs/references.md`. Inline-Zitate verwenden das dort definierte Nummerierungsschema.
+## Quellen
+Alle Quellenangaben sind in `docs/references.md` aufgeführt; Zitationen folgen dem dortigen Nummerierungsschema.
