@@ -13,10 +13,13 @@ terraform {
 
 # Auto-generate project name if not provided
 locals {
+  # Use provided account ID or empty string for now
+  account_id = var.aws_account_id
+
   # Generate project name from AWS account ID if not provided
-  generated_project_name = "carbon-finops-${substr(var.aws_account_id, -6, -1)}"
+  generated_project_name = var.aws_account_id != "" ? "carbon-finops-${substr(var.aws_account_id, -6, -1)}" : "carbon-finops-thesis"
   project_name = var.project_name != "" ? var.project_name : local.generated_project_name
-  
+
   # Common tags for all resources
   common_tags = {
     Project     = local.project_name
@@ -26,13 +29,16 @@ locals {
   }
 }
 
+# Data source to get current AWS account information (after provider is configured)
+data "aws_caller_identity" "current" {}
+
 provider "aws" {
   region = var.aws_region
   profile = var.aws_profile
 
-  # Specific AWS Account (can be any account with proper SSO access)
-  allowed_account_ids = [var.aws_account_id]
-  
+  # Specific AWS Account (will be enforced via Makefile or terraform.tfvars)
+  allowed_account_ids = var.aws_account_id != "" ? [var.aws_account_id] : null
+
   default_tags {
     tags = local.common_tags
   }

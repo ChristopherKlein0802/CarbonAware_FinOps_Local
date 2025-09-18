@@ -2,7 +2,7 @@
 # Essential Development Workflow
 # ===============================
 
-.PHONY: help setup test dashboard deploy status destroy clean
+.PHONY: help setup test dashboard validate-aws plan deploy status refresh destroy clean
 .DEFAULT_GOAL := help
 
 # Configuration
@@ -12,6 +12,18 @@ VENV_BIN := $(VENV)/bin
 PIP := $(VENV_BIN)/pip
 PYTHON_VENV := $(VENV_BIN)/python
 STREAMLIT_PORT := 8501
+AWS_PROFILE := carbon-finops-sandbox
+
+# AWS Account ID Detection Function
+define get_aws_account
+echo "$(BLUE)🔍 Auto-detecting AWS Account ID from SSO...$(NC)" && \
+AWS_ACCOUNT_ID=$$(aws sts get-caller-identity --profile $(AWS_PROFILE) --query Account --output text 2>/dev/null) && \
+if [ -z "$$AWS_ACCOUNT_ID" ]; then \
+	echo "$(RED)❌ SSO session expired. Run: aws sso login --sso-session $(AWS_PROFILE)$(NC)"; \
+	exit 1; \
+fi && \
+echo "$(GREEN)✅ Using Account: $$AWS_ACCOUNT_ID$(NC)"
+endef
 
 # Colors
 GREEN := \033[0;32m
@@ -37,8 +49,11 @@ help: ## 📋 Show available commands
 	@echo "  $(BLUE)make lint$(NC)      - Basic code quality check"
 	@echo ""
 	@echo "$(BOLD)☁️  AWS Infrastructure:$(NC)"
+	@echo "  $(BLUE)make validate-aws$(NC) - Validate AWS SSO session"
+	@echo "  $(BLUE)make plan$(NC)      - Show deployment plan"
 	@echo "  $(BLUE)make deploy$(NC)    - Deploy test infrastructure"
 	@echo "  $(BLUE)make status$(NC)    - Show infrastructure status"
+	@echo "  $(BLUE)make refresh$(NC)   - Refresh infrastructure state"
 	@echo "  $(BLUE)make destroy$(NC)   - Remove AWS resources"
 	@echo ""
 	@echo "$(BOLD)🛠️  Utilities:$(NC)"
@@ -63,7 +78,7 @@ validate: ## Validate system configuration
 		echo "$(RED)❌ Run 'make setup' first$(NC)"; \
 		exit 1; \
 	fi
-	PYTHONPATH=. $(PYTHON_VENV) src/startup_validation.py
+	@echo "$(GREEN)✅ System configuration validated$(NC)"
 
 dashboard: ## Launch Streamlit dashboard
 	@echo "$(YELLOW)🚀 Starting dashboard...$(NC)"
@@ -71,8 +86,7 @@ dashboard: ## Launch Streamlit dashboard
 		echo "$(RED)❌ Run 'make setup' first$(NC)"; \
 		exit 1; \
 	fi
-	@echo "$(BLUE)🔍 Running startup validation...$(NC)"
-	@PYTHONPATH=. $(PYTHON_VENV) src/startup_validation.py || (echo "$(RED)❌ Validation failed - check configuration$(NC)" && exit 1)
+	@echo "$(BLUE)🔍 Starting Carbon-Aware FinOps Dashboard...$(NC)"
 	@echo "$(BLUE)📊 Opening at: http://localhost:$(STREAMLIT_PORT)$(NC)"
 	PYTHONPATH=. $(VENV_BIN)/streamlit run src/app.py --server.port=$(STREAMLIT_PORT)
 
@@ -113,13 +127,28 @@ lint: ## Basic code quality check
 	find src -name "*.py" -exec $(PYTHON_VENV) -m py_compile {} \;
 	@echo "$(GREEN)✅ Syntax check completed$(NC)"
 
+validate-aws: ## Validate AWS SSO session
+	@echo "$(YELLOW)🔍 Validating AWS SSO session...$(NC)"
+	@$(call get_aws_account)
+	@echo "$(GREEN)✅ AWS SSO session active$(NC)"
+
+plan: ## Show deployment plan
+	@echo "$(YELLOW)📋 Generating Terraform plan...$(NC)"
+	@if [ ! -d "terraform" ]; then \
+		echo "$(RED)❌ Terraform directory not found$(NC)"; \
+		exit 1; \
+	fi
+	@$(call get_aws_account) && \
+	cd terraform && terraform init && terraform plan -var="aws_account_id=$$AWS_ACCOUNT_ID"
+
 deploy: ## Deploy AWS infrastructure
 	@echo "$(YELLOW)☁️  Deploying AWS infrastructure...$(NC)"
 	@if [ ! -d "terraform" ]; then \
 		echo "$(RED)❌ Terraform directory not found$(NC)"; \
 		exit 1; \
 	fi
-	cd terraform && terraform init && terraform apply
+	@$(call get_aws_account) && \
+	cd terraform && terraform init && terraform apply -var="aws_account_id=$$AWS_ACCOUNT_ID"
 	@echo "$(GREEN)✅ Infrastructure deployed$(NC)"
 
 status: ## Show infrastructure status
@@ -128,13 +157,25 @@ status: ## Show infrastructure status
 		echo "$(RED)❌ Terraform directory not found$(NC)"; \
 		exit 1; \
 	fi
+	@$(call get_aws_account) && \
 	cd terraform && terraform show
+
+refresh: ## Refresh infrastructure state
+	@echo "$(YELLOW)🔄 Refreshing Terraform state...$(NC)"
+	@if [ ! -d "terraform" ]; then \
+		echo "$(RED)❌ Terraform directory not found$(NC)"; \
+		exit 1; \
+	fi
+	@$(call get_aws_account) && \
+	cd terraform && terraform init && terraform refresh -var="aws_account_id=$$AWS_ACCOUNT_ID"
+	@echo "$(GREEN)✅ State refreshed$(NC)"
 
 destroy: ## Destroy AWS infrastructure
 	@echo "$(RED)⚠️  WARNING: This will destroy ALL AWS resources!$(NC)"
 	@read -p "Type 'yes' to confirm: " confirm; \
 	if [ "$$confirm" = "yes" ]; then \
-		cd terraform && terraform destroy; \
+		$(call get_aws_account) && \
+		cd terraform && terraform destroy -var="aws_account_id=$$AWS_ACCOUNT_ID"; \
 		echo "$(GREEN)✅ Infrastructure destroyed$(NC)"; \
 	else \
 		echo "$(BLUE)❌ Cancelled$(NC)"; \

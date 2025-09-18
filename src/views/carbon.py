@@ -9,230 +9,17 @@ import plotly.graph_objects as go
 from datetime import datetime
 from typing import Any, Optional
 
-from src.utils.performance import get_cached_historical_data
 
 
-def _render_optimization_zones(fig: go.Figure) -> None:
-    """Add optimization zone lines to carbon intensity chart"""
-    fig.add_hline(y=200, line_dash="dash", line_color="green",
-                  annotation_text="🟢 OPTIMAL ZONE (<200g)", annotation_position="top left")
-    fig.add_hline(y=350, line_dash="dash", line_color="orange",
-                  annotation_text="🟡 MODERATE ZONE (200-350g)", annotation_position="top left")
-    fig.add_hline(y=450, line_dash="dash", line_color="red",
-                  annotation_text="🔴 HIGH CARBON (>350g)", annotation_position="top left")
 
 
-def _process_historical_data(historical_data: list, current_intensity: float) -> tuple[list, list]:
-    """Process historical data to create 24-hour pattern"""
-    hours = []
-    grid_pattern = []
-    current_hour = datetime.now().hour
-
-    # Sort data by hour and create 24-hour pattern
-    for hour in range(24):
-        hours.append(hour)
-        # Find data for this hour (use most recent if multiple entries)
-        hour_data = [d for d in historical_data if d["hour"] == hour]
-        if hour_data:
-            grid_pattern.append(hour_data[-1]["carbonIntensity"])
-        elif hour == current_hour:
-            # Use current intensity for current hour if missing
-            grid_pattern.append(current_intensity)
-        else:
-            # Fill gaps with reasonable interpolation
-            prev_values = [d["carbonIntensity"] for d in historical_data if d["hour"] < hour]
-            next_values = [d["carbonIntensity"] for d in historical_data if d["hour"] > hour]
-            if prev_values and next_values:
-                grid_pattern.append((prev_values[-1] + next_values[0]) / 2)
-            elif prev_values:
-                grid_pattern.append(prev_values[-1])
-            elif next_values:
-                grid_pattern.append(next_values[0])
-            else:
-                grid_pattern.append(current_intensity)
-
-    return hours, grid_pattern
 
 
-def _render_carbon_chart(historical_data: list, current_intensity: float) -> None:
-    """Render the 24-hour carbon intensity chart"""
-    current_hour = datetime.now().hour
-
-    if historical_data and len(historical_data) > 0:
-        # Use real API data
-        hours, grid_pattern = _process_historical_data(historical_data, current_intensity)
-
-        # Determine data source for transparency
-        data_source = historical_data[0].get('source', 'unknown')
-        if 'hourly_collection' in data_source:
-            st.success(f"✅ Using self-collected real ElectricityMaps data ({len(historical_data)} hourly data points)")
-            st.info("🔬 **Academic Note**: Data collected hourly from ElectricityMaps API to build our own 24h dataset")
-        else:
-            st.success(f"✅ Using official ElectricityMaps 24h API data ({len(historical_data)} data points)")
-    else:
-        # Fallback: Show clear disclaimer about data unavailability
-        st.warning("⚠️ 24h data not yet available - building dataset over time")
-        st.info("📊 **Scientific Note**: Self-collecting hourly data from ElectricityMaps API to build our own 24h dataset. Check back in a few hours!")
-
-        # Create minimal chart with only current data point
-        hours = [current_hour]
-        grid_pattern = [current_intensity]
-
-    # Create chart
-    fig = go.Figure()
-
-    # Add the 24h pattern
-    fig.add_trace(go.Scatter(
-        x=hours,
-        y=grid_pattern,
-        mode='lines+markers',
-        name='German Grid',
-        line=dict(color='#2E8B57', width=3),
-        marker=dict(size=6)
-    ))
-
-    # Highlight current hour
-    fig.add_trace(go.Scatter(
-        x=[current_hour],
-        y=[current_intensity],
-        mode='markers',
-        name='Current',
-        marker=dict(size=15, color='red', symbol='star')
-    ))
-
-    # Add optimization zones
-    _render_optimization_zones(fig)
-
-    # Update chart title based on data source
-    if historical_data and len(historical_data) > 0:
-        chart_title = 'German Electricity Grid - Real ElectricityMaps API Data (Past 24h)'
-    else:
-        chart_title = 'German Electricity Grid - Current Data Only (24h API Unavailable)'
-
-    fig.update_layout(
-        title=chart_title,
-        xaxis_title='Hour of Day',
-        yaxis_title='Carbon Intensity (g CO₂/kWh)',
-        height=500,
-        showlegend=True
-    )
-
-    st.plotly_chart(fig, use_container_width=True)
-
-    # Scientific disclaimer about data source
-    if historical_data and len(historical_data) > 0:
-        st.info("🔬 **Academic Note**: Chart shows real ElectricityMaps historical data with daily caching for cost optimization")
-    else:
-        st.warning("🔬 **Academic Note**: Full 24h pattern unavailable - showing current data only to maintain NO-FALLBACK scientific policy")
-
-
-def _render_optimization_recommendations() -> None:
-    """Render optimization recommendations section"""
-    st.markdown("### 💡 Smart Scheduling Recommendations")
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.markdown("""
-        **🟢 OPTIMAL TIMES (Low Carbon):**
-        - **12:00-16:00**: Solar peak hours
-        - **02:00-06:00**: Low demand, wind power
-
-        **✅ RECOMMENDED ACTIONS:**
-        - Schedule batch jobs and data processing
-        - Run machine learning training
-        - Execute backup operations
-        - Deploy auto-scaling for variable workloads
-        """)
-
-    with col2:
-        st.markdown("""
-        **🔴 AVOID TIMES (High Carbon):**
-        - **18:00-22:00**: Peak demand, coal plants
-        - **07:00-09:00**: Morning demand surge
-
-        **❌ ACTIONS TO POSTPONE:**
-        - Non-urgent compute tasks
-        - Development/test environments
-        - Data analytics jobs
-        - Archive operations
-        """)
-
-
-def _render_business_impact_analysis(dashboard_data: Any) -> None:
-    """Render business impact analysis section"""
-    st.markdown("### 📈 Carbon-Aware vs Traditional Scheduling")
-
-    if dashboard_data and dashboard_data.instances:
-        # Calculate potential carbon savings
-        total_monthly_co2 = dashboard_data.total_co2_kg
-        traditional_monthly_co2 = total_monthly_co2 * 1.1  # Assume 10% worse with fixed scheduling
-
-        # Conservative optimization estimate
-        co2_reduction = traditional_monthly_co2 - total_monthly_co2
-        co2_reduction_percent = (co2_reduction / traditional_monthly_co2) * 100
-
-        col1, col2 = st.columns(2)
-
-        with col1:
-            st.metric(
-                "Monthly CO₂ Reduction",
-                f"{co2_reduction:.1f} kg",
-                f"{co2_reduction_percent:.1f}% improvement"
-            )
-
-            # EU ETS carbon pricing (approximate)
-            if co2_reduction > 0:
-                eur_savings = (co2_reduction / 1000) * 50  # Convert kg to tonnes × €50
-                st.metric("EU ETS Value Saved", f"€{eur_savings:.2f}", "Per month")
-
-        with col2:
-            st.markdown("**Implementation Strategy:**")
-            st.markdown("""
-            1. 🔍 **Monitor**: Track grid carbon intensity
-            2. ⏰ **Schedule**: Move workloads to green hours
-            3. 🔄 **Automate**: Use AWS EventBridge + Lambda
-            4. 📊 **Measure**: Compare before/after emissions
-            """)
-
-    st.markdown("### 🌍 Environmental Impact Context")
-
-    # Environmental context calculations
-    if dashboard_data and dashboard_data.instances:
-        instances_data = []
-        for inst in dashboard_data.instances:
-            if inst.monthly_co2_kg and inst.power_watts:
-                instances_data.append({
-                    "Instance": inst.instance_id[:8],
-                    "Type": inst.instance_type,
-                    "CO₂/Power": inst.monthly_co2_kg / inst.power_watts * 1000,
-                    "Efficiency": "High" if (inst.monthly_co2_kg / inst.power_watts * 1000) < 100 else "Low"
-                })
-
-        if instances_data:
-            efficiency_df = pd.DataFrame(instances_data)
-            st.dataframe(efficiency_df, use_container_width=True)
-
-    # Add energy mix information
-    st.markdown("### 🇩🇪 German Energy Mix Context")
-
-    energy_mix = pd.DataFrame([
-        {"Source": "Renewables", "Percentage": 45, "Type": "Green"},
-        {"Source": "Natural Gas", "Percentage": 25, "Type": "Fossil"},
-        {"Source": "Coal", "Percentage": 18, "Type": "Fossil"},
-        {"Source": "Nuclear", "Percentage": 12, "Type": "Nuclear"}
-    ])
-
-    import plotly.express as px
-    fig_mix = px.pie(energy_mix, values="Percentage", names="Source",
-                    color="Type", title="🇩🇪 German Energy Mix 2025 (Estimated)")
-    fig_mix.update_layout(height=400)
-    st.plotly_chart(fig_mix, use_container_width=True)
 
 
 def render_carbon_page(dashboard_data: Optional[Any]) -> None:
     """
-    Render the carbon optimization page
+    Render focused carbon optimization page
 
     Args:
         dashboard_data: Complete dashboard data object with carbon intensity data
@@ -243,38 +30,130 @@ def render_carbon_page(dashboard_data: Optional[Any]) -> None:
         st.warning("⚠️ No carbon intensity data available. Check ElectricityMaps API.")
         return
 
-    # Current Grid Status
+    # Current status and quick metrics
     current_intensity = dashboard_data.carbon_intensity.value
-    st.markdown(f"### ⚡ German Grid Status: {current_intensity:.0f} g CO₂/kWh")
+    _render_current_grid_status(current_intensity)
 
-    # Real 24h German Grid Pattern from ElectricityMaps API
-    st.markdown("### 📊 German Grid 24h Carbon Intensity Pattern")
-    st.markdown("*Real historical data from ElectricityMaps API (past 24 hours)*")
+    # Core feature: 24h pattern visualization with dynamic building from cached hourly data
+    from src.api.electricity import ElectricityMapsAPI
+    electricity_api = ElectricityMapsAPI()
+    historical_data = electricity_api.get_self_collected_24h_data("eu-central-1")
+    _render_dynamic_carbon_chart(historical_data, current_intensity)
 
-    # Get cached historical data for better performance
-    historical_data = get_cached_historical_data("eu-central-1")
+    # Simple optimization message (Business Impact is on Executive Summary)
+    st.success("🎯 **Key Insight**: Use carbon intensity data to schedule workloads during low-carbon hours for optimal environmental impact.")
 
-    # Render carbon intensity chart
-    _render_carbon_chart(historical_data, current_intensity)
 
-    # Render optimization recommendations
-    _render_optimization_recommendations()
+def _render_current_grid_status(current_intensity: float) -> None:
+    """Render current grid status with quick optimization metrics"""
+    # Use centralized grid status logic
+    from src.utils.ui import determine_grid_status
+    status_color, status_text, recommendation = determine_grid_status(current_intensity)
 
-    # Render business impact analysis
-    _render_business_impact_analysis(dashboard_data)
+    # Visual status display
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Current Grid Intensity", f"{current_intensity:.0f} g CO₂/kWh", status_text)
+    with col2:
+        st.metric("Status", f"{status_color} {status_text}", "German electricity grid")
+    with col3:
+        st.metric("Recommendation", recommendation[:15] + "...", "for cost & carbon optimization")
 
-    # Grid status determination
-    if current_intensity < 300:
-        grid_status = "Low"
-        status_emoji = "🟢"
-        recommendation = "✅ OPTIMAL: Schedule energy-intensive workloads now"
-    elif current_intensity < 500:
-        grid_status = "Medium"
-        status_emoji = "🟡"
-        recommendation = "⚠️ MODERATE: Consider delaying non-urgent tasks"
+    # Current status summary
+    st.info(f"{status_color} **{recommendation}**")
+
+
+def _render_dynamic_carbon_chart(historical_data: list, current_intensity: float) -> None:
+    """Render progressive 24h carbon chart with dynamic building"""
+    st.markdown("### 📊 German Grid 24h Carbon Intensity")
+
+    current_hour = datetime.now().hour
+
+    # Always include current data point
+    chart_hours = [current_hour]
+    chart_values = [current_intensity]
+
+    # Add historical data if available
+    if historical_data and len(historical_data) > 0:
+        # Process and sort historical data by hour
+        for data_point in historical_data:
+            hour = data_point["hour"]
+            value = data_point["carbonIntensity"]
+
+            # Avoid duplicate current hour
+            if hour != current_hour:
+                chart_hours.append(hour)
+                chart_values.append(value)
+
+        # Sort by hour for proper line connection
+        combined_data = list(zip(chart_hours, chart_values))
+        combined_data.sort(key=lambda x: x[0])
+        chart_hours, chart_values = zip(*combined_data)
+
+        data_points = len(historical_data)
+        if data_points < 6:
+            st.info(f"🔄 Building dataset: {data_points + 1} hours collected (collecting hourly)")
+        elif data_points < 18:
+            st.success(f"📈 Growing dataset: {data_points + 1} hours collected")
+        else:
+            st.success(f"✅ Full dataset: {data_points + 1} hourly measurements (24h pattern)")
     else:
-        grid_status = "High"
-        status_emoji = "🔴"
-        recommendation = "🚨 HIGH CARBON: Postpone batch jobs if possible"
+        st.warning("⚠️ Starting data collection - First hour collected")
 
-    st.info(f"{status_emoji} **Current Recommendation:** {recommendation}")
+    # Create progressive chart
+    fig = go.Figure()
+
+    # Progressive line chart - only connect available data points
+    if len(chart_hours) >= 2:
+        # Multiple points - show as connected line with current hour highlighted
+        marker_colors = ['red' if h == current_hour else '#2E8B57' for h in chart_hours]
+        marker_sizes = [12 if h == current_hour else 8 for h in chart_hours]
+        marker_symbols = ['star' if h == current_hour else 'circle' for h in chart_hours]
+
+        fig.add_trace(go.Scatter(
+            x=list(chart_hours),
+            y=list(chart_values),
+            mode='lines+markers',
+            name='German Grid Carbon Intensity',
+            line=dict(color='#2E8B57', width=3),
+            marker=dict(size=marker_sizes, color=marker_colors, symbol=marker_symbols)
+        ))
+    else:
+        # Single point - show as current hour marker
+        fig.add_trace(go.Scatter(
+            x=list(chart_hours),
+            y=list(chart_values),
+            mode='markers',
+            name='Current Hour',
+            marker=dict(size=12, color='red', symbol='star')
+        ))
+
+    # Chart shows carbon intensity without zone lines (status already displayed above)
+
+    # Dynamic chart title based on data availability
+    if historical_data and len(historical_data) >= 18:
+        chart_title = f'German Grid Carbon Intensity - Complete 24h Pattern ({len(chart_hours)} hours)'
+    elif historical_data and len(historical_data) > 0:
+        chart_title = f'German Grid Carbon Intensity - Building Pattern ({len(chart_hours)} hours collected)'
+    else:
+        chart_title = 'German Grid Carbon Intensity - Starting Collection'
+
+    # Update chart layout
+    fig.update_layout(
+        title=chart_title,
+        xaxis_title='Hour of Day',
+        yaxis_title='Carbon Intensity (g CO₂/kWh)',
+        height=500,
+        showlegend=True,
+        xaxis=dict(range=[0, 23], dtick=2)  # Show all 24 hours for reference
+    )
+
+    st.plotly_chart(fig, width='stretch')
+
+    # Progressive status display
+    if historical_data and len(historical_data) > 0:
+        total_hours = len(chart_hours)
+        coverage_pct = (total_hours / 24) * 100
+        st.caption(f"📊 Data Coverage: {total_hours}/24 hours ({coverage_pct:.0f}%) - Progressive building from ElectricityMaps API")
+    else:
+        st.caption("📊 Starting hourly data collection - Chart will progressively build over 24 hours")

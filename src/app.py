@@ -30,9 +30,7 @@ data_processor = get_data_processor()
 from src.views import (
     render_overview_page,
     render_infrastructure_page,
-    render_carbon_page,
-    render_competitive_analysis_page,
-    render_research_methods_page
+    render_carbon_page
 )
 
 # Page configuration
@@ -78,7 +76,7 @@ def load_custom_css() -> None:
     except (OSError, IOError) as e:
         logger.error(f"File system error loading CSS: {e} - using default Streamlit styles")
 
-@st.cache_data(ttl=APIConstants.STREAMLIT_DEFAULT_CACHE_TTL, show_spinner="Loading infrastructure data...")  # 30 minute cache
+@st.cache_resource(show_spinner="Loading infrastructure data...")  # Use cache_resource for complex objects
 def load_infrastructure_data() -> Optional[Any]:
     """Load infrastructure data with proper caching and specific error handling"""
     try:
@@ -107,24 +105,52 @@ def main() -> None:
     st.sidebar.title("🌱 Carbon-Aware FinOps")
     st.sidebar.markdown("*Bachelor Thesis Dashboard*")
 
-    # Navigation menu
+    # Simplified navigation menu - core features only
     page = st.sidebar.radio(
         "Navigation",
-        ["🏆 Executive Summary", "🇩🇪 Carbon Optimization", "🔄 Competitive Analysis", "🏗️ Infrastructure", "🔬 Research Methods"],
+        ["🏆 Executive Summary", "🇩🇪 Carbon Optimization", "🏗️ Infrastructure"],
         index=0
     )
 
     # Load data once for all pages
     dashboard_data = load_infrastructure_data()
 
-    # System status in sidebar
+    # API Status Widget - Core 5 APIs
     st.sidebar.markdown("---")
+    st.sidebar.markdown("### 🔗 API Status")
+
     if dashboard_data:
-        st.sidebar.success("✅ System Online")
+        # API health status simplified (monitoring module removed in cleanup)
+        api_statuses = {}
+
+        # Core 5 APIs with actual data availability detection
+        apis = [
+            ("ElectricityMaps", dashboard_data.carbon_intensity is not None and dashboard_data.carbon_intensity.value > 0),
+            ("AWS Cost Explorer", dashboard_data.total_cost_eur > 0),
+            ("CloudTrail", any(hasattr(i, 'runtime_hours') and i.runtime_hours and i.runtime_hours > 0 for i in dashboard_data.instances) if dashboard_data.instances else False),
+            ("Boavizta", any(i.power_watts and i.power_watts > 0 for i in dashboard_data.instances) if dashboard_data.instances else False),
+            ("AWS Pricing", any(hasattr(i, 'hourly_price_usd') and i.hourly_price_usd and i.hourly_price_usd > 0 for i in dashboard_data.instances) if dashboard_data.instances else False)
+        ]
+
+        online_count = sum(1 for _, status in apis if status)
+
+        # API status display
+        for api_name, is_online in apis:
+            status_icon = "✅" if is_online else "❌"
+            st.sidebar.write(f"{status_icon} {api_name}")
+
+        # Summary
+        st.sidebar.write(f"**{online_count}/5 APIs Online**")
+
+        # Instance count
         if hasattr(dashboard_data, 'instances'):
             st.sidebar.info(f"📡 {len(dashboard_data.instances)} instances monitored")
     else:
         st.sidebar.error("❌ System Offline")
+        # Show all APIs as offline
+        for api_name in ["ElectricityMaps", "AWS Cost Explorer", "CloudTrail", "Boavizta", "AWS Pricing"]:
+            st.sidebar.write(f"❌ {api_name}")
+        st.sidebar.write("**0/5 APIs Online**")
 
     # Render selected page with specific error handling
     try:
@@ -132,12 +158,8 @@ def main() -> None:
             render_overview_page(dashboard_data)
         elif page == "🇩🇪 Carbon Optimization":
             render_carbon_page(dashboard_data)
-        elif page == "🔄 Competitive Analysis":
-            render_competitive_analysis_page(dashboard_data)
         elif page == "🏗️ Infrastructure":
             render_infrastructure_page(dashboard_data)
-        elif page == "🔬 Research Methods":
-            render_research_methods_page(dashboard_data)
 
     except (AttributeError, KeyError) as e:
         st.error(f"❌ Data structure error: {e}")

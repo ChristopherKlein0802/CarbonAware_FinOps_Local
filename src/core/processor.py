@@ -16,7 +16,6 @@ from ..api.client import unified_api_client
 from ..models.aws import EC2Instance
 from ..models.business import BusinessCase
 from ..models.dashboard import DashboardData
-from .monitoring.cloudtrail import cloudtrail_tracker
 from ..utils.calculations import safe_round, calculate_simple_power_consumption
 from ..utils.cache import is_cache_valid, get_standard_cache_path, ensure_cache_dir, CacheTTL
 from .tracker import RuntimeTracker
@@ -126,14 +125,12 @@ class DataProcessor:
             # Calculate business case with validation factor awareness
             business_case = self.business_calculator.calculate_business_case(total_cost_eur, total_co2_kg, validation_factor)
 
-            # Get API health status during data refresh
-            api_health_status = {}
-            try:
-                from .monitoring.health import health_check_manager
-                api_health_status = health_check_manager.check_all_apis()
-            except Exception as e:
-                logger.warning(f"⚠️ Health check unavailable: {e}")
-                api_health_status = {"health_check": "unavailable"}
+            # Simple API health status (monitoring module removed in cleanup)
+            api_health_status = {
+                "ElectricityMaps": "operational" if carbon_intensity else "unavailable",
+                "AWS_APIs": "operational" if instances else "unavailable",
+                "monitoring": "simplified"
+            }
 
             # Create complete dashboard data
             dashboard_data = DashboardData(
@@ -183,14 +180,12 @@ class DataProcessor:
 
     def _create_minimal_response(self, carbon_intensity, error_message: str) -> DashboardData:
         """Create minimal response with available API data but no instances"""
-        # Get API health status even for minimal response
-        api_health_status = {}
-        try:
-            from .monitoring.health import health_check_manager
-            api_health_status = health_check_manager.check_all_apis()
-        except Exception as e:
-            logger.warning(f"⚠️ Health check unavailable: {e}")
-            api_health_status = {"health_check": "unavailable"}
+        # Simple API health status (monitoring module removed in cleanup)
+        api_health_status = {
+            "ElectricityMaps": "operational" if carbon_intensity else "unavailable",
+            "AWS_APIs": "minimal_data",
+            "monitoring": "simplified"
+        }
 
         return DashboardData(
             instances=[],

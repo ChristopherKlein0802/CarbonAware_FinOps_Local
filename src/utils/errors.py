@@ -26,45 +26,7 @@ P = ParamSpec('P')
 T = TypeVar('T')
 
 
-# Custom Exception Types for Better Error Handling
-class CacheOperationError(Exception):
-    """Non-critical cache read/write operation failures"""
-    pass
-
-
-class APIConnectionError(Exception):
-    """Critical API connection and authentication failures"""
-    pass
-
-
-class AWSCredentialsError(Exception):
-    """AWS credentials and token-related errors"""
-    pass
-
-
-class DataValidationError(Exception):
-    """Data structure and validation errors"""
-    pass
-
-
-class CloudTrailException(Exception):
-    """CloudTrail-specific operations and data errors"""
-    pass
-
-
-class CarbonDataException(Exception):
-    """Carbon intensity API and data processing errors"""
-    pass
-
-
-class CostCalculationException(Exception):
-    """Cost calculation and AWS pricing errors"""
-    pass
-
-
-class PowerConsumptionException(Exception):
-    """Power consumption calculation and hardware data errors"""
-    pass
+# Simplified error handling - only keeping actually used patterns
 
 
 def handle_cache_operations(fallback_value: Any = None) -> Callable[[Callable[P, T]], Callable[P, T | Any]]:

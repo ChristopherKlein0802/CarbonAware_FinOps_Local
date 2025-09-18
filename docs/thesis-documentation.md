@@ -8,6 +8,18 @@
 ### **🔬 Academic Positioning**
 This **Bachelor Thesis Prototype** explores the feasibility of integrated Carbon-aware FinOps optimization. All findings are preliminary and require extensive validation at production scale.
 
+#### **🎯 Competitive Advantages (Academic Hypothesis)**
+- **⚡ Real-time German grid carbon intensity integration** vs generic EU averages
+- **🎯 CloudTrail audit precision (±5% vs ±40% estimates)** for superior academic rigor
+- **💰 €20/month vs €200+ separate tools** cost advantage through API integration
+- **🇩🇪 German SME market specialization (20-100 instances)** vs enterprise-only focus
+- **📊 5-API integration with academic transparency** vs proprietary algorithms
+
+#### **🇩🇪 Target Market Specification**
+**Primary Focus:** German SMEs seeking cost-effective carbon-aware cloud optimization with academic-grade methodology transparency.
+
+**Market Gap Identified:** Current tools either focus on carbon reporting OR cost optimization, but not integrated real-time optimization with regional grid specificity.
+
 ### **🏆 Research Approach**
 **Novel integration approach combining:**
 - ✅ AWS Cost Explorer + Real-time German grid data + Business case generation

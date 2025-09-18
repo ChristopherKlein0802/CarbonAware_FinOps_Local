@@ -5,8 +5,9 @@ variable "aws_region" {
 }
 
 variable "aws_account_id" {
-  description = "AWS Account ID where resources will be created"
+  description = "AWS Account ID where resources will be created (optional - will auto-detect from SSO if not provided)"
   type        = string
+  default     = ""
 }
 
 variable "aws_profile"  {

@@ -25,11 +25,16 @@ class EC2Instance:
     instance_type: str
     state: str
     region: str
+    instance_name: Optional[str] = None  # NEW: Instance name from tags
     power_watts: Optional[float] = None
     hourly_co2_g: Optional[float] = None
     monthly_co2_kg: Optional[float] = None
     monthly_cost_usd: Optional[float] = None
     monthly_cost_eur: Optional[float] = None
+    runtime_hours: Optional[float] = None  # NEW: Actual runtime hours (CloudTrail-enhanced)
+    hourly_price_usd: Optional[float] = None  # NEW: AWS pricing per hour
+    cpu_utilization: Optional[float] = None  # NEW: CPU utilization percentage
+    data_quality: str = "estimated"  # NEW: "measured", "calculated", "estimated"
     confidence_level: str = "medium"  # "very_high" (CloudTrail), "high" (API), "medium" (estimates), "low" (fallback)
     data_sources: Optional[List[str]] = None  # Enhanced: includes "cloudtrail_audit" for precision tracking
     last_updated: Optional[datetime] = None

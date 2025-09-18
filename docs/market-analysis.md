@@ -106,6 +106,47 @@ This analysis compares our **Carbon-Aware FinOps Dashboard** against existing to
 
 ---
 
+## 🕳️ **Identified Market Gaps (Literature Review)**
+
+### **Current Tool Limitations Analysis:**
+
+#### **1. Carbon Tracking Tools** (CloudCarbonFootprint, etc.)
+- ✅ **Strengths**: Good for reporting and awareness, historical data analysis
+- ❌ **Limitations**:
+  - Limited real-time optimization capabilities
+  - No cost integration for business decision making
+  - Generic global averages vs regional grid specificity
+  - Reporting-focused rather than optimization-driven
+
+#### **2. FinOps Tools** (CloudHealth, Cloudability)
+- ✅ **Strengths**: Excellent cost optimization, mature business processes
+- ❌ **Limitations**:
+  - No carbon considerations whatsoever
+  - Enterprise pricing models (€200+ monthly)
+  - Focus purely on financial metrics
+  - Missing ESG compliance integration
+
+#### **3. Cloud Optimization** (AWS Trusted Advisor)
+- ✅ **Strengths**: Performance optimization, native AWS integration
+- ❌ **Limitations**:
+  - No carbon awareness in recommendations
+  - Generic recommendations without regional context
+  - Performance-focused rather than sustainability-driven
+  - Limited business case generation
+
+### **Our Integration Hypothesis:**
+
+**Market Gap Identified:**
+Real-time carbon data + cost optimization + German grid specificity = Better SME outcomes with €20/month vs €200+ for separate tools
+
+**Novel Value Proposition:**
+- Integrated carbon and cost optimization in single dashboard
+- Regional grid data (German market specialization)
+- SME-affordable pricing through API-only approach
+- Business case generation combining financial and environmental ROI
+
+---
+
 ## 🔮 **Future Market Trends**
 
 ### **Regulatory Drivers:**

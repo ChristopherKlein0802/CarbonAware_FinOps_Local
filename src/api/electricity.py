@@ -317,12 +317,18 @@ class ElectricityMapsAPI:
                 }
                 collected_data.append(new_entry)
 
-                # Keep only last 48 hours of data (for 24h + 24h buffer)
-                cutoff_time = datetime.now() - timedelta(hours=48)
+                # Implement sliding 24h window: Keep only last 24 hours + current hour
+                cutoff_time = datetime.now() - timedelta(hours=24)
                 collected_data = [
                     entry for entry in collected_data
                     if datetime.fromisoformat(entry['hour_key'].replace('Z', '')) > cutoff_time
                 ]
+
+                # If we have more than 24 hours of data, implement sliding window
+                if len(collected_data) > 24:
+                    # Sort by hour and keep only the most recent 24 entries
+                    collected_data.sort(key=lambda x: x['hour_key'])
+                    collected_data = collected_data[-24:]  # Keep last 24 hours
 
                 # Sort by hour_key
                 collected_data.sort(key=lambda x: x['hour_key'])
