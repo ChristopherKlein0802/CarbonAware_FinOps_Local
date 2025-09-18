@@ -2,7 +2,7 @@
 # Essential Development Workflow
 # ===============================
 
-.PHONY: help setup test dashboard validate-aws plan deploy status refresh destroy clean
+.PHONY: help setup test test-unit test-integration dashboard validate-aws plan deploy status refresh destroy clean
 .DEFAULT_GOAL := help
 
 # Configuration
@@ -102,6 +102,12 @@ test-unit: ## Run only unit tests
 	$(call check_venv)
 	$(PYTHON_VENV) -m pytest tests/unit/ -v
 	@echo "$(GREEN)✅ Unit tests completed$(NC)"
+
+test-integration: ## Run integration tests (requires live credentials)
+	@echo "$(YELLOW)🧪 Running integration tests...$(NC)"
+	$(call check_venv)
+	$(PYTHON_VENV) -m pytest tests/integration/ -m integration -v
+	@echo "$(GREEN)✅ Integration tests completed$(NC)"
 
 test-coverage: ## Run tests with coverage report
 	@echo "$(YELLOW)🧪 Running tests with coverage...$(NC)"

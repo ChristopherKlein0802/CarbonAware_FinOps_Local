@@ -212,7 +212,7 @@ def _render_integration_excellence(dashboard_data: Any) -> None:
         **🎓 Academic Contribution**: This integration demonstrates:
         - **Real-time Correlation**: Carbon intensity + AWS costs + CloudTrail precision
         - **German SME Focus**: Regional grid data + affordable API-only approach
-        - **Precision Revolution**: ±5% CloudTrail accuracy vs ±40% traditional methods
+        - **Target Precision**: CloudTrail runtime auditing aims for ±5% accuracy once sufficient data is available (baseline ±40%)
         - **Integration Efficiency**: €20/month vs €200+ for separate carbon + FinOps tools
         """)
 
@@ -280,7 +280,7 @@ def _render_precision_insights(dashboard_data: Any) -> None:
             st.error("⚠️ **Insufficient Runtime Data**: Cost validation requires instances to run for meaningful periods. Current data is too limited for accurate cost comparison.")
         else:
             st.warning("⚠️ **Building Runtime History**: CloudTrail precision improves over time. Current validation factor indicates developing accuracy.")
-        st.info("💡 **Academic Excellence**: Once instances accumulate runtime, CloudTrail provides ±5% cost accuracy vs traditional ±40% estimates.")
+        st.info("💡 **Academic Outlook**: Mit ausreichender Laufzeit-Historie kann CloudTrail eine Zielgenauigkeit von ±5 % erreichen; derzeit liegen nur Schätzwerte vor (≈±40 %).")
 
 
 def _render_data_quality_summary(dashboard_data: Any) -> None:

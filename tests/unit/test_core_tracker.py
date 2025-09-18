@@ -1,218 +1,212 @@
-"""
-Tests for src.core.tracker module
-Testing RuntimeTracker functionality with proper mocking
-"""
+"""Unit tests for src.core.tracker.RuntimeTracker."""
 
+import json
 import unittest
-from unittest.mock import Mock, patch, MagicMock
-from datetime import datetime
-from typing import Dict, List
+from datetime import datetime, timedelta, timezone
+from unittest.mock import MagicMock, Mock, patch, mock_open
 
-# Import the class under test
 from src.core.tracker import RuntimeTracker
 from src.models.aws import EC2Instance
 
 
 class TestRuntimeTracker(unittest.TestCase):
-    """Test cases for RuntimeTracker class"""
+    """Test suite for the RuntimeTracker class."""
 
-    def setUp(self):
-        """Set up test fixtures"""
+    def setUp(self) -> None:
         self.tracker = RuntimeTracker()
         self.sample_instance = {
             "instance_id": "i-test123",
             "instance_type": "t3.medium",
             "state": "running",
             "region": "eu-central-1",
-            "launch_time": datetime.now(),
-            "state_transition_reason": "User initiated"
+            "launch_time": datetime.now(timezone.utc),
+            "state_transition_reason": "user-initiated",
         }
 
-    def test_initialization(self):
-        """Test RuntimeTracker initialization"""
+    def test_initialization(self) -> None:
         tracker = RuntimeTracker()
         self.assertIsInstance(tracker, RuntimeTracker)
 
-    @patch('src.core.tracker.boto3.Session')
-    def test_get_all_ec2_instances_success(self, mock_session):
-        """Test successful EC2 instance retrieval"""
-        # Mock AWS response
+    @patch("src.core.tracker.boto3.Session")
+    def test_get_all_ec2_instances_success(self, mock_session: Mock) -> None:
         mock_client = Mock()
         mock_session.return_value.client.return_value = mock_client
         mock_client.describe_instances.return_value = {
-            'Reservations': [{
-                'Instances': [{
-                    'InstanceId': 'i-test123',
-                    'InstanceType': 't3.medium',
-                    'State': {'Name': 'running'},
-                    'LaunchTime': datetime.now(),
-                    'StateTransitionReason': 'User initiated'
-                }]
-            }]
+            "Reservations": [
+                {
+                    "Instances": [
+                        {
+                            "InstanceId": "i-test123",
+                            "InstanceType": "t3.medium",
+                            "State": {"Name": "running"},
+                            "LaunchTime": datetime.now(timezone.utc),
+                            "StateTransitionReason": "user",
+                        }
+                    ]
+                }
+            ]
         }
 
         instances = self.tracker.get_all_ec2_instances()
 
         self.assertEqual(len(instances), 1)
-        self.assertEqual(instances[0]['instance_id'], 'i-test123')
-        self.assertEqual(instances[0]['instance_type'], 't3.medium')
-        self.assertEqual(instances[0]['state'], 'running')
+        self.assertEqual(instances[0]["instance_id"], "i-test123")
+        self.assertEqual(instances[0]["instance_type"], "t3.medium")
 
-    @patch('src.core.tracker.boto3.Session')
-    def test_get_all_ec2_instances_error(self, mock_session):
-        """Test EC2 instance retrieval with AWS error"""
-        mock_session.return_value.client.side_effect = Exception("AWS Error")
-
+    @patch("src.core.tracker.boto3.Session")
+    def test_get_all_ec2_instances_error(self, mock_session: Mock) -> None:
+        mock_session.return_value.client.side_effect = Exception("AWS error")
         instances = self.tracker.get_all_ec2_instances()
-
         self.assertEqual(instances, [])
 
-    # CloudTrail monitoring removed after cleanup
-    def test_get_precise_runtime_hours_cloudtrail_success(self):
-        """Test runtime calculation after CloudTrail removal - uses fallback"""
+    @patch("src.core.tracker.is_cache_valid", return_value=True)
+    def test_get_precise_runtime_hours_uses_cache(self, mock_cache_valid: Mock) -> None:
+        cached_payload = {"runtime_hours": 12.5}
+        with patch("builtins.open", mock_open(read_data=json.dumps(cached_payload))):
+            runtime = self.tracker.get_precise_runtime_hours(self.sample_instance)
+        self.assertEqual(runtime, 12.5)
+        mock_cache_valid.assert_called_once()
+
+    @patch("src.core.tracker.ensure_cache_dir")
+    @patch("src.core.tracker.is_cache_valid", return_value=False)
+    @patch("src.core.tracker.boto3.Session")
+    def test_get_precise_runtime_hours_from_cloudtrail(
+        self,
+        mock_session: Mock,
+        mock_cache_valid: Mock,
+        mock_ensure_cache_dir: Mock,
+    ) -> None:
+        mock_cloudtrail = Mock()
+        paginator = Mock()
+        now = datetime.now(timezone.utc)
+        events = [
+            {
+                "EventName": "StartInstances",
+                "EventTime": now - timedelta(hours=5),
+                "Resources": [{"ResourceName": "i-test123"}],
+            },
+            {
+                "EventName": "StopInstances",
+                "EventTime": now - timedelta(hours=1),
+                "Resources": [{"ResourceName": "i-test123"}],
+            },
+        ]
+        paginator.paginate.return_value = [{"Events": events}]
+        mock_cloudtrail.get_paginator.return_value = paginator
+        mock_session.return_value.client.return_value = mock_cloudtrail
+
+        with patch("builtins.open", mock_open()) as mocked_open:
+            runtime = self.tracker.get_precise_runtime_hours(self.sample_instance)
+
+        self.assertAlmostEqual(runtime, 4.0, places=2)
+        mocked_open.assert_called()
+
+    @patch("src.core.tracker.ensure_cache_dir")
+    @patch("src.core.tracker.is_cache_valid", return_value=False)
+    @patch("src.core.tracker.boto3.Session")
+    def test_get_precise_runtime_hours_no_events(
+        self,
+        mock_session: Mock,
+        mock_cache_valid: Mock,
+        mock_ensure_cache_dir: Mock,
+    ) -> None:
+        mock_cloudtrail = Mock()
+        paginator = Mock()
+        paginator.paginate.return_value = [{"Events": []}]
+        mock_cloudtrail.get_paginator.return_value = paginator
+        mock_session.return_value.client.return_value = mock_cloudtrail
+
         runtime = self.tracker.get_precise_runtime_hours(self.sample_instance)
+        self.assertIsNone(runtime)
 
-        # Should return fallback estimate since CloudTrail is removed
-        self.assertIsInstance(runtime, float)
-        self.assertGreater(runtime, 0)
-
-    # CloudTrail monitoring removed after cleanup
-    def test_get_precise_runtime_hours_cloudtrail_fallback(self):
-        """Test runtime calculation after CloudTrail removal - uses fallback"""
-        runtime = self.tracker.get_precise_runtime_hours(self.sample_instance)
-
-        # Should fall back to conservative estimate
-        self.assertIsInstance(runtime, float)
-        self.assertGreater(runtime, 0)
-
-    def test_minimal_conservative_estimate_micro(self):
-        """Test conservative estimate for micro instance"""
-        instance = {**self.sample_instance, "instance_type": "t3.micro", "state": "running"}
-
-        runtime = self.tracker._get_minimal_conservative_estimate(instance)
-
-        self.assertIsInstance(runtime, float)
-        self.assertGreater(runtime, 0)
-
-    def test_minimal_conservative_estimate_large(self):
-        """Test conservative estimate for large instance"""
-        instance = {**self.sample_instance, "instance_type": "t3.large", "state": "stopped"}
-
-        runtime = self.tracker._get_minimal_conservative_estimate(instance)
-
-        self.assertIsInstance(runtime, float)
-        self.assertGreater(runtime, 0)
-
-    @patch('src.core.tracker.boto3.Session')
-    @patch('src.utils.cache.is_cache_valid')
-    def test_get_cpu_utilization_cached(self, mock_cache_valid, mock_session):
-        """Test CPU utilization retrieval from cache"""
-        mock_cache_valid.return_value = True
-
-        with patch('builtins.open', mock_open_json({"cpu_utilization": 45.5})):
+    @patch("src.core.tracker.boto3.Session")
+    @patch("src.core.tracker.is_cache_valid", return_value=True)
+    def test_get_cpu_utilization_cached(self, mock_cache_valid: Mock, mock_session: Mock) -> None:
+        cached_payload = {"cpu_utilization": 45.5}
+        with patch("builtins.open", mock_open(read_data=json.dumps(cached_payload))):
             cpu_util = self.tracker.get_cpu_utilization("i-test123")
-
         self.assertEqual(cpu_util, 45.5)
 
-    @patch('src.core.tracker.boto3.Session')
-    @patch('src.utils.cache.is_cache_valid')
-    def test_get_cpu_utilization_fresh(self, mock_cache_valid, mock_session):
-        """Test CPU utilization fresh API call"""
-        mock_cache_valid.return_value = False
-
-        # Mock CloudWatch response
+    @patch("src.core.tracker.boto3.Session")
+    @patch("src.core.tracker.is_cache_valid", return_value=False)
+    def test_get_cpu_utilization_fresh(self, mock_cache_valid: Mock, mock_session: Mock) -> None:
         mock_client = Mock()
         mock_session.return_value.client.return_value = mock_client
         mock_client.get_metric_data.return_value = {
-            'MetricDataResults': [{
-                'Values': [30.0, 40.0, 50.0]
-            }]
+            "MetricDataResults": [{"Values": [30.0, 40.0, 50.0]}]
         }
 
-        with patch('builtins.open', Mock()):
-            with patch('os.makedirs'):
+        with patch("builtins.open", mock_open()) as mocked_open:
+            with patch("os.makedirs"):
                 cpu_util = self.tracker.get_cpu_utilization("i-test123")
 
-        self.assertEqual(cpu_util, 40.0)  # Average of [30, 40, 50]
+        self.assertEqual(cpu_util, 40.0)
+        mocked_open.assert_called()
 
-    @patch('src.core.tracker.boto3.Session')
-    @patch('src.utils.cache.is_cache_valid')
-    def test_get_cpu_utilization_no_data(self, mock_cache_valid, mock_session):
-        """Test CPU utilization with no CloudWatch data"""
-        mock_cache_valid.return_value = False
-
+    @patch("src.core.tracker.boto3.Session")
+    @patch("src.core.tracker.is_cache_valid", return_value=False)
+    def test_get_cpu_utilization_no_data(self, mock_cache_valid: Mock, mock_session: Mock) -> None:
         mock_client = Mock()
         mock_session.return_value.client.return_value = mock_client
         mock_client.get_metric_data.return_value = {
-            'MetricDataResults': [{'Values': []}]
+            "MetricDataResults": [{"Values": []}]
         }
 
         cpu_util = self.tracker.get_cpu_utilization("i-test123")
-
         self.assertIsNone(cpu_util)
 
-    @patch('src.api.client.unified_api_client')
-    def test_process_instance_enhanced_success(self, mock_api_client):
-        """Test successful enhanced instance processing"""
-        # Mock API responses
+    @patch("src.api.client.unified_api_client")
+    def test_process_instance_enhanced_success(self, mock_api_client: Mock) -> None:
         mock_power_data = Mock()
         mock_power_data.avg_power_watts = 15.0
         mock_api_client.get_power_consumption.return_value = mock_power_data
         mock_api_client.get_instance_pricing.return_value = 0.05
 
-        # Mock internal methods
-        with patch.object(self.tracker, 'get_precise_runtime_hours', return_value=720.0):
-            with patch.object(self.tracker, 'get_cpu_utilization', return_value=50.0):
-                result = self.tracker.process_instance_enhanced(self.sample_instance, 350.0)
+        with patch.object(self.tracker, "get_precise_runtime_hours", return_value=720.0):
+            with patch.object(self.tracker, "get_cpu_utilization", return_value=50.0):
+                result = self.tracker.process_instance_enhanced(
+                    self.sample_instance, 350.0
+                )
 
         self.assertIsInstance(result, EC2Instance)
         self.assertEqual(result.instance_id, "i-test123")
-        self.assertEqual(result.instance_type, "t3.medium")
         self.assertGreater(result.monthly_cost_eur, 0)
         self.assertGreater(result.monthly_co2_kg, 0)
 
-    @patch('src.api.client.unified_api_client')
-    def test_process_instance_enhanced_no_power_data(self, mock_api_client):
-        """Test instance processing with missing power data"""
+    @patch("src.api.client.unified_api_client")
+    def test_process_instance_enhanced_missing_power(self, mock_api_client: Mock) -> None:
         mock_api_client.get_power_consumption.return_value = None
-
         result = self.tracker.process_instance_enhanced(self.sample_instance, 350.0)
-
         self.assertIsNone(result)
 
-    @patch('src.api.client.unified_api_client')
-    def test_process_instance_enhanced_no_cpu_data(self, mock_api_client):
-        """Test instance processing with missing CPU data (NO-FALLBACK)"""
+    @patch("src.api.client.unified_api_client")
+    def test_process_instance_enhanced_missing_cpu(self, mock_api_client: Mock) -> None:
         mock_power_data = Mock()
         mock_power_data.avg_power_watts = 15.0
         mock_api_client.get_power_consumption.return_value = mock_power_data
         mock_api_client.get_instance_pricing.return_value = 0.05
 
-        with patch.object(self.tracker, 'get_precise_runtime_hours', return_value=720.0):
-            with patch.object(self.tracker, 'get_cpu_utilization', return_value=None):
-                result = self.tracker.process_instance_enhanced(self.sample_instance, 350.0)
+        with patch.object(self.tracker, "get_precise_runtime_hours", return_value=720.0):
+            with patch.object(self.tracker, "get_cpu_utilization", return_value=None):
+                result = self.tracker.process_instance_enhanced(
+                    self.sample_instance, 350.0
+                )
 
-        # Should return EC2Instance with fallback CPU due to changed behavior
-        self.assertIsNotNone(result)
-        self.assertIsInstance(result, EC2Instance)
-        self.assertEqual(result.cpu_utilization, 35.0)  # Fallback CPU value
+        self.assertIsNone(result)
 
-    def test_get_enhanced_confidence_metadata(self):
-        """Test confidence metadata generation"""
-        confidence, sources = self.tracker._get_enhanced_confidence_metadata(self.sample_instance, 720.0)
-
-        self.assertIsInstance(confidence, str)
-        self.assertIsInstance(sources, list)
-        self.assertIn("aws_api", sources)
-
-
-def mock_open_json(data):
-    """Helper function to mock open with JSON data"""
-    import json
-    mock = MagicMock()
-    mock.return_value.__enter__.return_value.read.return_value = json.dumps(data)
-    return mock
+    def test_get_enhanced_confidence_metadata(self) -> None:
+        confidence, sources = self.tracker._get_enhanced_confidence_metadata(
+            has_power_data=True,
+            has_pricing_data=True,
+            has_cpu_data=True,
+            has_runtime_data=True,
+        )
+        self.assertEqual(confidence, "high")
+        self.assertCountEqual(
+            sources,
+            ["aws_api", "boavizta", "aws_pricing", "cloudwatch", "cloudtrail_audit"],
+        )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

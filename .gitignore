@@ -159,6 +159,9 @@ data/baseline/*
 data/results/*
 !data/results/.gitkeep
 
+# Integration artefacts
+artifacts/
+
 # Temporary files
 tmp/
 temp/

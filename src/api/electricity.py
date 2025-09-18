@@ -6,7 +6,7 @@ Carbon intensity data for carbon-aware optimization
 import os
 import json
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, List
 import logging
 from dotenv import load_dotenv
@@ -176,7 +176,7 @@ class ElectricityMapsAPI:
         zone = AWSConstants.REGION_MAPPINGS.get(region, "DE")
 
         # Calculate time range for past 24 hours
-        end_time = datetime.utcnow()
+        end_time = datetime.now(timezone.utc)
         start_time = end_time - timedelta(hours=24)
 
         try:
@@ -185,8 +185,8 @@ class ElectricityMapsAPI:
             # Debug log the full request
             request_params = {
                 "zone": zone,
-                "start": start_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                "end": end_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "start": start_time.isoformat(timespec="seconds").replace("+00:00", "Z"),
+                "end": end_time.isoformat(timespec="seconds").replace("+00:00", "Z"),
                 "granularity": "hourly"
             }
             logger.info(f"📊 API Request params: {request_params}")

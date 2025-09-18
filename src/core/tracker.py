@@ -1,15 +1,16 @@
-"""
-Runtime Tracking and AWS Data Collection
-CloudTrail-enhanced precision tracking
-"""
+"""Runtime tracking and AWS data collection utilities."""
 
+import json
 import logging
-import boto3
 import os
-from typing import List, Dict, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from typing import Dict, List, Optional
+
+import boto3
+from botocore.exceptions import ClientError
 
 from ..models.aws import EC2Instance
+from ..utils.cache import CacheTTL, ensure_cache_dir, get_standard_cache_path, is_cache_valid
 
 logger = logging.getLogger(__name__)
 
@@ -62,39 +63,150 @@ class RuntimeTracker:
             return []
 
     def get_precise_runtime_hours(self, instance: Dict) -> Optional[float]:
-        """CloudTrail-first precise runtime calculation - Academic Excellence Upgrade
-
-        Revolutionary approach: Uses AWS CloudTrail audit events for exact runtime measurement
-        Replaces all launch-time estimates with precise start/stop event tracking
-        Academic advantage: Exact timestamps instead of runtime estimates
-        """
+        """Calculate runtime hours from CloudTrail start/stop events."""
         instance_id = instance["instance_id"]
+        region = instance.get("region", "eu-central-1")
+
+        cache_identifier = f"{instance_id}_{region}"
+        cache_path = get_standard_cache_path("cloudtrail_runtime", cache_identifier)
+        ensure_cache_dir(cache_path)
+
+        if is_cache_valid(cache_path, CacheTTL.CLOUDTRAIL_EVENTS):
+            try:
+                with open(cache_path, "r", encoding="utf-8") as cache_file:
+                    cached_payload = json.load(cache_file)
+                runtime_hours = cached_payload.get("runtime_hours")
+                if runtime_hours is not None:
+                    logger.debug(
+                        "Using cached CloudTrail runtime for %s (%.2f h)",
+                        instance_id,
+                        runtime_hours,
+                    )
+                    return runtime_hours
+            except (OSError, ValueError, KeyError) as cache_error:
+                logger.warning(
+                    "CloudTrail runtime cache invalid for %s: %s",
+                    instance_id,
+                    cache_error,
+                )
 
         try:
-            # For demonstration: Use realistic fallback estimates
-            # (CloudTrail would be enabled in production for exact tracking)
-            logger.info(f"💡 Using demonstration runtime estimates for {instance_id}")
-            return self._get_minimal_conservative_estimate(instance)
+            session = boto3.Session(
+                profile_name=os.getenv("AWS_PROFILE", "carbon-finops-sandbox")
+            )
+            cloudtrail = session.client("cloudtrail", region_name=region)
 
-        except Exception as e:
-            logger.error(f"❌ Runtime calculation error for {instance_id}: {e}")
-            return self._get_minimal_conservative_estimate(instance)
+            start_time = datetime.now(timezone.utc) - timedelta(days=30)
+            end_time = datetime.now(timezone.utc)
 
-    def _get_minimal_conservative_estimate(self, instance: Dict) -> None:
-        """NO-FALLBACK POLICY: Return None when CloudTrail unavailable
+            lookup_params = {
+                "LookupAttributes": [
+                    {
+                        "AttributeKey": "ResourceName",
+                        "AttributeValue": instance_id,
+                    }
+                ],
+                "StartTime": start_time,
+                "EndTime": end_time,
+            }
 
-        Academic integrity requires transparent data absence rather than estimated values.
-        This maintains the NO-FALLBACK policy for scientific rigor.
-        """
-        instance_id = instance.get("instance_id", "unknown")
-        logger.warning(f"⚠️ NO-FALLBACK POLICY: Runtime data unavailable for {instance_id} - CloudTrail API failed")
-        logger.info("💡 Academic integrity: Returning None instead of estimated values")
-        return None
+            events: List[Dict] = []
+            paginator = cloudtrail.get_paginator("lookup_events")
+            for page in paginator.paginate(**lookup_params):
+                events.extend(page.get("Events", []))
+
+            relevant_events = self._extract_relevant_events(events, instance_id)
+            if not relevant_events:
+                logger.warning(
+                    "No CloudTrail state change events for %s in last 30 days", instance_id
+                )
+                return None
+
+            runtime_hours = self._calculate_runtime_from_events(
+                relevant_events, end_time
+            )
+
+            try:
+                payload = {
+                    "runtime_hours": runtime_hours,
+                    "event_count": len(relevant_events),
+                    "collected_at": datetime.now(timezone.utc).isoformat(),
+                }
+                with open(cache_path, "w", encoding="utf-8") as cache_file:
+                    json.dump(payload, cache_file)
+            except OSError as cache_error:
+                logger.warning(
+                    "Failed to cache CloudTrail runtime for %s: %s",
+                    instance_id,
+                    cache_error,
+                )
+
+            logger.info(
+                "CloudTrail runtime calculated for %s: %.2f h from %d events",
+                instance_id,
+                runtime_hours,
+                len(relevant_events),
+            )
+            return runtime_hours
+
+        except ClientError as aws_error:
+            logger.error("CloudTrail client error for %s: %s", instance_id, aws_error)
+            return None
+        except Exception as error:  # pragma: no cover - safeguard for unexpected issues
+            logger.error("Runtime calculation error for %s: %s", instance_id, error)
+            return None
+
+    def _extract_relevant_events(
+        self, events: List[Dict], instance_id: str
+    ) -> List[Dict]:
+        """Filter CloudTrail events to those marking instance lifecycle changes."""
+        start_events = {"RunInstances", "StartInstances"}
+        stop_events = {"StopInstances", "TerminateInstances"}
+        relevant: List[Dict] = []
+
+        for event in events:
+            event_name = event.get("EventName")
+            event_time = event.get("EventTime")
+            if event_name not in start_events | stop_events:
+                continue
+            if event_time is None:
+                continue
+
+            resources = event.get("Resources", []) or []
+            if not any(r.get("ResourceName") == instance_id for r in resources):
+                continue
+
+            relevant.append({"name": event_name, "time": event_time})
+
+        relevant.sort(key=lambda entry: entry["time"])
+        return relevant
+
+    def _calculate_runtime_from_events(
+        self, events: List[Dict], end_time: datetime
+    ) -> float:
+        """Accumulate runtime hours from ordered CloudTrail events."""
+        session_start: Optional[datetime] = None
+        runtime_hours = 0.0
+        start_events = {"RunInstances", "StartInstances"}
+        stop_events = {"StopInstances", "TerminateInstances"}
+
+        for event in events:
+            event_time = event["time"]
+            event_name = event["name"]
+
+            if event_name in start_events:
+                session_start = event_time
+            elif event_name in stop_events and session_start is not None:
+                runtime_hours += (event_time - session_start).total_seconds() / 3600.0
+                session_start = None
+
+        if session_start is not None:
+            runtime_hours += (end_time - session_start).total_seconds() / 3600.0
+
+        return round(runtime_hours, 2)
 
     def get_cpu_utilization(self, instance_id: str) -> Optional[float]:
         """Get average CPU utilization from CloudWatch with 3-hour caching"""
-        from ..utils.cache import is_cache_valid, get_standard_cache_path, ensure_cache_dir, CacheTTL
-
         # Use persistent cache directory like other APIs
         cache_path = get_standard_cache_path("cpu_utilization", instance_id)
         ensure_cache_dir(cache_path)
@@ -197,8 +309,10 @@ class RuntimeTracker:
 
             # NO-FALLBACK POLICY: Runtime hours must come from CloudTrail
             if actual_runtime_hours is None:
-                logger.warning(f"⚠️ NO-FALLBACK POLICY: Runtime data unavailable for {instance['instance_id']} - CloudTrail data missing")
-                logger.info("💡 Academic integrity: Cannot proceed without real CloudTrail data")
+                logger.warning(
+                    "Runtime data unavailable for %s - CloudTrail data missing",
+                    instance["instance_id"],
+                )
                 return None
 
             # Get CPU utilization for power calculation
@@ -206,8 +320,10 @@ class RuntimeTracker:
 
             # NO-FALLBACK POLICY: CPU utilization must come from CloudWatch
             if cpu_utilization is None:
-                logger.warning(f"⚠️ NO-FALLBACK POLICY: CPU utilization unavailable for {instance['instance_id']} - CloudWatch data missing")
-                logger.info("💡 Academic integrity: Cannot proceed without real CloudWatch metrics")
+                logger.warning(
+                    "CPU utilization unavailable for %s - CloudWatch data missing",
+                    instance["instance_id"],
+                )
                 return None
 
             # Enhanced CO2 calculation with CloudTrail-verified runtime and simple power scaling
@@ -226,7 +342,12 @@ class RuntimeTracker:
             monthly_cost_eur = monthly_cost_usd * 0.92  # EUR_USD_RATE
 
             # Determine confidence level and data sources
-            confidence_level, data_sources = self._get_enhanced_confidence_metadata(instance, actual_runtime_hours)
+            confidence_level, data_sources = self._get_enhanced_confidence_metadata(
+                has_power_data=True,
+                has_pricing_data=hourly_price_usd is not None,
+                has_cpu_data=cpu_utilization is not None,
+                has_runtime_data=actual_runtime_hours is not None,
+            )
 
             # Determine data quality based on available sources
             data_quality = "measured" if "cloudtrail_audit" in data_sources else "calculated"
@@ -255,31 +376,26 @@ class RuntimeTracker:
             logger.error(f"❌ Error processing instance {instance.get('instance_id', 'unknown')}: {e}")
             return None
 
-    def _get_enhanced_confidence_metadata(self, instance: Dict, runtime_hours: float) -> tuple[str, List[str]]:
-        """Get enhanced confidence metadata for instance based on actual data availability"""
-        data_sources = []
+    def _get_enhanced_confidence_metadata(
+        self,
+        *,
+        has_power_data: bool,
+        has_pricing_data: bool,
+        has_cpu_data: bool,
+        has_runtime_data: bool,
+    ) -> tuple[str, List[str]]:
+        """Derive confidence metadata based on the sources that contributed data."""
+        data_sources: List[str] = ["aws_api"]
 
-        # AWS API (always available if we have instance data)
-        data_sources.append("aws_api")
-
-        # Boavizta (if power data is available)
-        if hasattr(instance, 'power_watts') or self._has_power_data(instance):
+        if has_power_data:
             data_sources.append("boavizta")
-
-        # CloudWatch (if CPU data is available)
-        cpu_utilization = self.get_cpu_utilization(instance.get("instance_id", ""))
-        if cpu_utilization is not None:
+        if has_pricing_data:
+            data_sources.append("aws_pricing")
+        if has_cpu_data:
             data_sources.append("cloudwatch")
-
-        # CloudTrail (if we have measured runtime data)
-        if runtime_hours and hasattr(instance, 'data_quality') and instance.get('data_quality') == 'measured':
+        if has_runtime_data:
             data_sources.append("cloudtrail_audit")
 
-        # AWS Cost Explorer (if we have real pricing data)
-        if hasattr(instance, 'hourly_price_usd') and instance.get('hourly_price_usd'):
-            data_sources.append("cost_explorer")
-
-        # Determine confidence level based on data sources
         if len(data_sources) >= 4:
             confidence_level = "high"
         elif len(data_sources) >= 3:
@@ -288,12 +404,3 @@ class RuntimeTracker:
             confidence_level = "low"
 
         return confidence_level, data_sources
-
-    def _has_power_data(self, instance: Dict) -> bool:
-        """Check if power data is available for this instance type"""
-        try:
-            from ..api.client import unified_api_client
-            power_data = unified_api_client.get_power_consumption(instance.get("instance_type", ""))
-            return power_data is not None
-        except Exception:
-            return False

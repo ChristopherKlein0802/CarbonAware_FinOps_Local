@@ -10,7 +10,7 @@ import logging
 import logging.config
 import json
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any
 from pathlib import Path
 
@@ -26,7 +26,7 @@ class StructuredFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         """Format log record as structured JSON"""
         log_entry = {
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),
@@ -156,7 +156,7 @@ def log_performance_metric(
         "operation": operation,
         "duration_ms": round(duration_ms, 2),
         "success": success,
-        "timestamp": datetime.utcnow().isoformat() + "Z"
+        "timestamp": datetime.now(timezone.utc).isoformat()
     }
 
     # Add any additional context
@@ -202,7 +202,7 @@ def log_api_operation(
         "operation": operation,
         "response_time_ms": round(response_time_ms, 2),
         "success": success,
-        "timestamp": datetime.utcnow().isoformat() + "Z"
+        "timestamp": datetime.now(timezone.utc).isoformat()
     }
 
     if status_code:
@@ -246,7 +246,7 @@ def log_carbon_data(
         "carbon_intensity_g_co2_kwh": carbon_intensity,
         "source": source,
         "confidence": confidence,
-        "timestamp": datetime.utcnow().isoformat() + "Z"
+        "timestamp": datetime.now(timezone.utc).isoformat()
     }
 
     logger.info(
