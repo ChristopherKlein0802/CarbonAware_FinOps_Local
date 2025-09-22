@@ -12,6 +12,8 @@ Der Prototyp implementiert einen integrierten Monitoring- und Optimierungs-Workf
 - Boavizta-Hardwaremodellen zur nutzungsabhängigen Energieeinschätzung [1], [2], [6].
 - AWS Cost Explorer, Pricing, CloudTrail und CloudWatch für Kostenvalidierung, Preisdaten, Laufzeitaudits und CPU-Metriken [7], [13].
 
+Damit werden insgesamt sechs spezialisierte Services orchestriert, um Kosten-, Laufzeit- und Emissionsdaten konsistent zu vereinen.
+
 Die Integration dient als reproduzierbare Referenzimplementierung für carbon-aware FinOps im KMU-Skalierungsbereich (ca. 20–100 Instanzen) mit wissenschaftlicher Nachvollziehbarkeit.
 
 ## Systemüberblick
