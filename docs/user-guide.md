@@ -16,156 +16,74 @@ streamlit run app.py
 ## 📋 **Dashboard Navigation**
 
 ### **🏆 1. Executive Summary (Main Page)**
-**Purpose:** SME management overview with immediate business value
+**Purpose:** Verdichteter Überblick für Management und Stakeholder.
 
 **Key Elements:**
-- **🇩🇪 German Grid Status:** Live carbon intensity with color-coded recommendations
-  - 🟢 Green (<200g): Optimal time for workloads
-  - 🟡 Yellow (200-350g): Moderate - consider delays
-  - 🔴 Red (>350g): Avoid non-urgent tasks
+- **🇩🇪 German Grid Status:** Live-Intensität mit Ampelbewertung (🟢 < 200 g, 🟡 200–350 g, 🔴 > 350 g CO₂/kWh).
+- **Kosten- und CO₂-Metriken:** Aggregierte Monatswerte basierend auf den aktuell verfügbaren Instanzdaten.
+- **Business-Case-Kacheln:** Einsparpotenziale und Validierungsstatus, soweit durch echte API-Daten gedeckt.
 
-- **📊 Current Infrastructure:** Your 4 baseline instances
-  - Active instances count
-  - Monthly cost (€20.81)
-  - Monthly CO₂ (0.37 kg)
-  - Optimization potential percentage
-
-- **🏢 SME Scenario Calculator:**
-  - Input field: Number of instances (1-500)
-  - Quick buttons: 20/50/100 instances
-  - Instant calculations: Cost, CO₂, Savings, ROI
-
-- **📈 Optimization Chart:** Visual comparison of different approaches
-
-**How to Use:**
-1. Check current German grid status for immediate recommendations
-2. Enter your company's instance count in calculator
-3. Review projected savings and ROI timeline
-4. Use scenarios for business case presentations
+**So nutzt du die Seite:**
+1. Grid-Status prüfen und kurzfristige Maßnahmen ableiten.
+2. Kosten- und Emissionswerte einordnen, bei Warnungen Quellencheck starten.
+3. Business-Case-Hinweise lesen; bei „Schätzwerte“ Hinweise aus Methodik beachten.
 
 ### **🇩🇪 2. Carbon Optimization**
-**Purpose:** Demonstrate real-time German grid advantage
+**Purpose:** Visualisierung der stündlichen Netzintensität für Lastverschiebung.
 
 **Key Features:**
-- **📊 24h Grid Pattern:** Shows daily carbon intensity variation
-  - Optimal times: 12:00-16:00 (solar peak)
-  - Avoid times: 18:00-22:00 (coal peak)
-  - Current time highlighted with red star
+- **📊 24h-Pattern:** Plot der letzten Stunden (ElectricityMaps-History oder lokale Sammlung).
+- **🔍 Status-Karten:** Empfohlene Vorgehensweise je nach aktueller Intensität.
+- **📈 Fortschrittsanzeige:** Hinweis, ob bereits genügend Messpunkte für ein Tagesprofil vorliegen.
 
-- **💡 Smart Scheduling:** Actionable recommendations
-  - What to do now vs what to postpone
-  - Specific time windows for optimization
+**Praxis-Tipps:**
+1. Chart beobachten und geplante Batch-Jobs in grüne Zeitfenster legen.
+2. Bei unvollständigen Daten (Hinweis im Chart) zusätzliche Messläufe starten.
+3. Werte für ESG-/CSRD-Reporting dokumentieren.
 
-- **📈 Traditional vs Smart:** Quantified comparison
-  - Current constant usage approach
-  - Smart carbon-aware scheduling
-  - Potential CO₂ reduction (20-30%)
+### **🏗️ 3. Infrastructure**
+**Purpose:** Technische Detailanalyse für DevOps und FinOps.
 
-- **🇪🇺 EU Compliance:** Business benefits for SMEs
+**Inhalte:**
+- **Instanz-Tabelle:** Laufzeit, CPU, Kosten- und CO₂-Werte mit NO-FALLBACK-Hinweisen.
+- **Summen- und Durchschnittswerte:** Aggregierte Kennzahlen über alle Instanzen.
+- **Datenqualitäts-Hinweise:** Transparente Anzeige, wenn CloudTrail oder CloudWatch noch keine Messwerte liefern.
 
-**How to Use:**
-1. Check optimal scheduling times for your workloads
-2. Plan batch jobs during green periods
-3. Use metrics for EU compliance reporting
-4. Reference for customer carbon credentials
-
-### **🔄 3. Competitive Analysis**
-**Purpose:** Justify tool selection and investment
-
-**Key Sections:**
-- **📊 Feature Comparison:** Our tool vs competitors
-- **💰 Cost Analysis:** €20/month vs €200+ for separate tools
-- **📈 ROI Demonstration:** Quantified integration advantages
-- **🏢 SME Value Proposition:** Why choose integrated approach
-
-**Business Use Cases:**
-- Management decision justification
-- Vendor selection documentation
-- Investment approval presentations
-- Competitive positioning analysis
-
-### **🏗️ 4. Infrastructure**
-**Purpose:** Technical details for IT teams
-
-**Content:**
-- Instance-level breakdown
-- Technical specifications
-- Cost per instance analysis
-- Validation metrics
-
-**Target Audience:** Technical stakeholders, DevOps teams
-
-### **🔬 5. Research Methods**
-**Purpose:** Academic methodology and validation
-
-**Content:**
-- Scientific data sources
-- Validation methodology
-- Academic disclaimers
-- Literature references
-
-**Target Audience:** Academic reviewers, thesis committee
+**Empfohlenes Vorgehen:**
+1. Tabelle nach Warnsymbolen durchsuchen (⚠️ bedeutet fehlende Primärdaten).
+2. Auffällige Instanzen (z. B. hohe Wattzahl) gegen AWS-Metriken verifizieren.
+3. Ergebnisse in Validierungsdokumentation übertragen.
 
 ---
 
 ## 🎯 **Business Use Cases**
 
 ### **📊 Executive Presentations**
-**Page:** Executive Summary
-**Scenario:** Monthly board meeting, quarterly reviews
-**Key Metrics:**
-- Current grid status and immediate actions
-- SME calculator results for budget planning
-- ROI timeline for investment decisions
+**Seite:** Executive Summary
+**Szenario:** Monatliche Management-Updates
+**Relevante Kennzahlen:** Grid-Status, validierte Kosten-/CO₂-Werte, Business-Case-Narrative inkl. Unsicherheiten.
 
-### **🌱 ESG Reporting**
-**Page:** Carbon Optimization
-**Scenario:** Sustainability reports, customer requirements
-**Key Metrics:**
-- CO₂ reduction percentages
-- EU compliance status
-- Carbon-aware scheduling benefits
+### **🌱 ESG Reporting & CSRD**
+**Seite:** Carbon Optimization
+**Szenario:** Nachhaltigkeitsreporting, Kundenaudits
+**Relevante Kennzahlen:** 24h-Intensitätsprofil, dokumentierte Unsicherheiten, Quellenangaben (ElectricityMaps, Boavizta).
 
-### **💼 Vendor Justification**
-**Page:** Competitive Analysis
-**Scenario:** Tool selection, budget approval
-**Key Metrics:**
-- Cost comparison (€20 vs €200+)
-- Feature advantages
-- Implementation timeline (3 days vs weeks)
-
-### **🔧 Technical Implementation**
-**Page:** Infrastructure + Research Methods
-**Scenario:** IT planning, academic validation
-**Key Metrics:**
-- Technical specifications
-- Data source validation
-- Scientific methodology
+### **🔧 Technischer Betrieb**
+**Seite:** Infrastructure
+**Szenario:** FinOps-/DevOps-Analyse der Instanzflotte
+**Relevante Kennzahlen:** Laufzeiten (CloudTrail), CPU (CloudWatch), Kostenbindung (AWS Pricing/Cost Explorer) und Datenqualitäts-Hinweise.
 
 ---
 
 ## 📈 **Key Dashboard Metrics**
 
-### **🏢 SME Calculator Results**
-For different company sizes:
+### **🏢 Beobachtete Kennzahlen**
+Die angezeigten Werte stammen ausschließlich aus den aktuell verfügbaren API-Daten. Fehlende Messwerte werden mit ⚠️ gekennzeichnet und fließen nicht in Summen ein (siehe NO-FALLBACK-Policy).
 
-| **Company Size** | **Instances** | **Monthly Savings** | **Annual ROI** | **Payback** |
-|------------------|---------------|---------------------|----------------|-------------|
-| Small SME | 20 | €33.30 | €400/year | 15 months |
-| Medium SME | 50 | €83.24 | €999/year | 6 months |
-| Large SME | 100 | €166.48 | €1,998/year | 3 months |
-
-### **🔄 Competitive Advantage**
-- **Cost Advantage:** 90% lower (€20 vs €200+/month)
-- **ROI Advantage:** 67% better than separate tools
-- **Speed Advantage:** 90% faster (3 days vs weeks)
-- **Integration Advantage:** 32% vs 25% optimization
-
-### **🇩🇪 German Grid Benefits**
-- **Real-time Updates:** Every 30 minutes
-- **Variation Range:** 150-550g CO₂/kWh daily
-- **Optimization Potential:** Up to 60% better than static averages
-- **EU Compliance:** Built-in ETS pricing (€50/tonne)
+### **🇩🇪 German Grid Insights**
+- **Aktualisierung:** bis zu stündlich (ElectricityMaps + lokaler Cache).
+- **Variationsband:** typischerweise 150–550 g CO₂/kWh laut Literatur [16][17]; konkrete Werte stammen aus der Messung.
+- **Compliance-Hinweis:** EU-ETS-Preis (€50/t) wird für Sensitivitätsanalysen genutzt; keine automatische Berichterstattung.
 
 ---
 

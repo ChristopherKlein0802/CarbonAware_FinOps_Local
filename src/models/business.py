@@ -21,3 +21,4 @@ class BusinessCase:
     confidence_interval: float = 0.15
     methodology: str = "Theoretical framework"
     validation_status: str = "Requires validation"
+    source_notes: Optional[str] = None

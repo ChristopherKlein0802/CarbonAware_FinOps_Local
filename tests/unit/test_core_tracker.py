@@ -176,8 +176,15 @@ class TestRuntimeTracker(unittest.TestCase):
     @patch("src.api.client.unified_api_client")
     def test_process_instance_enhanced_missing_power(self, mock_api_client: Mock) -> None:
         mock_api_client.get_power_consumption.return_value = None
-        result = self.tracker.process_instance_enhanced(self.sample_instance, 350.0)
-        self.assertIsNone(result)
+        mock_api_client.get_instance_pricing.return_value = 0.05
+
+        with patch.object(self.tracker, "get_precise_runtime_hours", return_value=10.0):
+            with patch.object(self.tracker, "get_cpu_utilization", return_value=50.0):
+                result = self.tracker.process_instance_enhanced(self.sample_instance, 350.0)
+
+        self.assertIsInstance(result, EC2Instance)
+        self.assertIsNone(result.power_watts)
+        self.assertEqual(result.data_quality, "partial")
 
     @patch("src.api.client.unified_api_client")
     def test_process_instance_enhanced_missing_cpu(self, mock_api_client: Mock) -> None:
@@ -192,7 +199,9 @@ class TestRuntimeTracker(unittest.TestCase):
                     self.sample_instance, 350.0
                 )
 
-        self.assertIsNone(result)
+        self.assertIsInstance(result, EC2Instance)
+        self.assertIsNone(result.power_watts)
+        self.assertEqual(result.data_quality, "partial")
 
     def test_get_enhanced_confidence_metadata(self) -> None:
         confidence, sources = self.tracker._get_enhanced_confidence_metadata(

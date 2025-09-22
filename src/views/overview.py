@@ -390,16 +390,22 @@ def _render_business_case_summary(dashboard_data: Any) -> None:
 
     with impact_col2:
         st.markdown("**🌍 Environmental Impact**")
-        # Calculate CO2 savings (8% improvement typical)
         current_co2 = dashboard_data.total_co2_kg
-        co2_savings = current_co2 * 0.08  # 8% improvement
-        st.metric("CO₂ Reduction", f"{co2_savings:.1f} kg/month", "through smart scheduling")
+        co2_savings = business_case.integrated_co2_reduction_kg or (current_co2 * 0.08 if current_co2 else 0.0)
+        st.metric(
+            "CO₂ Reduction",
+            f"{co2_savings:.1f} kg/month",
+            "Literature-aligned scenario" if business_case.integrated_co2_reduction_kg else "Heuristic (8%)"
+        )
 
-        # EU carbon pricing
-        eu_carbon_value = (co2_savings / 1000) * 50  # €50/tonne
-        st.metric("Carbon Value", f"€{eu_carbon_value:.2f}/month", "EU ETS pricing")
+        # EU carbon pricing Sensitivität
+        eu_carbon_value = (co2_savings / 1000) * AcademicConstants.EU_ETS_PRICE_PER_TONNE if co2_savings else 0.0
+        st.metric("Carbon Value", f"€{eu_carbon_value:.2f}/month", "EU ETS sensitivity")
 
-    st.success("🎯 **Key Benefit**: Automatic optimization during low-carbon grid hours saves money and reduces emissions simultaneously")
+    info_message = "🎯 **Key Benefit (theoretical)**: Carbon-aware scheduling kombiniert Kosten- und CO₂-Effekte basierend auf Literaturwerten."
+    if getattr(business_case, "source_notes", None):
+        info_message += f" {business_case.source_notes}"
+    st.success(info_message)
 
     # Data transparency section
     st.markdown("---")

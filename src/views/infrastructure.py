@@ -77,26 +77,23 @@ def _render_instance_detail_table(dashboard_data: Any) -> None:
         # Get runtime data with NO-FALLBACK transparency
         runtime_hours = "⚠️ Nicht berechenbar"
         runtime_explanation = "CloudTrail-Daten fehlen"
-        data_quality = "Keine Daten"
+        data_quality_raw = getattr(instance, 'data_quality', 'limited') if hasattr(instance, 'data_quality') else 'limited'
         if hasattr(instance, 'runtime_hours') and instance.runtime_hours is not None:
             runtime_hours = f"{instance.runtime_hours:.1f}h"
             runtime_explanation = "CloudTrail-Daten verfügbar"
-            if hasattr(instance, 'data_quality'):
-                data_quality = instance.data_quality.title()
-        else:
-            data_quality = "⚠️ NO-FALLBACK Policy"
+        data_quality = data_quality_raw.lower()
 
         # CO₂ Formula Components: Power(kW) × Grid_Intensity(g/kWh) × Runtime(h) ÷ 1000 = kg CO₂
-        power_kw = f"{instance.power_watts / 1000:.3f}" if instance.power_watts else "N/A"
+        power_kw = f"{instance.power_watts / 1000:.3f}" if instance.power_watts is not None else "N/A"
         grid_intensity_display = f"{grid_intensity:.0f}" if grid_intensity else "N/A"
 
         # Data quality badge
-        if data_quality == "Measured":
+        if data_quality == "measured":
             quality_badge = "🟢 Measured"
-        elif data_quality == "Calculated":
-            quality_badge = "🟡 Calculated"
+        elif data_quality == "partial":
+            quality_badge = "🟡 Partial"
         else:
-            quality_badge = "🔴 Estimated"
+            quality_badge = "🔴 Limited"
 
         table_data.append({
             "Instance Name": instance.instance_name or "Unnamed",
@@ -106,8 +103,8 @@ def _render_instance_detail_table(dashboard_data: Any) -> None:
             "CPU (%)": cpu_util,
             "Power (kW)": power_kw,
             "Grid Intensity (g/kWh)": grid_intensity_display,
-            "CO₂/Month (kg)": f"{instance.monthly_co2_kg:.3f}" if instance.monthly_co2_kg else "⚠️ Nicht berechenbar",
-            "Cost/Month (€)": f"{instance.monthly_cost_eur:.2f}" if instance.monthly_cost_eur else "⚠️ Nicht berechenbar",
+            "CO₂/Month (kg)": f"{instance.monthly_co2_kg:.3f}" if instance.monthly_co2_kg is not None else "⚠️ Nicht berechenbar",
+            "Cost/Month (€)": f"{instance.monthly_cost_eur:.2f}" if instance.monthly_cost_eur is not None else "⚠️ Nicht berechenbar",
             "Data Quality": quality_badge
         })
 
@@ -149,5 +146,4 @@ def _render_instance_detail_table(dashboard_data: Any) -> None:
 
     else:
         st.error("No instance data available for detailed analysis")
-
 

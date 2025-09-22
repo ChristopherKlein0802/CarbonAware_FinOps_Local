@@ -10,6 +10,7 @@ from datetime import datetime
 from ..models.aws import EC2Instance, AWSCostData
 from ..models.business import BusinessCase
 from ..utils.calculations import safe_round, calculate_simple_power_consumption
+from ..constants import AcademicConstants
 
 logger = logging.getLogger(__name__)
 
@@ -61,26 +62,25 @@ class BusinessCaseCalculator:
             validation_factor: Cost validation factor from AWS Cost Explorer comparison
         """
 
-        # DYNAMIC SCENARIO CALCULATION based on data quality and validation
-        # Adjust optimization potential based on validation factor and infrastructure characteristics
+        # Normalise negative inputs (defensive programming for academic metrics)
+        baseline_cost = max(baseline_cost, 0.0)
+        baseline_co2 = max(baseline_co2, 0.0)
 
-        # Enhanced base optimization potential with development scenario handling
-        if baseline_cost < 1.0:  # Development scenario
-            base_conservative = 0.05  # 5% conservative for dev environments
-            base_moderate = 0.08      # 8% moderate for dev environments
+        # Base factors derived from literature (McKinsey [7]: 15–25% cost savings, MIT [20]: 15–25% CO₂)
+        base_conservative = AcademicConstants.CONSERVATIVE_SCENARIO_FACTOR  # 10%
+        base_moderate = AcademicConstants.MODERATE_SCENARIO_FACTOR          # 20%
+
+        if baseline_cost < 1.0:  # Development/Test-Szenario
+            quality_modifier = 0.4
             logger.info("🧪 Development environment: Conservative optimization estimates")
-        elif validation_factor <= 1.5:  # Good data quality
-            base_conservative = 0.08  # 8% conservative
-            base_moderate = 0.15      # 15% moderate
-        elif validation_factor <= 5.0:  # Moderate data quality
-            base_conservative = 0.05  # 5% conservative
-            base_moderate = 0.10      # 10% moderate
-        elif validation_factor <= 50.0:  # Building data quality
-            base_conservative = 0.04  # 4% conservative
-            base_moderate = 0.08      # 8% moderate
-        else:  # Very limited data quality (high validation factor)
-            base_conservative = 0.03  # 3% conservative
-            base_moderate = 0.06      # 6% moderate
+        elif validation_factor <= 1.5:  # Gute Datenqualität (nahe Echtwert)
+            quality_modifier = 0.8
+        elif validation_factor <= 5.0:  # Aufbauende Datenlage
+            quality_modifier = 0.6
+        elif validation_factor <= 50.0:  # Stark eingeschränkte Daten
+            quality_modifier = 0.45
+        else:  # Kaum valide Datenpunkte
+            quality_modifier = 0.3
 
         # Cost-based scaling: larger infrastructures have more optimization potential
         if baseline_cost > 500:  # Large infrastructure
@@ -90,9 +90,9 @@ class BusinessCaseCalculator:
         else:  # Small infrastructure
             cost_scaling = 0.8
 
-        # Calculate dynamic factors
-        scenario_a_factor = min(base_conservative * cost_scaling, 0.15)  # Cap at 15%
-        scenario_b_factor = min(base_moderate * cost_scaling, 0.25)      # Cap at 25%
+        # Calculate dynamic factors (cap reflects conservative interpretation of literature ranges)
+        scenario_a_factor = min(base_conservative * quality_modifier * cost_scaling, 0.15)
+        scenario_b_factor = min(base_moderate * quality_modifier * cost_scaling, 0.25)
 
         # Apply factors to calculate actual savings
         scenario_a_cost_reduction = baseline_cost * scenario_a_factor
@@ -138,7 +138,8 @@ class BusinessCaseCalculator:
             integrated_co2_reduction_kg=integrated_co2_reduction,
             confidence_interval=0.15,
             methodology="INTEGRATION_EXCELLENCE",
-            validation_status=f"Cost validation factor: {validation_factor:.2f}"
+            validation_status=f"Cost validation factor: {validation_factor:.2f}",
+            source_notes="Factors derived from McKinsey [7] cost studies and MIT carbon-aware scheduling [20]"
         )
 
     def calculate_scenario_savings(self, baseline_cost: float, scenario_factor: float) -> float:

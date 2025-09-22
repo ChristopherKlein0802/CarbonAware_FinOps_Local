@@ -113,6 +113,11 @@ src/
 - **AWS Pricing API**: Instance-specific pricing (7d caching)
 - **AWS CloudWatch**: CPU utilization metrics (3h caching)
 
+### **Terraform Test Workloads**
+- Vier EC2-Testinstanzen starten per User-Data automatisierte CPU-Profile
+- Szenarien decken niedrige (~10 %), mittlere (~40 %), hohe (~80 %) und dynamisch wechselnde Last ab
+- Lasten werden über `stress-ng` erzeugt, damit CloudWatch/CloudTrail realistische Metriken liefern
+
 ---
 
 ## 🎯 **Development Workflow**

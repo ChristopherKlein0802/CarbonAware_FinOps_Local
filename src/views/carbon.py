@@ -6,7 +6,7 @@ German Grid focused carbon optimization analysis
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 
@@ -68,15 +68,16 @@ def _render_current_grid_status(current_intensity: float) -> None:
 
 def _render_dynamic_carbon_chart(historical_data: Optional[list], current_intensity: float) -> None:
     """Render progressive 24h carbon chart with datetime axis"""
-    from datetime import datetime, timedelta
+    from datetime import datetime, timedelta, timezone
     st.markdown("### 📊 German Grid 24h Carbon Intensity")
 
-    current_time = datetime.now()
+    current_time_local = datetime.now(timezone.utc).astimezone()
+    current_time_utc = datetime.now(timezone.utc)
 
     # Always include current data point with full timestamp
-    chart_datetimes = [current_time]
+    chart_datetimes = [current_time_local]
     chart_values = [current_intensity]
-    chart_labels = [f"{current_time.strftime('%d.%m.%Y %H:00')} (Jetzt)"]
+    chart_labels = [f"{current_time_local.strftime('%d.%m.%Y %H:00')} (Jetzt)"]
 
     # Add historical data if available
     if historical_data:
@@ -87,7 +88,9 @@ def _render_dynamic_carbon_chart(historical_data: Optional[list], current_intens
             if not timestamp_str:
                 continue
             try:
-                point_datetime = datetime.fromisoformat(str(timestamp_str).replace('Z', ''))
+                point_datetime = datetime.fromisoformat(str(timestamp_str).replace('Z', '+00:00'))
+                if point_datetime.tzinfo is None:
+                    point_datetime = point_datetime.replace(tzinfo=timezone.utc)
             except ValueError:
                 continue
 
@@ -103,24 +106,25 @@ def _render_dynamic_carbon_chart(historical_data: Optional[list], current_intens
 
         # Sort chronologically and extend chart data
         for point_datetime, value in sorted(dedup_points.items()):
-            if point_datetime.hour == current_time.hour and point_datetime.date() == current_time.date():
+            local_dt = point_datetime.astimezone()
+            if local_dt.hour == current_time_local.hour and local_dt.date() == current_time_local.date():
                 continue  # Skip duplicate of current hour
-            chart_datetimes.append(point_datetime)
+            chart_datetimes.append(local_dt)
             chart_values.append(value)
 
-            if point_datetime.date() == current_time.date():
+            if local_dt.date() == current_time_local.date():
                 label_suffix = "(Heute)"
-            elif point_datetime.date() == (current_time.date() - timedelta(days=1)):
+            elif local_dt.date() == (current_time_local.date() - timedelta(days=1)):
                 label_suffix = "(Gestern)"
             else:
                 label_suffix = ""
-            chart_labels.append(f"{point_datetime.strftime('%d.%m.%Y %H:00')} {label_suffix}".strip())
+            chart_labels.append(f"{local_dt.strftime('%d.%m.%Y %H:00')} {label_suffix}".strip())
 
         # Sort by datetime for proper chronological order
         combined_data = sorted(zip(chart_datetimes, chart_values, chart_labels), key=lambda x: x[0])
         chart_datetimes, chart_values, chart_labels = map(list, zip(*combined_data))
 
-        historical_points = len(chart_datetimes) - 1  # exclude current hour point
+        historical_points = max(len(chart_datetimes) - 1, 0)  # exclude current hour point
         if historical_points < 6:
             st.info(f"🔄 Building dataset: {historical_points + 1} hours available")
         elif historical_points < 18:
@@ -129,6 +133,7 @@ def _render_dynamic_carbon_chart(historical_data: Optional[list], current_intens
             st.success(f"✅ Full dataset: {historical_points + 1} hourly measurements (24h pattern)")
     else:
         st.warning("⚠️ Starting data collection - First hour collected")
+        historical_points = 0
 
     # Create progressive chart
     fig = go.Figure()
@@ -179,10 +184,10 @@ def _render_dynamic_carbon_chart(historical_data: Optional[list], current_intens
     # Chart shows carbon intensity without zone lines (status already displayed above)
 
     # Dynamic chart title based on data availability
-    if historical_data and len(chart_datetimes) >= 19:
-        chart_title = f'German Grid Carbon Intensity - Complete 24h Pattern ({len(chart_datetimes)} hours)'
-    elif historical_data and len(chart_datetimes) > 1:
-        chart_title = f'German Grid Carbon Intensity - Building Pattern ({len(chart_datetimes)} hours collected)'
+    if historical_data and historical_points >= 18:
+        chart_title = f'German Grid Carbon Intensity - Complete 24h Pattern ({historical_points + 1} hours)'
+    elif historical_data and historical_points > 0:
+        chart_title = f'German Grid Carbon Intensity - Building Pattern ({historical_points + 1} hours collected)'
     else:
         chart_title = 'German Grid Carbon Intensity - Starting Collection'
 
@@ -204,11 +209,11 @@ def _render_dynamic_carbon_chart(historical_data: Optional[list], current_intens
 
     # Progressive status display with datetime information
     if historical_data:
-        total_hours = len(chart_datetimes)
+        total_hours = historical_points + 1  # include current hour
         coverage_pct = min((total_hours / 24) * 100, 100)
 
-        today_points = len([dt for dt in chart_datetimes if dt.date() == current_time.date()])
-        yesterday_points = len([dt for dt in chart_datetimes if dt.date() == (current_time.date() - timedelta(days=1))])
+        today_points = len([dt for dt in chart_datetimes if dt.date() == current_time_local.date()])
+        yesterday_points = len([dt for dt in chart_datetimes if dt.date() == (current_time_local.date() - timedelta(days=1))])
 
         st.caption(f"📊 Data Coverage: {total_hours}/24 hours ({coverage_pct:.0f}%) | Today: {today_points} | Yesterday: {yesterday_points}")
         st.caption("🟢 Today • 🟠 Yesterday • ⭐ Current Hour")

@@ -5,7 +5,7 @@ terraform {
       version = "~> 5.0"
     }
   }
-  
+
   backend "local" {
     path = "terraform.tfstate"
   }
@@ -18,7 +18,7 @@ locals {
 
   # Generate project name from AWS account ID if not provided
   generated_project_name = var.aws_account_id != "" ? "carbon-finops-${substr(var.aws_account_id, -6, -1)}" : "carbon-finops-thesis"
-  project_name = var.project_name != "" ? var.project_name : local.generated_project_name
+  project_name           = var.project_name != "" ? var.project_name : local.generated_project_name
 
   # Common tags for all resources
   common_tags = {
@@ -33,7 +33,7 @@ locals {
 data "aws_caller_identity" "current" {}
 
 provider "aws" {
-  region = var.aws_region
+  region  = var.aws_region
   profile = var.aws_profile
 
   # Specific AWS Account (will be enforced via Makefile or terraform.tfvars)
@@ -78,16 +78,16 @@ resource "aws_instance" "test_instances" {
       instance_type = "t3.small"
       scenario      = "SME Office Hours (60-72% savings potential)"
     }
-    
+
     # Medium instance - Core business scenario  
     "business-medium" = {
       schedule      = "Current: Always Running (Business Analysis)"
       purpose       = "Core business workload carbon-aware optimization"
       description   = "Medium instance - primary carbon scheduling analysis"
-      instance_type = "t3.medium" 
+      instance_type = "t3.medium"
       scenario      = "Carbon-Aware Scheduling (15-35% CO2 reduction)"
     }
-    
+
     # Large instance - Enterprise scenario
     "enterprise-large" = {
       schedule      = "Current: Always Running (Enterprise Analysis)"
@@ -96,7 +96,7 @@ resource "aws_instance" "test_instances" {
       instance_type = "t3.large"
       scenario      = "Hybrid Strategy (Cost + Carbon optimization)"
     }
-    
+
     # Micro instance - Edge/Cost-sensitive scenario
     "edge-micro" = {
       schedule      = "Current: Always Running (Edge Analysis)"
@@ -110,21 +110,22 @@ resource "aws_instance" "test_instances" {
   ami           = data.aws_ami.amazon_linux.id
   instance_type = each.value.instance_type
   monitoring    = var.enable_monitoring
+  user_data     = file("${path.module}/user-data/${each.key}.sh")
 
   tags = merge(local.common_tags, {
-    Name         = "${local.project_name}-${each.key}"
-    ScheduleType = each.key
-    Purpose      = each.value.purpose
-    Schedule     = each.value.schedule
-    Description  = each.value.description
-    Scenario     = each.value.scenario
-    AnalysisTarget = "true"
+    Name             = "${local.project_name}-${each.key}"
+    ScheduleType     = each.key
+    Purpose          = each.value.purpose
+    Schedule         = each.value.schedule
+    Description      = each.value.description
+    Scenario         = each.value.scenario
+    AnalysisTarget   = "true"
     ThesisValidation = "Bachelor-2025"
     # Enhanced analytics tags
-    BusinessSize = each.key == "sme-small" ? "SME" : each.key == "business-medium" ? "Business" : each.key == "enterprise-large" ? "Enterprise" : "Edge"
+    BusinessSize     = each.key == "sme-small" ? "SME" : each.key == "business-medium" ? "Business" : each.key == "enterprise-large" ? "Enterprise" : "Edge"
     OptimizationType = each.key == "sme-small" ? "OfficeHours" : each.key == "business-medium" ? "CarbonAware" : each.key == "enterprise-large" ? "Hybrid" : "WeekendOnly"
     PowerConsumption = each.value.instance_type == "t3.micro" ? "8.2W" : each.value.instance_type == "t3.small" ? "10.7W" : each.value.instance_type == "t3.medium" ? "11.5W" : "18.4W"
-    ResearchFocus = "German-SME-CarbonAware-FinOps"
+    ResearchFocus    = "German-SME-CarbonAware-FinOps"
   })
 
   lifecycle {
@@ -135,7 +136,7 @@ resource "aws_instance" "test_instances" {
 # Outputs
 output "instance_ids" {
   description = "IDs of all test instances"
-  value = [for instance in aws_instance.test_instances : instance.id]
+  value       = [for instance in aws_instance.test_instances : instance.id]
 }
 
 output "instances" {

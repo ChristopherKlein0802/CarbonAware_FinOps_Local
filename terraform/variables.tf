@@ -10,7 +10,7 @@ variable "aws_account_id" {
   default     = ""
 }
 
-variable "aws_profile"  {
+variable "aws_profile" {
   description = "AWS profile for authentication (supports SSO profiles)"
   type        = string
   default     = "default"

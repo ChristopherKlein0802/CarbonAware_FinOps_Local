@@ -16,7 +16,7 @@ AWS_PROFILE := carbon-finops-sandbox
 
 # Simplified AWS Account Detection
 define get_aws_account
-	@echo "$(BLUE)🔍 Detecting AWS Account...$(NC)" && \
+	echo "$(BLUE)🔍 Detecting AWS Account...$(NC)" && \
 	AWS_ACCOUNT_ID=$$(aws sts get-caller-identity --profile $(AWS_PROFILE) --query Account --output text 2>/dev/null) && \
 	if [ -z "$$AWS_ACCOUNT_ID" ]; then \
 		echo "$(RED)❌ AWS SSO expired. Run: aws sso login --profile $(AWS_PROFILE)$(NC)"; \

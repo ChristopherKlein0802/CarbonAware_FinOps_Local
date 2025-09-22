@@ -4,12 +4,12 @@
 
 **Systematische Marktanalyse** zur Validierung der wissenschaftlichen Hypothese: *"Integrierte Carbon-aware FinOps Tools bieten signifikante Vorteile gegenüber separaten Lösungen"*
 
-### **🎯 Zentrale Forschungsergebnisse:**
+### **🎯 Zentrale Beobachtungen (Desk Research, Stand 09/2025):**
 
-1. **Validierte Marktlücke**: KEINE existierende Lösung kombiniert Echtzeit-Deutsche-Grid-Daten + AWS-Kostenoptimierung + Business-Case-Generierung
-2. **Kostenvorteil**: €5-20/Monat vs. €200+ für separate Tools (97,5% Kostenersparnis)
-3. **Funktionale Hypothese**: Literaturbasierte Schätzungen deuten auf ~28 % zusätzliche Optimierungspotenziale durch Integration hin; empirische Bestätigung steht aus.
-4. **Deutsche SME-Marktlücke**: Gezielte Lösung für 20-100 Instanzen mit EU-Compliance
+1. **Marktlücke:** In der ausgewerteten Anbieter-Stichprobe wurde keine Lösung gefunden, die Echtzeit-Strommix-Daten für Deutschland mit AWS-Kostenoptimierung und Business-Case-Modulen kombiniert (Quellenbasis: Gartner Market Guide [8], GSF-Directory [6], Marketplace-Suche 09/2025).
+2. **Preisband:** Analyse der Listenpreise legt nahe, dass integrierte Angebote für KMU typischerweise im Bereich €200 +/Monat liegen, während der Prototyp lediglich Infrastruktur- und API-Kosten (≤ €20/Monat) verursacht. Die Aussage beruht auf Anbieterangaben ohne vertragliche Rabatte.
+3. **Funktionshypothese:** Literaturwerte zu Right-Sizing und carbon-aware Scheduling (McKinsey [7], MIT [20]) ergeben addiert ein theoretisches Einsparpotenzial von bis zu ~28 %; eine empirische Validierung mit Produktionsdaten steht weiterhin aus.
+4. **SME-Fokus:** Deutsche KMU (20–100 Instanzen) werden in den analysierten Quellen selten adressiert (Bitkom [10], BMWK [11]); der Prototyp schließt diese Lücke explorativ.
 
 **Methodologie**: Systematische Tool-Analyse nach wissenschaftlichen Standards mit transparenten Vergleichskriterien.
 
@@ -19,13 +19,15 @@
 
 ### **Identifizierte Tool-Kategorien & Marktabdeckung:**
 
-| Kategorie | Marktanteil | Hauptvertreter | Preis/Monat | Kernlimitation |
-|-----------|-------------|----------------|-------------|-----------------|
-| **Enterprise FinOps** | 45% | CloudHealth, nOps | €200-500 | ❌ Keine Carbon-Daten |
-| **Carbon Reporting** | 25% | Cloud Carbon Footprint | €150-300 | ❌ Keine Kostenintegration |
-| **Cloud-Native Tools** | 20% | AWS Carbon Tool, Azure Sustainability | €0-50 | ❌ Provider-Lock-in |
-| **Academic/OSS Tools** | 10% | Green Software Foundation | €0 | ❌ Keine Business-Integration |
-| **Integrierte Lösungen** | **0%** | **KEINE GEFUNDEN** | **N/A** | 🎯 **MARKTLÜCKE** |
+| Kategorie | Marktanteil* | Hauptvertreter | Preis/Monat (Listenpreis) | Kernlimitation |
+|-----------|--------------|----------------|---------------------------|-----------------|
+| **Enterprise FinOps** | ~45 % | CloudHealth, nOps | €200–500 | ❌ Keine Carbon-Daten [7][8] |
+| **Carbon Reporting** | ~25 % | Cloud Carbon Footprint | €150–300 | ❌ Keine Kostenintegration [6][15] |
+| **Cloud-Native Tools** | ~20 % | AWS Carbon Tool, Azure Sustainability | €0–50 | ❌ Provider-Lock-in |
+| **Academic/OSS Tools** | ~10 % | Green Software Foundation | €0 | ❌ Keine Business-Integration |
+| **Integrierte Lösungen** | n. b. | keine identifiziert | n. a. | 🎯 Forschungs-Hypothese |
+
+*Schätzung basierend auf den in [7][8][15][20] betrachteten Marktsegmenten. Keine repräsentative Vollerhebung.
 
 ### **🔬 Wissenschaftliche Recherchemethodik:**
 
@@ -137,30 +139,30 @@
 
 ### **🏆 Competitive Advantage Summary:**
 
-#### **Unsere Einzigartigen Stärken:**
-1. **WELTWEIT ERSTE** Carbon-aware FinOps Integration (validated durch systematische Recherche)
-2. **DEUTSCHE GRID-SPEZIALISIERUNG** (250-550g CO₂/kWh Variabilität vs. 350g static)
-3. **SME-KOSTENOPTIMIERUNG** (€5 vs €200+ - 97,5% Ersparnis)
-4. **CLOUDTRAIL-INNOVATION** (±5% accuracy vs ±40% estimates)
-5. **BUSINESS-CASE GENERIERUNG** (ROI + ESG metrics kombiniert)
+#### **Prototypische Stärken (Hypothesenstatus):**
+1. **Integration:** Erste identifizierte Referenzimplementierung für kombinierte CO₂- und Kostensicht im KMU-Kontext (Desk Research, Quellen [6][7][8][20]).
+2. **Deutscher Kontext:** Echtzeitdaten der DE-Zone (ElectricityMaps) mit Literaturbandbreite 250–550 g CO₂/kWh [16][17].
+3. **Kostenstruktur:** Nutzung von API-basierten Datenquellen (< €20/Monat infrastrukturell) statt proprietärer Plattformpreise (vgl. [7][8]).
+4. **CloudTrail-Nutzung:** Ansatz zur Reduktion der Laufzeit-Unsicherheit auf ±5 % (theoretisch) gegenüber Schätzungen (~±40 %) gemäß AWS-Dokumentation [13].
+5. **Business-Case-Modellierung:** Kombination aus Kostensicht (McKinsey [7]) und carbon-aware Szenarien (MIT [20]); Ergebnisse explizit als theoretisch gekennzeichnet.
 
-#### **Anerkannte Schwächen:**
-1. **Geografische Limitierung** (nur German Grid vs. globale Lösungen)
-2. **Skalierungs-Limitierung** (20-100 Instanzen vs. Enterprise 1000+)
-3. **AI-Funktionalität** (regelbasiert vs. ML-optimierte Konkurrenten)
-4. **Empirische Validierung** (literatur-basiert vs. produktions-validierte Claims)
+#### **Bekannte Limitationen:**
+1. **Geografische Fokussierung:** Aktuell nur 🇩🇪-Netzdaten; kein globaler Benchmark.
+2. **Skalierung:** Datenmodell auf 20–100 Instanzen ausgelegt; Enterprise-Anforderungen (1000 +) ungetestet.
+3. **Automatisierung:** Regelbasierte Optimierungen statt ML-gestützter Empfehlungen (vgl. nOps [7]).
+4. **Validierung:** Keine produktionsreifen Messreihen; Aussagen basieren auf Literatur und einem Integrationstest (docs/validation-results.md).
 
 ### **🎓 Wissenschaftliche Conclusion:**
 
-**Research Question Validated**: *"Integration von Carbon-aware FinOps bietet signifikante Vorteile gegenüber separaten Tools"*
+**Forschungsfrage:** *„Kann ein integriertes Carbon-aware FinOps Tool Kosten und CO₂ gegenüber separaten Werkzeugen optimieren?“*
 
-**Evidence**:
-- ✅ **Marktlücke bestätigt**: 93% Gap in Kernfunktionalität
-- ✅ **Kostenvorteil validiert**: 97,5% Ersparnis durch API-Integration
-- ✅ **Funktionale Überlegenheit**: 28% zusätzliche Optimierung durch Integration
-- ✅ **Deutsche SME-Relevanz**: Spezialisierte Lösung für unterversorgte Zielgruppe
+**Status der Evidenz:**
+- 🔍 **Marktbeobachtung:** Desk Research identifiziert keine etablierte integrierte Lösung (siehe Tabelle oben).
+- 💰 **Kostenannahme:** Preisvergleich basiert auf veröffentlichen Listenpreisen; Realkosten können abweichen.
+- 🌱 **Optimierungspotenzial:** Literaturwerte addiert (~28 %) stellen eine Hypothese dar; Verifikation benötigt weitere Feldstudien.
+- 🇩🇪 **KMU-Kontext:** Bedarf durch Studien [10][11] indiziert, tatsächliche Adoption noch nicht untersucht.
 
-**Academic Contribution**: Diese Analyse liefert die **erste systematische Competitive Analysis** der Carbon-aware FinOps Landschaft und validiert eine signifikante, bisher unerkannte Marktlücke für deutsche SME-Unternehmen.
+**Akademischer Beitrag:** Systematische Analyse der verfügbaren Literatur und Angebote, Ableitung einer belastbaren Forschungslücke sowie Formulierung klarer Validierungsschritte für kommende Arbeiten.
 
 ---
 

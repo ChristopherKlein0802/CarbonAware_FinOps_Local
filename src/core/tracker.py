@@ -11,6 +11,7 @@ from botocore.exceptions import ClientError
 
 from ..models.aws import EC2Instance
 from ..utils.cache import CacheTTL, ensure_cache_dir, get_standard_cache_path, is_cache_valid
+from ..constants import AcademicConstants
 
 logger = logging.getLogger(__name__)
 
@@ -292,65 +293,61 @@ class RuntimeTracker:
 
             # Get power consumption from Boavizta (24h cache)
             power_data = unified_api_client.get_power_consumption(instance["instance_type"])
-
-            if not power_data:
-                logger.warning(f"⚠️ No power data for {instance['instance_type']}")
-                return None
+            avg_power_watts = power_data.avg_power_watts if power_data else None
 
             # Get real AWS pricing from Pricing API
             hourly_price_usd = unified_api_client.get_instance_pricing(instance["instance_type"], instance["region"])
 
-            if not hourly_price_usd:
-                logger.warning(f"⚠️ No pricing data for {instance['instance_type']}")
-                return None
-
             # Get actual runtime hours
             actual_runtime_hours = self.get_precise_runtime_hours(instance)
-
-            # NO-FALLBACK POLICY: Runtime hours must come from CloudTrail
-            if actual_runtime_hours is None:
-                logger.warning(
-                    "Runtime data unavailable for %s - CloudTrail data missing",
-                    instance["instance_id"],
-                )
-                return None
 
             # Get CPU utilization for power calculation
             cpu_utilization = self.get_cpu_utilization(instance["instance_id"])
 
-            # NO-FALLBACK POLICY: CPU utilization must come from CloudWatch
-            if cpu_utilization is None:
-                logger.warning(
-                    "CPU utilization unavailable for %s - CloudWatch data missing",
-                    instance["instance_id"],
-                )
-                return None
+            effective_power_watts = None
+            hourly_co2_g = None
+            monthly_co2_kg = None
+            monthly_cost_usd = None
+            monthly_cost_eur = None
 
-            # Enhanced CO2 calculation with CloudTrail-verified runtime and simple power scaling
-            effective_power_watts = calculate_simple_power_consumption(power_data.avg_power_watts, cpu_utilization)
+            if avg_power_watts is not None and cpu_utilization is not None:
+                effective_power_watts = calculate_simple_power_consumption(avg_power_watts, cpu_utilization)
 
-            # Use academically validated CO2 calculation from utils/calculations.py
-            from ..utils.calculations import calculate_co2_emissions
-            monthly_co2_kg = calculate_co2_emissions(effective_power_watts, carbon_intensity, actual_runtime_hours)
+            if effective_power_watts is not None and actual_runtime_hours is not None:
+                from ..utils.calculations import calculate_co2_emissions
+                monthly_co2_kg = calculate_co2_emissions(effective_power_watts, carbon_intensity, actual_runtime_hours)
+                power_kw = effective_power_watts / 1000.0
+                hourly_co2_g = power_kw * carbon_intensity
 
-            # Calculate hourly CO2 for instance metadata
-            power_kw = effective_power_watts / 1000.0
-            hourly_co2_g = power_kw * carbon_intensity
-
-            # Enhanced cost calculation with CloudTrail precision
-            monthly_cost_usd = hourly_price_usd * actual_runtime_hours
-            monthly_cost_eur = monthly_cost_usd * 0.92  # EUR_USD_RATE
+            if hourly_price_usd is not None and actual_runtime_hours is not None:
+                monthly_cost_usd = hourly_price_usd * actual_runtime_hours
+                monthly_cost_eur = monthly_cost_usd * AcademicConstants.EUR_USD_RATE
 
             # Determine confidence level and data sources
             confidence_level, data_sources = self._get_enhanced_confidence_metadata(
-                has_power_data=True,
+                has_power_data=avg_power_watts is not None,
                 has_pricing_data=hourly_price_usd is not None,
                 has_cpu_data=cpu_utilization is not None,
                 has_runtime_data=actual_runtime_hours is not None,
             )
 
             # Determine data quality based on available sources
-            data_quality = "measured" if "cloudtrail_audit" in data_sources else "calculated"
+            if all([
+                actual_runtime_hours is not None,
+                cpu_utilization is not None,
+                effective_power_watts is not None,
+                monthly_cost_eur is not None
+            ]):
+                data_quality = "measured"
+            elif any([
+                actual_runtime_hours is not None,
+                cpu_utilization is not None,
+                effective_power_watts is not None,
+                monthly_cost_eur is not None
+            ]):
+                data_quality = "partial"
+            else:
+                data_quality = "limited"
 
             return EC2Instance(
                 instance_id=instance["instance_id"],
