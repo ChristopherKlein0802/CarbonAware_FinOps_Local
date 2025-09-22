@@ -115,42 +115,42 @@ def main() -> None:
     # Load data once for all pages
     dashboard_data = load_infrastructure_data()
 
-    # API Status Widget - Core 5 APIs
+    # API Status Widget - Core 6 services
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 🔗 API Status")
 
-    if dashboard_data:
-        # API health status simplified (monitoring module removed in cleanup)
-        api_statuses = {}
+    if dashboard_data and getattr(dashboard_data, "api_health_status", None):
+        api_statuses = dashboard_data.api_health_status
+        online_count = sum(1 for status in api_statuses.values() if getattr(status, "healthy", False))
 
-        # Core 5 APIs with actual data availability detection
-        apis = [
-            ("ElectricityMaps", dashboard_data.carbon_intensity is not None and dashboard_data.carbon_intensity.value > 0),
-            ("AWS Cost Explorer", dashboard_data.total_cost_eur > 0),
-            ("CloudTrail", any(hasattr(i, 'runtime_hours') and i.runtime_hours and i.runtime_hours > 0 for i in dashboard_data.instances) if dashboard_data.instances else False),
-            ("Boavizta", any(i.power_watts and i.power_watts > 0 for i in dashboard_data.instances) if dashboard_data.instances else False),
-            ("AWS Pricing", any(hasattr(i, 'hourly_price_usd') and i.hourly_price_usd and i.hourly_price_usd > 0 for i in dashboard_data.instances) if dashboard_data.instances else False)
-        ]
+        for api_name, status in api_statuses.items():
+            label = api_name.replace("_", " ").title()
+            status_code = getattr(status, "status", "error")
+            if getattr(status, "healthy", False):
+                icon = "✅"
+            elif status_code == "degraded":
+                icon = "⚠️"
+            else:
+                icon = "❌"
+            st.sidebar.write(f"{icon} {label}")
 
-        online_count = sum(1 for _, status in apis if status)
+        st.sidebar.write(f"**{online_count}/{len(api_statuses)} Services Online**")
 
-        # API status display
-        for api_name, is_online in apis:
-            status_icon = "✅" if is_online else "❌"
-            st.sidebar.write(f"{status_icon} {api_name}")
-
-        # Summary
-        st.sidebar.write(f"**{online_count}/5 APIs Online**")
-
-        # Instance count
         if hasattr(dashboard_data, 'instances'):
             st.sidebar.info(f"📡 {len(dashboard_data.instances)} instances monitored")
     else:
         st.sidebar.error("❌ System Offline")
-        # Show all APIs as offline
-        for api_name in ["ElectricityMaps", "AWS Cost Explorer", "CloudTrail", "Boavizta", "AWS Pricing"]:
+        fallback_services = [
+            "ElectricityMaps",
+            "Boavizta",
+            "AWS Cost Explorer",
+            "AWS Pricing",
+            "CloudWatch",
+            "CloudTrail"
+        ]
+        for api_name in fallback_services:
             st.sidebar.write(f"❌ {api_name}")
-        st.sidebar.write("**0/5 APIs Online**")
+        st.sidebar.write(f"**0/{len(fallback_services)} Services Online**")
 
     # Render selected page with specific error handling
     try:

@@ -293,6 +293,10 @@ def _render_data_quality_summary(dashboard_data: Any) -> None:
     measured_runtime = len([i for i in dashboard_data.instances if hasattr(i, 'runtime_hours') and i.runtime_hours is not None])
     real_pricing = len([i for i in dashboard_data.instances if hasattr(i, 'hourly_price_usd') and i.hourly_price_usd])
     measured_quality = len([i for i in dashboard_data.instances if hasattr(i, 'data_quality') and i.data_quality == 'measured'])
+    cpu_available = any(
+        hasattr(i, 'cpu_utilization') and i.cpu_utilization is not None
+        for i in dashboard_data.instances
+    )
 
     quality_col1, quality_col2, quality_col3, quality_col4 = st.columns(4)
 
@@ -316,31 +320,45 @@ def _render_data_quality_summary(dashboard_data: Any) -> None:
             apis_active += 1
         if dashboard_data.instances:
             apis_active += 1
-        st.metric("🔗 Active APIs", f"{apis_active}/5", "Core data sources")
+        st.metric("🔗 Data Categories", f"{apis_active}/3", "Carbon / Cost / Infra")
 
     # Data source details
     st.markdown("**📋 Data Source Details:**")
 
-    data_sources = []
-    if dashboard_data.carbon_intensity:
-        data_sources.append("✅ **ElectricityMaps**: Real German grid carbon intensity")
-    else:
-        data_sources.append("❌ **ElectricityMaps**: No carbon data")
+    def _format_timestamp(ts: Optional[Any]) -> str:
+        if not ts:
+            return ""
+        try:
+            if hasattr(ts, 'strftime'):
+                return ts.strftime('%d.%m.%Y %H:%M')
+            return str(ts)
+        except Exception:
+            return ""
 
-    if dashboard_data.total_cost_eur > 0:
-        data_sources.append("✅ **AWS Cost Explorer**: Actual billing data")
-    else:
-        data_sources.append("❌ **AWS Cost Explorer**: No cost data")
+    service_descriptions = {
+        "ElectricityMaps": "Real German grid carbon intensity",
+        "Boavizta": "Hardware power consumption models",
+        "AWS Pricing": "Instance hourly rates",
+        "AWS Cost Explorer": "Actual billing data",
+        "CloudWatch": "CPU metrics for power scaling",
+        "CloudTrail": "Audit-grade runtime tracking"
+    }
 
-    if dashboard_data.instances:
-        data_sources.append("✅ **Boavizta**: Hardware power consumption models")
-        data_sources.append("✅ **AWS Pricing API**: Instance hourly rates")
-        if measured_runtime > 0:
-            data_sources.append("✅ **CloudTrail**: Precise runtime tracking")
-        else:
-            data_sources.append("⚠️ **CloudTrail**: Limited runtime data")
-    else:
-        data_sources.append("❌ **AWS APIs**: No instance data")
+    data_sources: list[str] = []
+
+    api_health = getattr(dashboard_data, 'api_health_status', {})
+
+    for service, status in api_health.items():
+        label = service.replace('_', ' ').title()
+        description = service_descriptions.get(label, service_descriptions.get(service, "Data service"))
+        icon = "✅" if getattr(status, 'healthy', False) else ("⚠️" if getattr(status, 'status', '') == "degraded" else "❌")
+        timestamp = _format_timestamp(getattr(status, 'last_check', None))
+        stamp = f" (Stand {timestamp})" if timestamp else ""
+        note = f" – {status.error_message}" if getattr(status, 'error_message', None) and not getattr(status, 'healthy', False) else ""
+        data_sources.append(f"{icon} **{label}**: {description}{stamp}{note}")
+
+    if not data_sources:
+        data_sources.append("⚠️ Keine Service-Metadaten verfügbar")
 
     for source in data_sources:
         st.markdown(f"- {source}")
@@ -411,36 +429,50 @@ def _render_business_case_summary(dashboard_data: Any) -> None:
     st.markdown("---")
     st.markdown("### 📊 Data Source Transparency")
 
-    # API status overview
-    api_col1, api_col2 = st.columns(2)
+    api_health = getattr(dashboard_data, 'api_health_status', {})
 
-    with api_col1:
-        st.markdown("**Real-time API Data:**")
-        if dashboard_data.carbon_intensity:
-            st.success("✅ ElectricityMaps - German grid carbon")
-        else:
-            st.error("❌ ElectricityMaps - No data")
+    def _format_timestamp(ts: Optional[Any]) -> str:
+        if not ts:
+            return ""
+        try:
+            if hasattr(ts, 'strftime'):
+                return ts.strftime('%d.%m.%Y %H:%M')
+            return str(ts)
+        except Exception:
+            return ""
 
-        if dashboard_data.total_cost_eur > 0:
-            st.success("✅ AWS Cost Explorer - Real billing")
-        else:
-            st.error("❌ AWS Cost Explorer - No cost data")
+    service_descriptions = {
+        "ElectricityMaps": "German grid carbon",
+        "Boavizta": "Power consumption models",
+        "AWS Pricing": "Instance hourly rates",
+        "AWS Cost Explorer": "Real billing",
+        "CloudWatch": "CPU metrics",
+        "CloudTrail": "Runtime tracking"
+    }
 
-        if dashboard_data.instances and any(i.power_watts for i in dashboard_data.instances):
-            st.success("✅ Boavizta - Power consumption models")
-        else:
-            st.error("❌ Boavizta - No power data")
+    status_entries: list[tuple[str, str]] = []
+    for service, status in api_health.items():
+        label = service.replace('_', ' ').title()
+        description = service_descriptions.get(label, service_descriptions.get(service, "Data service"))
+        icon = "✅" if getattr(status, 'healthy', False) else ("⚠️" if getattr(status, 'status', '') == "degraded" else "❌")
+        timestamp = _format_timestamp(getattr(status, 'last_check', None))
+        stamp = f" (Stand {timestamp})" if timestamp else ""
+        note = f" – {status.error_message}" if getattr(status, 'error_message', None) and not getattr(status, 'healthy', False) else ""
+        status_entries.append((label, f"{icon} {label} – {description}{stamp}{note}"))
 
-    with api_col2:
-        st.markdown("**Enhanced Precision:**")
-        if dashboard_data.instances and any(hasattr(i, 'runtime_hours') and i.runtime_hours for i in dashboard_data.instances):
-            st.success("✅ CloudTrail - Exact runtime tracking")
-        else:
-            st.warning("⚠️ CloudTrail - Limited runtime data")
+    status_entries.sort(key=lambda item: item[0])
 
-        if dashboard_data.instances and any(hasattr(i, 'hourly_price_usd') and i.hourly_price_usd for i in dashboard_data.instances):
-            st.success("✅ AWS Pricing - Real instance rates")
-        else:
-            st.error("❌ AWS Pricing - No pricing data")
+    if status_entries:
+        st.markdown("**Live Service Status:**")
+        api_col1, api_col2 = st.columns(2)
+        midpoint = (len(status_entries) + 1) // 2
+        with api_col1:
+            for _, entry in status_entries[:midpoint]:
+                st.markdown(entry)
+        with api_col2:
+            for _, entry in status_entries[midpoint:]:
+                st.markdown(entry)
+    else:
+        st.info("Keine Service-Metadaten verfügbar")
 
     st.caption("🔬 **NO-FALLBACK Policy**: Only real API data used - no synthetic estimates")
