@@ -77,10 +77,10 @@ def load_custom_css() -> None:
         logger.error(f"File system error loading CSS: {e} - using default Streamlit styles")
 
 @st.cache_resource(show_spinner="Loading infrastructure data...")  # Use cache_resource for complex objects
-def load_infrastructure_data() -> Optional[Any]:
+def load_infrastructure_data(force_refresh: bool = False) -> Optional[Any]:
     """Load infrastructure data with proper caching and specific error handling"""
     try:
-        return data_processor.get_infrastructure_data()
+        return data_processor.get_infrastructure_data(force_refresh=force_refresh)
     except (ConnectionError, TimeoutError) as e:
         logger.error(f"Network error loading infrastructure data: {e}")
         return None
@@ -105,6 +105,15 @@ def main() -> None:
     st.sidebar.title("🌱 Carbon-Aware FinOps")
     st.sidebar.markdown("*Bachelor Thesis Dashboard*")
 
+    if "force_refresh" not in st.session_state:
+        st.session_state["force_refresh"] = False
+
+    st.sidebar.markdown("### 🔧 Actions")
+    if st.sidebar.button("🔄 Refresh data", use_container_width=True):
+        st.session_state["force_refresh"] = True
+        load_infrastructure_data.clear()
+        st.sidebar.success("Refreshing API data…")
+
     # Simplified navigation menu - core features only
     page = st.sidebar.radio(
         "Navigation",
@@ -113,7 +122,10 @@ def main() -> None:
     )
 
     # Load data once for all pages
-    dashboard_data = load_infrastructure_data()
+    force_refresh_flag = st.session_state.get("force_refresh", False)
+    dashboard_data = load_infrastructure_data(force_refresh_flag)
+    if force_refresh_flag:
+        st.session_state["force_refresh"] = False
 
     # API Status Widget - Core 6 services
     st.sidebar.markdown("---")

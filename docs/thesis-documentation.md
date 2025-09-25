@@ -1,8 +1,8 @@
 # Dokumentation Bachelorarbeit: Carbon-Aware FinOps Integration
 
 ## 1. Forschungsgrundlage
-- **Forschungsfrage:** Wie kann ein integriertes Carbon-aware FinOps Tool durch die Kombination von Echtzeit-Stromnetz-Daten sowohl Kosten als auch CO₂-Emissionen optimieren – im Vergleich zu separaten Tools?
-- **Motivation:** Der deutsche Mittelstand benötigt kosteneffiziente Lösungen, die FinOps- und Nachhaltigkeitsanforderungen zusammenführen [7], [10], [11].
+- **Forschungsfrage:** Wie lässt sich ein integriertes Monitoring-System entwickeln, das Kosten und CO₂-Emissionen von Cloud-Infrastrukturen simultan erfasst, und welche Vorteile bietet dieser Ansatz gegenüber bestehenden getrennten Lösungen?
+- **Motivation:** Der deutsche Mittelstand benötigt kosteneffiziente Werkzeuge, die FinOps- und Nachhaltigkeitsanforderungen gleichzeitig adressieren und CSRD-konforme Emissionsdaten bereitstellen [7], [10], [11].
 
 ## 2. Literaturüberblick
 ### 2.1 Carbon Footprint in der Cloud
@@ -17,11 +17,12 @@ Die Cloud-Adaption und Digitalisierung im deutschen Mittelstand sind umfangreich
 ### 2.4 CloudTrail für Umweltmetriken
 CloudTrail wird bislang primär für Compliance genutzt [13]. Die Arbeit untersucht die Übertragbarkeit auf präzise Laufzeitmessung und stützt sich auf Leitfäden zu nachhaltiger Softwareentwicklung [14], [15], [20].
 
-## 3. Methodisches Vorgehen
-1. **Datenintegration:** ElectricityMaps (Carbon-Intensität), Boavizta (Hardwaremodelle), AWS Cost Explorer/Pricing (Kosten), CloudTrail (Laufzeit) und CloudWatch (CPU-Auslastung).
-2. **No-Fallback-Policy:** Ausfälle werden sichtbar gemacht; keine synthetischen Daten.
-3. **Berechnungsmodelle:** CO₂ = Leistung (kW) × Intensität (g/kWh) × Laufzeit (h) / 1000 [4], [6]; Leistungswerte aus dem 30/70-Modell [1], [2]; Kosten- und Einsparpotenziale basieren auf konservativen Literaturwerten (15–25 % Kosten, 15–35 % CO₂) [7], [8], [15].
-4. **Unsicherheiten:** Jede Dashboard-Antwort enthält Metadaten zu Quellen und Fehlerintervallen (±5 % Carbon, ±10 % Power, ±2 % Kosten, ±15 % Szenarien).
+## 3. Methodisches Vorgehen (Design Science Research)
+1. **Problemidentifikation:** Analyse vorhandener FinOps- und Carbon-Tools anhand eines Bewertungsrasters zur Ermittlung integrativer Defizite.
+2. **Datenintegration:** ElectricityMaps (Carbon-Intensität), Boavizta (Hardwaremodelle), AWS Cost Explorer/Pricing (Kosten), CloudTrail (Laufzeit) und CloudWatch (CPU-Auslastung) werden über den `DataProcessor` gebündelt.
+3. **No-Fallback-Policy:** API-Ausfälle werden transparent ausgewiesen; es existieren keine synthetischen Ersatzwerte.
+4. **Berechnungsmodelle:** CO₂ = Leistung (kW) × Intensität (g/kWh) × Laufzeit (h) / 1000 [4], [6]; Leistungswerte basieren auf dem 30/70-Modell für Serverlast [1], [2]; Business-Faktoren stützen sich auf konservative Literaturwerte (15–25 % Kosten, 15–35 % CO₂) [7], [8], [15].
+5. **Unsicherheiten:** Jede Dashboard-Antwort enthält Metadaten zu Quellen, Messintervallen und Unsicherheiten (±5 % Carbon, ±10 % Power, ±2 % Kosten, ±15 % Szenarien).
 
 ## 4. Ethische und akademische Aspekte
 - **Datenschutz:** Es werden ausschließlich Infrastrukturmetriken verarbeitet.

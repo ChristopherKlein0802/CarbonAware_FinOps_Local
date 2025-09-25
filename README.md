@@ -1,63 +1,82 @@
 # Carbon-Aware FinOps Tool – Bachelorarbeit
 
-## Forschungsfrage
-„Wie kann ein integriertes Carbon-aware FinOps Tool durch die Kombination von Echtzeit-Stromnetz-Daten sowohl Kosten als auch CO₂-Emissionen optimieren – im Vergleich zu separaten Tools?“
+## Projektüberblick
+- Integriertes Monitoring-System für Cloud-Kosten und CO₂-Emissionen mit Fokus auf deutsche KMU
+- Kombination aus Echtzeit-Stromnetzmetriken, AWS-Laufzeitdaten und FinOps-Kennzahlen
+- Forschungsprojekt im Rahmen eines Design-Science-Ansatzes mit offen dokumentierter Architektur und Evaluation
 
-## Problemstellung
-Deutsche kleine und mittlere Unternehmen (KMU) nutzen Cloud-Infrastrukturen zunehmend intensiv, jedoch adressieren verfügbare Werkzeuge meist nur entweder Kosten- oder CO₂-Transparenz [7], [8], [10]. Regionale Netzcharakteristika und präzise Laufzeittelemetrie fehlen häufig, wodurch EU-Compliance-Anforderungen und Budgetgrenzen deutscher KMU nur unzureichend berücksichtigt werden [11], [12], [19].
+## Forschungsfrage und Teilfragen
+„Wie lässt sich ein integriertes Monitoring-System entwickeln, das Kosten und CO₂-Emissionen von Cloud-Infrastrukturen simultan erfasst, und welche Vorteile bietet dieser Ansatz gegenüber bestehenden getrennten Lösungen?“
 
-## Beitrag des Prototyps
-Der Prototyp implementiert einen integrierten Monitoring- und Optimierungs-Workflow mit:
-- ElectricityMaps für die deutsche Netz-Carbon-Intensität (2-Stunden-Cache) [4], [16], [17].
-- Boavizta-Hardwaremodellen zur nutzungsabhängigen Energieeinschätzung [1], [2], [6].
-- AWS Cost Explorer, Pricing, CloudTrail und CloudWatch für Kostenvalidierung, Preisdaten, Laufzeitaudits und CPU-Metriken [7], [13].
+Zur Beantwortung werden folgende Teilfragen adressiert:
+1. Welche Defizite weisen existierende Tools bei der Integration von Kosten- und Emissionsmetriken auf?
+2. Wie lassen sich heterogene Datenquellen trotz unterschiedlicher Charakteristika robust integrieren?
+3. Welche messbaren Vorteile bietet die Integration gegenüber getrennten Ansätzen?
+4. Inwieweit lässt sich der entwickelte Ansatz auf verschiedene Unternehmensgrößen, Cloud-Anbieter und geografische Kontexte adaptieren?
 
-Damit werden insgesamt sechs spezialisierte Services orchestriert, um Kosten-, Laufzeit- und Emissionsdaten konsistent zu vereinen.
+## Motivation und Kontext
+84 % der Unternehmen sehen Kostenkontrolle als größte Cloud-Herausforderung, während die CSRD ab 2024 detaillierte Emissionsreports inklusive Scope-3-Daten fordert. Deutsche KMU geraten damit doppelt unter Druck: Sie müssen Kosten senken und belastbare Emissionsdaten liefern, obwohl verfügbare Tools beide Dimensionen voneinander trennen. Der Prototyp schließt diese Lücke, indem er Kostentransparenz und Carbon Accounting gemeinsam adressiert und so eine belastbare Grundlage für Compliance-Reporting und FinOps-Entscheidungen schafft.
 
-Die Integration dient als reproduzierbare Referenzimplementierung für carbon-aware FinOps im KMU-Skalierungsbereich (ca. 20–100 Instanzen) mit wissenschaftlicher Nachvollziehbarkeit.
+## Ziele und Beitrag
+- Systematische Analyse bestehender Kosten- und Emissionslösungen samt Bewertungsframework
+- Entwicklung eines integrierten Dashboards, das Echtzeitdaten, historische Laufzeiten und modellbasierte Emissionsberechnungen verknüpft
+- Quantitative Evaluation über 30 Tage hinsichtlich Datenverfügbarkeit, Genauigkeit und Handlungsempfehlungen
+- Dokumentation übertragbarer Integrationsmuster für KMU und Erweiterbarkeit auf weitere Regionen sowie Cloud-Anbieter
 
-## Systemüberblick
-Das Streamlit-Dashboard (`src/app.py`) bildet die Präsentationsschicht und orchestriert Datenerhebung über den `DataProcessor` (`src/core/processor.py`). Dieser koordiniert API-Clients, Laufzeit-Tracking und Business-Case-Berechnungen. Dataclasses modellieren die Messwerte (`src/models`), während Utilities Caching, Logging, Validierung und Berechnungen kapseln. Terraform-Artefakte (`terraform/`) stellen eine repräsentative AWS-Testumgebung bereit.
+## Methodischer Ansatz (Design Science Research)
+- **Problemidentifikation:** Literatur-Review und Marktanalyse definieren Integrationsdefizite getrennter Tools.
+- **Anforderungsanalyse:** Ableitung funktionaler Anforderungen (z. B. No-Fallback-Policy, Unsicherheitsangaben, EU-spezifische Berichte).
+- **Artefaktentwicklung:** Iterative Implementierung des Dashboards, inkl. API-Orchestrierung, Laufzeittracking und Business-Case-Modellen.
+- **Evaluation:** Vergleich mit Baseline-Tools anhand verifizierter Metriken (CO₂/kg pro Instanz, Kostenabweichung, Datenlatenz).
+- **Kommunikation:** Open-Source-Repository, reproduzierbare Makefile-Workflows und begleitende Dokumente in `docs/`.
+
+## Systemarchitektur und Komponenten
+- **Streamlit Frontend (`src/app.py`):** Navigierbares Dashboard mit Executive Summary, Carbon-Ansicht und Infrastrukturübersicht.
+- **Datenorchestrierung (`src/core/processor.py`):** Aggregiert API-Daten, validiert Unsicherheiten und erstellt `DashboardData`-Payloads.
+- **Laufzeittracking (`src/core/tracker.py`):** Nutzt CloudTrail-Events und CloudWatch-Metriken für präzise Betriebsstunden.
+- **Berechnungen (`src/core/calculator.py` & `src/utils/calculations.py`):** Emissions- und Kostenmodelle auf Basis Boavizta, ElectricityMaps und FinOps-Szenarien.
+- **API-Clients (`src/api/`):** Kapseln Zugriffe auf ElectricityMaps, AWS Cost Explorer, AWS Pricing, CloudWatch und optionale Datenquellen.
+- **Infrastruktur (`terraform/`):** Referenzumgebung zur Reproduktion der Experimente mit AWS-Workloads im KMU-Skalierungsbereich.
 
 ```
 CarbonAware_FinOps_Local/
 ├── src/
-│   ├── api/              # External API clients (ElectricityMaps, AWS, Boavizta)
-│   ├── core/             # Data processing, runtime tracking, optimisation logic
-│   ├── models/           # Dataclasses for dashboard payloads
-│   ├── utils/            # Shared utilities (caching, calculations, logging)
-│   └── views/            # Streamlit view components
-├── docs/                 # Methodology, validation and market analyses
-├── tests/                # Unit tests for calculators, processor, tracker
-├── terraform/            # AWS test environment templates
-├── Makefile              # Reproducible workflow commands
-├── requirements.txt      # Baseline dependencies
-└── requirements-frozen.txt # Locked environment for reproducibility
+│   ├── api/              # Externe Schnittstellen zu ElectricityMaps, AWS, Boavizta
+│   ├── core/             # DataProcessor, Tracker, Business- und Carbon-Kalkulatoren
+│   ├── models/           # Dataclasses für Dashboard-, Business- und AWS-Objekte
+│   ├── utils/            # Cache-, Validierungs- und Berechnungshilfen
+│   └── views/            # Streamlit-Komponenten und Layout-Logik
+├── docs/                 # Literaturarbeit, Methodik, Evaluationsprotokolle
+├── tests/                # Unit-Tests für Kernlogik und Integrationspunkte
+├── terraform/            # Infrastruktur-Templates für Evaluationsszenarien
+├── Makefile              # Wiederholbare Befehle (Setup, Tests, Dashboard)
+├── requirements.txt      # Abhängigkeitsbasis für die Entwicklungsumgebung
+└── requirements-frozen.txt # Reproduzierbare Referenzumgebung
 ```
 
-## Wissenschaftliche Methodik
-- **No-Fallback-Policy:** API-Ausfälle werden sichtbar gemacht, anstatt durch synthetische Daten kaschiert zu werden.
-- **CO₂-Berechnung:** Monatswerte basieren auf etablierten Leistungs- und Intensitätsmodellen (IEA, GSF) [4], [6]; die Leistungs-Skalierung nutzt das 30/70-Modell für Serverlast [1], [2].
-- **Kosten- und Business-Case-Modellierung:** Szenariofaktoren stützen sich auf konservative Werte aus jüngeren FinOps-Studien [7], [8], [9].
-- **Unsicherheiten:** Jede Dashboard-Antwort weist explizite Unsicherheiten und Datenquellen aus.
+## Evaluationskonzept
+- **Zeithorizont:** 30 Tage Beobachtung in einer kontrollierten AWS-Testumgebung.
+- **Metriken:** Datenverfügbarkeit je API, Kostenabweichung vs. AWS Billing, CO₂/kg je Instanz, Aggregationstreue gegenüber ElectricityMaps-Daten, Dashboard-Latenz.
+- **Vergleichsbasis:** Manuell gepflegte Kostenreports und separate CO₂-Tracker (Baseline) vs. integrierte Darstellung im Dashboard.
+- **Dokumentation:** Ergebnisse und Unsicherheiten werden in `docs/evaluation/` sowie direkt im Dashboard ausgewiesen.
 
 ## Schnellstart
 ```bash
-# 1. Repository klonen
+# Repository klonen
 git clone <your-repo-url>
 cd CarbonAware_FinOps_Local
 
-# 2. Virtuelle Umgebung einrichten
+# Virtuelle Umgebung einrichten
 make setup
 
-# 3. Dashboard starten
+# Dashboard starten
 make dashboard
 
-# 4. Browser öffnen
+# Browser öffnen (Standardport)
 # http://localhost:8501
 ```
 
-## Optional AWS Integration
+## Optionale AWS-Integration
 ```bash
 # AWS SSO Profil vorbereiten
 aws configure sso --profile your-profile-name
@@ -71,11 +90,10 @@ cp .env.example .env
 make deploy
 ```
 
-## Dokumentation
-Ausführliche Hintergründe zu Methodik, Validierung und Marktanalyse finden sich in `docs/thesis-documentation.md`, `docs/literature-integration.md` und weiteren Dokumenten. Das vollständige Literaturverzeichnis steht in `docs/references.md`.
+## Dokumentation und Quellen
+- Methodische Details, Marktanalyse und Evaluationspläne: `docs/thesis-documentation.md`
+- Literatur- und Quellenverwaltung: `docs/references.md`
+- Modularisierung und Integrationsmuster: `docs/literature-integration.md`
 
 ## Lizenz
-Das Projekt entstand im Rahmen einer Bachelorarbeit. Die Nutzung ist an die Richtlinien der jeweiligen Hochschule gebunden; ergänzende Hinweise stehen in `LICENSE`.
-
-## Quellen
-Alle Quellenangaben sind in `docs/references.md` aufgeführt; Zitationen folgen dem dortigen Nummerierungsschema.
+Das Projekt entstand im Rahmen einer Bachelorarbeit. Die Nutzung richtet sich nach den Vorgaben der Hochschule; ergänzende Hinweise stehen in `LICENSE`.

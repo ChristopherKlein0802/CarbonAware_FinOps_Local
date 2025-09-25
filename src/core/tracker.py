@@ -7,7 +7,12 @@ from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 
 import boto3
-from botocore.exceptions import ClientError
+from botocore.exceptions import (
+    ClientError,
+    NoCredentialsError,
+    SSOError,
+    UnauthorizedSSOTokenError,
+)
 
 from ..models.aws import EC2Instance
 from ..utils.cache import CacheTTL, ensure_cache_dir, get_standard_cache_path, is_cache_valid
@@ -59,11 +64,17 @@ class RuntimeTracker:
             logger.info(f"✅ Found {len(instances)} instances in eu-central-1")
             return instances
 
+        except (UnauthorizedSSOTokenError, SSOError, NoCredentialsError) as auth_error:
+            logger.error("🚫 AWS authentication required for EC2 discovery: %s", auth_error)
+            raise
+        except ClientError as client_error:
+            logger.error("❌ AWS EC2 client error: %s", client_error)
+            raise
         except Exception as e:
             logger.error(f"❌ AWS EC2 collection error: {e}")
             return []
 
-    def get_precise_runtime_hours(self, instance: Dict) -> Optional[float]:
+    def get_precise_runtime_hours(self, instance: Dict, *, force_refresh: bool = False) -> Optional[float]:
         """Calculate runtime hours from CloudTrail start/stop events."""
         instance_id = instance["instance_id"]
         region = instance.get("region", "eu-central-1")
@@ -72,7 +83,7 @@ class RuntimeTracker:
         cache_path = get_standard_cache_path("cloudtrail_runtime", cache_identifier)
         ensure_cache_dir(cache_path)
 
-        if is_cache_valid(cache_path, CacheTTL.CLOUDTRAIL_EVENTS):
+        if not force_refresh and is_cache_valid(cache_path, CacheTTL.CLOUDTRAIL_EVENTS):
             try:
                 with open(cache_path, "r", encoding="utf-8") as cache_file:
                     cached_payload = json.load(cache_file)
@@ -97,40 +108,84 @@ class RuntimeTracker:
             )
             cloudtrail = session.client("cloudtrail", region_name=region)
 
-            start_time = datetime.now(timezone.utc) - timedelta(days=30)
             end_time = datetime.now(timezone.utc)
 
-            lookup_params = {
-                "LookupAttributes": [
-                    {
-                        "AttributeKey": "ResourceName",
-                        "AttributeValue": instance_id,
-                    }
-                ],
-                "StartTime": start_time,
-                "EndTime": end_time,
-            }
+            launch_time = instance.get("launch_time")
+            if isinstance(launch_time, datetime) and launch_time.tzinfo is None:
+                launch_time = launch_time.replace(tzinfo=timezone.utc)
 
-            events: List[Dict] = []
-            paginator = cloudtrail.get_paginator("lookup_events")
-            for page in paginator.paginate(**lookup_params):
-                events.extend(page.get("Events", []))
+            lookback_days = 30
+            max_lookback_days = 120
+            lookback_step = 30
+            relevant_events: List[Dict] = []
+            lookback_start = end_time - timedelta(days=lookback_days)
 
-            relevant_events = self._extract_relevant_events(events, instance_id)
+            while True:
+                base_start = end_time - timedelta(days=lookback_days)
+                if launch_time:
+                    earliest_required = launch_time - timedelta(hours=1)
+                    start_time = min(base_start, earliest_required) if earliest_required < base_start else base_start
+                else:
+                    start_time = base_start
+
+                lookup_params = {
+                    "LookupAttributes": [
+                        {
+                            "AttributeKey": "ResourceName",
+                            "AttributeValue": instance_id,
+                        }
+                    ],
+                    "StartTime": start_time,
+                    "EndTime": end_time,
+                }
+
+                events: List[Dict] = []
+                paginator = cloudtrail.get_paginator("lookup_events")
+                for page in paginator.paginate(**lookup_params):
+                    events.extend(page.get("Events", []))
+
+                relevant_events = self._extract_relevant_events(events, instance_id)
+                lookback_start = start_time
+
+                has_start_event = any(event["name"] in {"RunInstances", "StartInstances"} for event in relevant_events)
+                window_exhausted = lookback_days >= max_lookback_days
+                reached_launch = launch_time is not None and start_time <= (launch_time - timedelta(minutes=5))
+
+                if relevant_events and (has_start_event or reached_launch or window_exhausted):
+                    break
+                if not relevant_events and (window_exhausted or reached_launch):
+                    break
+
+                lookback_days += lookback_step
+
             if not relevant_events:
-                logger.warning(
-                    "No CloudTrail state change events for %s in last 30 days", instance_id
+                state = (instance.get("state") or "").lower()
+                if launch_time and state == "running":
+                    runtime_hours = (end_time - launch_time).total_seconds() / 3600.0
+                    logger.warning(
+                        "Fallback runtime estimation for %s using launch time (no CloudTrail events)",
+                        instance_id,
+                    )
+                else:
+                    logger.warning(
+                        "No CloudTrail state change events for %s within lookback window",
+                        instance_id,
+                    )
+                    return None
+            else:
+                runtime_hours = self._calculate_runtime_from_events(
+                    relevant_events,
+                    end_time,
+                    lookback_start,
+                    launch_time,
+                    instance.get("state"),
                 )
-                return None
-
-            runtime_hours = self._calculate_runtime_from_events(
-                relevant_events, end_time
-            )
 
             try:
                 payload = {
                     "runtime_hours": runtime_hours,
                     "event_count": len(relevant_events),
+                    "lookback_start": lookback_start.isoformat() if lookback_start else None,
                     "collected_at": datetime.now(timezone.utc).isoformat(),
                 }
                 with open(cache_path, "w", encoding="utf-8") as cache_file:
@@ -143,10 +198,11 @@ class RuntimeTracker:
                 )
 
             logger.info(
-                "CloudTrail runtime calculated for %s: %.2f h from %d events",
+                "CloudTrail runtime calculated for %s: %.2f h from %d events (lookback start %s)",
                 instance_id,
                 runtime_hours,
-                len(relevant_events),
+                len(relevant_events) if relevant_events else 0,
+                lookback_start.strftime("%Y-%m-%d") if lookback_start else "n/a",
             )
             return runtime_hours
 
@@ -183,13 +239,33 @@ class RuntimeTracker:
         return relevant
 
     def _calculate_runtime_from_events(
-        self, events: List[Dict], end_time: datetime
+        self,
+        events: List[Dict],
+        end_time: datetime,
+        lookback_start: Optional[datetime],
+        launch_time: Optional[datetime] = None,
+        instance_state: Optional[str] = None,
     ) -> float:
-        """Accumulate runtime hours from ordered CloudTrail events."""
+        """Accumulate runtime hours from ordered CloudTrail events with fallbacks."""
         session_start: Optional[datetime] = None
         runtime_hours = 0.0
         start_events = {"RunInstances", "StartInstances"}
         stop_events = {"StopInstances", "TerminateInstances"}
+
+        fallback_start: Optional[datetime] = None
+        if launch_time and lookback_start and launch_time < lookback_start:
+            fallback_start = launch_time
+        elif launch_time:
+            fallback_start = launch_time
+        else:
+            fallback_start = lookback_start
+
+        if events:
+            first_event_name = events[0].get("name")
+            if first_event_name in stop_events and fallback_start is not None:
+                session_start = fallback_start
+
+        instance_state_lower = (instance_state or "").lower()
 
         for event in events:
             event_time = event["time"]
@@ -200,20 +276,25 @@ class RuntimeTracker:
             elif event_name in stop_events and session_start is not None:
                 runtime_hours += (event_time - session_start).total_seconds() / 3600.0
                 session_start = None
+            elif event_name in stop_events and session_start is None and fallback_start is not None:
+                runtime_hours += (event_time - fallback_start).total_seconds() / 3600.0
+                fallback_start = None
 
         if session_start is not None:
             runtime_hours += (end_time - session_start).total_seconds() / 3600.0
+        elif instance_state_lower == "running" and fallback_start is not None:
+            runtime_hours += max((end_time - fallback_start).total_seconds() / 3600.0, 0.0)
 
         return round(runtime_hours, 2)
 
-    def get_cpu_utilization(self, instance_id: str) -> Optional[float]:
+    def get_cpu_utilization(self, instance_id: str, *, force_refresh: bool = False) -> Optional[float]:
         """Get average CPU utilization from CloudWatch with 3-hour caching"""
         # Use persistent cache directory like other APIs
         cache_path = get_standard_cache_path("cpu_utilization", instance_id)
         ensure_cache_dir(cache_path)
 
         # Check cache first (3 hours for CPU data - cost optimization)
-        if is_cache_valid(cache_path, CacheTTL.CPU_UTILIZATION):
+        if not force_refresh and is_cache_valid(cache_path, CacheTTL.CPU_UTILIZATION):
             try:
                 import json
                 with open(cache_path, "r") as f:
@@ -285,7 +366,7 @@ class RuntimeTracker:
             logger.warning(f"⚠️ CloudWatch CPU query error for {instance_id}: {e}")
             return None  # NO-FALLBACK: No synthetic data
 
-    def process_instance_enhanced(self, instance: Dict, carbon_intensity: float) -> Optional[EC2Instance]:
+    def process_instance_enhanced(self, instance: Dict, carbon_intensity: float, *, force_refresh: bool = False) -> Optional[EC2Instance]:
         """Enhanced instance processing with runtime tracking and CPU utilization"""
         try:
             from ..api.client import unified_api_client
@@ -299,10 +380,10 @@ class RuntimeTracker:
             hourly_price_usd = unified_api_client.get_instance_pricing(instance["instance_type"], instance["region"])
 
             # Get actual runtime hours
-            actual_runtime_hours = self.get_precise_runtime_hours(instance)
+            actual_runtime_hours = self.get_precise_runtime_hours(instance, force_refresh=force_refresh)
 
             # Get CPU utilization for power calculation
-            cpu_utilization = self.get_cpu_utilization(instance["instance_id"])
+            cpu_utilization = self.get_cpu_utilization(instance["instance_id"], force_refresh=force_refresh)
 
             effective_power_watts = None
             hourly_co2_g = None

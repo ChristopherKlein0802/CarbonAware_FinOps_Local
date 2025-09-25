@@ -1,155 +1,62 @@
-# 🧮 Wissenschaftliche Berechnungsformeln
+# Berechnungsgrundlagen
 
-## Bachelor Thesis - Carbon-Aware FinOps Tool
-**Akademische Berechnungsgrundlagen mit strikter NO-FALLBACK Policy**
+Dieses Dokument beschreibt die Formeln und Annahmen, die in der Bachelorarbeit sowie im Prototypen zur Bestimmung von Kosten- und Emissionskennzahlen verwendet werden.
 
----
+## 1. CO₂-Berechnung
+**Formel (IEA/GHG-Standard):**
+\[
+\text{CO₂}_{\text{kg}} = \frac{\text{Leistung}_{\text{kW}} \times \text{Netzintensität}_{\text{g/kWh}} \times \text{Laufzeit}_{\text{h}}}{1000}
+\]
 
-## 🔬 **Kernberechnungen**
+- Leistung: aus Boavizta-Modellen bzw. 30/70-Leistungsmodell
+- Netzintensität: ElectricityMaps (Region DE, Echtzeit oder 24h-Historie)
+- Laufzeit: CloudTrail-Audit-Events
+- Ergebnis: Kilogramm CO₂ pro Betrachtungszeitraum
 
-### 1. **CO₂-Emissionsberechnung**
-**Internationale Standard-Formel nach IEA-Methodik:**
+**Beispiel:**
+\(0{,}1\,\text{kW} \times 350\,\text{g/kWh} \times 720\,\text{h} / 1000 = 25{,}2\,\text{kg CO₂}\)
 
-```
-CO₂ (kg) = Power(kW) × Grid_Intensity(g/kWh) × Runtime(h) ÷ 1000
-```
+## 2. Leistungsmodell
+**Energy-Proportional Computing (Barroso & Hölzle, 2007):**
+\[
+\text{Effektive Leistung} = \text{Basisleistung} \times (0{,}3 + 0{,}7 \times \text{CPU}_{\%})
+\]
 
-**Einheitenanalyse:**
-- Power: Watts → kW (÷1000)
-- Grid_Intensity: g CO₂/kWh (ElectricityMaps API)
-- Runtime: Stunden (CloudTrail API)
-- Ergebnis: kg CO₂ (÷1000 für g→kg Konvertierung)
+- 30 % Grundlast deckt konstante Verbraucher (Mainboard, Speicher, Kühlung) ab
+- 70 % variabler Anteil folgt der CPU-Auslastung
+- CPU-Auslastung in Prozent basiert auf CloudWatch-Metriken (Standardperioden)
 
-**Beispielrechnung:**
-```
-100W × 350g/kWh × 730h ÷ 1000 = 25.55 kg CO₂/Monat
-```
+## 3. Kostenmodell
+\[
+\text{Monatliche Kosten}_{\text{EUR}} = \text{Preis}_{\text{USD/h}} \times \text{Laufzeit}_{\text{h}} \times \text{Wechselkurs}_{\text{EUR/USD}}
+\]
 
-### 2. **Power-Skalierung nach CPU-Auslastung**
-**Linear Power Scaling Model (Barroso & Hölzle, 2007):**
+- Preise: AWS Pricing API (On-Demand, `eu-central-1`)
+- Laufzeit: CloudTrail (vgl. Abschnitt 4)
+- Wechselkurs: Europäische Zentralbank, im Prototyp als Konstante gepflegt
 
-```
-Effective_Power = Base_Power × (0.3 + 0.7 × CPU_Utilization/100)
-```
+## 4. CloudTrail-basierte Laufzeitbestimmung
+1. Sammeln der Events `RunInstances`, `StartInstances`, `StopInstances`, `TerminateInstances`.
+2. Sortieren nach Zeitstempel und Paaren von Start/Stop-Ereignissen.
+3. Summieren der Differenzen für den Betrachtungszeitraum.
+4. Ergebnisse werden in `RuntimeTracker.process_instance_enhanced` gespeichert und für Kosten- und CO₂-Berechnungen genutzt.
 
-**Wissenschaftliche Begründung:**
-- **30% Grundlast**: Server-Grundverbrauch (CPU idle, RAM, Kühlung)
-- **70% Variable Last**: CPU-abhängiger Verbrauch
-- Quelle: Google Datacenter Paper, Stanford University Research
+## 5. Unsicherheiten und Annahmen
+| Parameter | Unsicherheit | Quelle/Begründung |
+|-----------|-------------|-------------------|
+| ElectricityMaps Netzintensität | ±5 % | Anbieterangabe und Literatur [16], [17] |
+| Boavizta Leistungsmodelle | ±10 % | Modellierung basierend auf Messreihen |
+| CloudWatch CPU-Daten | ±5 % | Stichprobenbasierte Messung |
+| AWS Cost Explorer | ±2 % | Rundungen und zeitliche Verzögerung |
+| Business-Szenarien (Einsparungen) | ±15 % | Literaturwerte [7], [8], [15] |
 
-**Beispielrechnungen:**
-```
-100W Base × (0.3 + 0.7 × 50%) = 100W × 0.65 = 65W (50% CPU)
-100W Base × (0.3 + 0.7 × 100%) = 100W × 1.0 = 100W (100% CPU)
-100W Base × (0.3 + 0.7 × 0%) = 100W × 0.3 = 30W (0% CPU)
-```
+Die kombinierte Unsicherheit für CO₂- und Kostenschätzungen liegt konservativ bei etwa ±12 % (Root-Sum-of-Squares).
 
-### 3. **Kostenberechnung**
-**Direkte AWS-Kostenberechnung:**
+## 6. Literaturbezug
+- Barroso, L. A.; Hölzle, U. (2007): *The Case for Energy-Proportional Computing*.
+- International Energy Agency (2022): *Global Energy & CO₂ Status Report*.
+- Green Software Foundation (2023): *Software Carbon Intensity Specification*.
+- McKinsey & Company (2024): *Cloud cost optimization: A $1 trillion opportunity*.
+- Gartner (2024): *Market Guide for Cloud Financial Management Tools*.
 
-```
-Monthly_Cost_EUR = Hourly_Price_USD × Runtime_Hours × EUR_USD_Rate
-```
-
-**Parameter:**
-- Hourly_Price_USD: AWS Pricing API (exakt)
-- Runtime_Hours: CloudTrail API (audit-genau)
-- EUR_USD_Rate: 0.92 (ECB September 2024)
-
----
-
-## 📊 **Datenquellen & Genauigkeit**
-
-### **API-Integration (5 externe Quellen):**
-
-| API | Caching | Genauigkeit | Zweck |
-|-----|---------|-------------|-------|
-| **ElectricityMaps** | 2h | ±5% | Deutsche Netzdaten |
-| **Boavizta** | 7d | ±10% | Hardware-Power Models |
-| **AWS Cost Explorer** | 6h | ±2% | Billing-Validierung |
-| **AWS Pricing API** | 7d | Exakt | Instance-Preise |
-| **AWS CloudWatch** | 3h | ±5% | CPU-Metriken |
-
-### **NO-FALLBACK Policy:**
-```python
-# Beispiel: Wissenschaftlich korrekte Fehlerbehandlung
-def get_runtime_hours(instance_id: str) -> Optional[float]:
-    try:
-        return cloudtrail_api.get_precise_runtime(instance_id)
-    except APIError:
-        logger.error("❌ API failed - NO FALLBACK used")
-        return None  # Keine Schätzwerte für akademische Integrität
-```
-
----
-
-## 🎯 **Unsicherheitsanalyse**
-
-### **Dokumentierte Fehlerquellen:**
-
-| Parameter | Unsicherheit | Quelle |
-|-----------|-------------|--------|
-| Grid Carbon Intensity | ±5% | ElectricityMaps Messunsicherheit |
-| Hardware Power Models | ±10% | Boavizta Modell-Varianz |
-| CPU Utilization | ±5% | CloudWatch Sampling |
-| AWS Kosten | ±2% | Billing-Rundung |
-| **Gesamt (RSS)** | **±12%** | Root Sum of Squares |
-
-### **Verbesserung durch CloudTrail:**
-- **Ohne CloudTrail**: ±40% (Schätzungen)
-- **Mit CloudTrail**: ±5% (Audit-Daten)
-- **Faktor 8x** Genauigkeitssteigerung
-
----
-
-## 🇩🇪 **Deutsche Grid-Spezialisierung**
-
-### **Regionale Variabilität:**
-- **Coal-Heavy Hours**: 450-550g CO₂/kWh (Abends)
-- **Renewable-Heavy Hours**: 150-300g CO₂/kWh (Mittags)
-- **Optimierungspotential**: Bis zu 73% CO₂-Reduktion durch Timing
-
-### **24h-Datensammlung:**
-```python
-# Free-Tier: ElectricityMaps "history" Endpoint (letzte 24 Stunden)
-params = {"zone": "DE"}
-response = requests.get(f"{BASE_URL}/carbon-intensity/history", params=params, headers=headers)
-
-if response.ok:
-    hourly_points = response.json()["history"]  # Liste mit datetime & carbonIntensity
-else:
-    hourly_points = None
-
-# Fallback – lokale Sammlung auf Basis von /latest:
-if not hourly_points:
-    hourly_points = cache.read("hourly_collection_de")  # aus stündlichen Latest-Messungen
-```
-
----
-
-## 📚 **Wissenschaftliche Quellen**
-
-1. **Barroso, L.A., Hölzle, U.** (2007). *The Case for Energy-Proportional Computing*. Computer, 40(12), 33-37.
-2. **IEA** (2021). *Global Energy & CO2 Status Report*. International Energy Agency.
-3. **ElectricityMaps** (2024). *Real-time CO2 emissions of electricity consumption*. API Documentation.
-4. **Boavizta** (2024). *Environmental Footprint of Digital Services*. API Methodology.
-5. **AWS** (2024). *Cost Explorer & CloudTrail API Documentation*. Amazon Web Services.
-
----
-
-## ⚖️ **Compliance & Standards**
-
-### **Akademische Standards:**
-- ✅ **ISO 14064**: Greenhouse Gas Quantification
-- ✅ **GHG Protocol**: Corporate Standard
-- ✅ **EU Taxonomy**: Green Investment Framework
-- ✅ **NO-FALLBACK**: Wissenschaftliche Transparenz
-
-### **German Regulations:**
-- ✅ **CSRD**: Corporate Sustainability Reporting Directive
-- ✅ **EU Green Deal**: Climate Law Compliance
-- ✅ **German Energy Act**: Regional Grid Data
-
----
-
-*Diese Dokumentation gewährleistet volle Transparenz der Berechnungsmethodik für die Bachelor-Thesis-Bewertung.*
+Alle Quellen sind vollständig in `docs/references.md` nachgewiesen.

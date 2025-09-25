@@ -1,171 +1,106 @@
-# 🌍 Carbon-Aware FinOps Dashboard - Professional Architecture
+# Systemarchitektur: Carbon-Aware FinOps Dashboard
 
-## 🎓 **Bachelor Thesis Project**
-**Research Question:** "How can an integrated Carbon-aware FinOps Tool optimize both costs and CO2 emissions through real-time grid data compared to separate Carbon-Reporting and Cost-Optimization tools?"
+## 1. Einordnung
+- **Forschungsfrage:** Wie lässt sich ein integriertes Monitoring-System entwickeln, das Kosten und CO₂-Emissionen von Cloud-Infrastrukturen simultan erfasst, und welche Vorteile bietet dieser Ansatz gegenüber bestehenden getrennten Lösungen?
+- **Projektziel:** Referenzarchitektur für deutsche KMU (ca. 20–100 AWS-Instanzen) mit klarer Trennung von Datenakquise, Verarbeitung und Visualisierung.
+- **Methodik:** Design-Science-Ansatz mit iterativen Build-Evaluate-Zyklen und nachvollziehbarer Dokumentation.
 
-**Academic Scope:** First integrated tool combining ElectricityMaps API + AWS Cost Explorer + SME business case generation
-
----
-
-## 🏗️ **Professional Software Architecture**
-
-### **🎯 Design Principles**
-- **Clean Architecture** with clear separation of concerns
-- **MVC Pattern** for maintainable code structure
-- **Domain-Driven Design** with academic business logic
-- **Enterprise-Grade** error handling and logging
-- **Type Safety** with comprehensive data models
-
-### **📁 Project Structure**
-
+## 2. Projektstruktur
 ```
 CarbonAware_FinOps_Local/
 ├── src/
-│   ├── api/           # External integrations (ElectricityMaps, AWS, Boavizta)
-│   ├── app.py         # Streamlit entrypoint and layout configuration
-│   ├── core/          # Data processor, calculators, trackers
-│   ├── models/        # Typed dataclasses for dashboard payloads
-│   ├── utils/         # Shared utilities (cache, logging, validation)
-│   └── views/         # Streamlit page components
-├── docs/              # Academic documentation set
-├── tests/             # Unit and integration tests
-├── terraform/         # Optional AWS validation environment
-├── requirements*.txt  # Dependency specifications
-├── Makefile           # Reproducible automation targets
-└── .env.example       # Environment variable template
+│   ├── app.py               # Streamlit-Einstieg und Seitenrouting
+│   ├── api/                 # Integrationen: ElectricityMaps, AWS, Boavizta
+│   ├── core/                # DataProcessor, Tracker, Kalkulatoren
+│   ├── models/              # Dataclasses für Dashboard-, Business- und AWS-Objekte
+│   ├── utils/               # Cache-, Berechnungs-, Logging- und Validierungshilfen
+│   └── views/               # Streamlit-Komponenten (Übersicht, Carbon, Infrastruktur)
+├── docs/                    # Methodik, Architektur, Evaluation, Literatur
+├── tests/                   # Unit- und Integrationstests
+├── terraform/               # Reproduzierbare AWS-Testumgebung
+├── Makefile                 # Automatisierte Workflows (Setup, Tests, Dashboard)
+└── requirements*.txt        # Abhängigkeitsmanagement
 ```
 
----
+## 3. Schichtenmodell
+- **Präsentation (`src/app.py`, `src/views/`)**
+  - Streamlit-basierte Oberfläche mit Executive Summary, Carbon-Analyse und Infrastrukturdetail.
+  - Einheitliche UI-Hilfen über `src/utils/ui.py` und CSS-Assets.
+- **Verarbeitung (`src/core/`)**
+  - `DataProcessor`: Orchestriert API-Aufrufe, konsolidiert Messwerte und erstellt `DashboardData`.
+  - `RuntimeTracker`: Greift auf CloudTrail-Events zu und ermittelt Laufzeiten mit Auditgranularität.
+  - `CarbonCalculator`/`BusinessCaseCalculator`: Abbildung von Emissions- und Wirtschaftlichkeitslogik.
+- **Integration (`src/api/`)**
+  - Kapselt ElectricityMaps-, Boavizta- und AWS-spezifische Endpunkte.
+  - Einheitlicher Zugriff über `unified_api_client` mit Caching und Fehlertoleranz.
+- **Domänenmodell (`src/models/`)**
+  - Typisierte Dataclasses für EC2-Instanzen, Carbon-Metriken, Business Cases und Dashboard-Responses.
+  - Enthalten Metadaten zu Datenquellen, Unsicherheiten und Aktualität.
+- **Querschnitt (`src/utils/`)**
+  - `cache.py`: Standardisierte Cachepfade, TTL-Verwaltung, Reinigung.
+  - `calculations.py`: Mathematische Kernfunktionen (z. B. Leistungsmodell, Rundungslogik).
+  - `validation.py` und `errors.py`: Gemeinsame Validierungs- und Fehlermeldungsstrukturen.
 
-## 🎯 **Layer Responsibilities**
-
-### **🎨 Presentation Layer** (`src/app.py`, `src/views/`)
-**Responsibility:** Streamlit UI and thesis narration
-- Sidebar navigation with academic context
-- Executive, carbon, and infrastructure pages assembled from modular view helpers
-- Lightweight CSS styling from `src/assets/`
-
-### **🧠 Processing Layer** (`src/core/`)
-**Responsibility:** Data orchestration and business logic
-- `DataProcessor` composes API clients, calculators, and trackers
-- CloudTrail-enhanced runtime tracking and validation logic
-- Carbon and business-case calculators with documented uncertainty ranges
-
-### **🌐 Integration Layer** (`src/api/`)
-**Responsibility:** External data acquisition with caching and error handling
-- ElectricityMaps carbon intensity client with graceful degradation
-- Boavizta power model retrieval
-- AWS Pricing, Cost Explorer, CloudWatch, and CloudTrail accessors
-
-### **🧱 Domain Layer** (`src/models/`)
-**Responsibility:** Typed payloads for thesis-grade traceability
-- Dataclasses for EC2 instances, carbon metrics, business cases, and dashboard payload
-- Centralised uncertainty metadata and validation factors
-
-### **🔗 Shared Utilities** (`src/utils/`)
-**Responsibility:** Cross-cutting helpers
-- Cache helpers, structured logging, validation scoring, and UI shortcuts
-- Streamlit performance utilities for consistent chart rendering
-
----
-
-## 🔄 **Data Flow Architecture**
-
+## 4. Datenfluss
 ```mermaid
-graph TB
-    A[Frontend App] --> B[Data Processor Controller]
-    B --> C[API Services]
-    C --> D[ElectricityMaps API]
-    C --> E[Boavizta API]
-    C --> F[AWS Cost Explorer]
-
-    B --> G[Business Models]
-    G --> H[EC2Instance]
-    G --> I[CarbonIntensity]
-    G --> J[BusinessCase]
-
-    K[Health Controller] --> C
-    L[Performance Monitor] --> C
-
-    M[Frontend Pages] --> A
-    N[UI Components] --> M
+graph TD
+    A[Streamlit UI] -->|User Request| B[DataProcessor]
+    B --> C[RuntimeTracker]
+    B --> D[CarbonCalculator]
+    B --> E[BusinessCaseCalculator]
+    B --> F[Unified API Client]
+    F --> G[ElectricityMaps]
+    F --> H[Boavizta]
+    F --> I[AWS Services]
+    C --> I
+    D --> J[DashboardData]
+    E --> J
+    B --> J
+    J --> A
 ```
 
----
+## 5. API-Layer und Datenmodelle
+- **UnifiedAPIClient (`src/api/client.py`):** Bündelt ElectricityMaps-, Boavizta- und AWS-Aufrufe und propagiert Fehler im Sinne der No-Fallback-Policy.
+- **AWS-Hilfsklassen (`src/api/aws.py`):** Stellt spezialisierte Clients für Cost Explorer, Pricing und CloudWatch bereit; nutzt gemeinsame Cache-Helfer.
+- **ElectricityMaps (`src/api/electricity.py`):** Liefert aktuelle Intensitäten sowie 24h-Historien für die deutsche Zone.
+- **Boavizta (`src/api/boavizta.py`):** Berechnet Leistungsprofile für AWS-Instanzen.
 
-## 📊 **API Integration Strategy**
+| Methode | Quelle | Zweck | Rückgabe |
+|---------|--------|-------|----------|
+| `get_current_carbon_intensity(zone)` | ElectricityMaps | Echtzeit-Netzintensität | `Optional[CarbonIntensity]` |
+| `get_carbon_intensity_24h(zone)` | ElectricityMaps | Trendanalyse auf 24h-Basis | `Optional[List[CarbonPoint]]` |
+| `get_power_profile(instance_type)` | Boavizta | Leistungsmodell (min/avg/max) | `Optional[PowerProfile]` |
+| `get_monthly_costs()` | AWS Cost Explorer | Validierung der Ausgaben | `Optional[AWSCostData]` |
+| `get_instance_pricing(instance_type, region)` | AWS Pricing | On-Demand-Preis pro Instanz | `Optional[InstancePrice]` |
 
-### **🎯 Intelligent Caching System**
-| API | Cache Duration | Rationale | Cost Savings |
-|-----|---------------|-----------|--------------|
-| **ElectricityMaps** | 30 minutes | Grid data updates every 15-60min | ~75% fewer calls |
-| **Boavizta** | 24 hours | Hardware specs are static | Rate limit protection |
-| **AWS Cost Explorer** | 1 hour | Billing data updates daily | ~95% cost reduction |
+**Genutzte Dataclasses (`src/models/`):** `CarbonIntensity`, `PowerProfile`, `AWSCostData`, `DashboardData` inkl. `APIHealthStatus` dokumentieren Quellen, Zeitstempel und Unsicherheiten.
 
-### **🏥 Health Monitoring**
-- **Real-time API status** in dashboard header
-- **Automatic failover** to cached data when APIs unavailable
-- **Performance metrics** tracking response times
-- **Academic transparency** with "No fallback data" policy
+## 6. Cache-Mechanismen
+| Datenquelle | Modul | Cache-TTL (`CacheTTL`) | Begründung |
+|-------------|-------|------------------------|------------|
+| ElectricityMaps (aktuell) | `src/api/electricity.py` | 30 Minuten (`CARBON_DATA`) | Netzintensität ändert sich im 15–60-Minuten-Takt.
+| ElectricityMaps (24h) | `src/api/electricity.py` | 24 Stunden (`CARBON_24H`) | Historische Daten sind stabil.
+| Boavizta Hardwareprofile | `src/api/boavizta.py` | 7 Tage (`POWER_DATA`) | Instanzmodelle ändern sich selten.
+| AWS Pricing | `src/api/aws.py` | 7 Tage (`PRICING_DATA`) | Listenpreise werden selten angepasst.
+| AWS Cost Explorer | `src/api/aws.py` | 6 Stunden (`COST_DATA`) | Abrechnungsdaten werden täglich aktualisiert.
+| AWS CloudWatch | `src/api/aws.py` | 3 Stunden (`CPU_UTILIZATION`) | Balance aus Aktualität und API-Kosten.
+| AWS CloudTrail | `src/core/tracker.py` | 24 Stunden (`CLOUDTRAIL_EVENTS`) | Events sind unveränderlich, tägliche Synchronisation genügt.
 
----
+Die Cache-Funktionen (`src/utils/cache.py`) verwalten Pfade, TTLs und Bereinigung; `clean_old_cache_files` verhindert überalterte Artefakte. Dadurch sinkt das API-Aufkommen um >80 % und die Betriebskosten bleiben im KMU-Rahmen.
 
-## 🎓 **Academic Standards**
+## 7. Qualitätsmechanismen
+- **No-Fallback-Policy:** Jeder API-Ausfall wird sichtbar gemacht (`None`/Warnungen statt synthetischer Werte).
+- **Unsicherheitsmetadaten:** `DashboardData` speichert Intervallangaben (z. B. ±15 % für Carbon-Szenarien).
+- **Validierung:** `BusinessCaseCalculator.calculate_cloudtrail_enhanced_accuracy` gleicht berechnete Kosten mit AWS-Kosten ab.
+- **Tests:** Unit-Tests für Kalkulationen und Tracker (`tests/unit/`), Integrationstest-Skript für End-to-End-Durchläufe (`tests/integration/`).
 
-### **🔬 Scientific Rigor**
-- **NO FALLBACK DATA:** All calculations use real API data only
-- **Conservative Estimates:** ±15% uncertainty ranges documented
-- **Transparent Methodology:** All calculations peer-reviewable
-- **Business Case Validation:** Theoretical scenarios requiring empirical validation
+## 8. Anschluss an die Thesis
+- **Design-Science-Artefakt:** Architektur dient als Artefakt im Sinne von Hevner et al. mit dokumentiertem Nutzenbeitrag für KMU.
+- **Evaluationsgrundlage:** Struktur ermöglicht Messung der Forschungskennzahlen (Kostenabweichung, CO₂-Einsparungspotenziale, Datenverfügbarkeit).
+- **Reproduzierbarkeit:** Makefile-Workflows und Requirements-Dateien sichern Wiederholbarkeit der Experimente.
 
-### **📚 Bachelor Thesis Compliance**
-- **Novel Research Question:** First integrated carbon-aware FinOps tool
-- **Literature Foundation:** 21+ peer-reviewed sources
-- **Technical Implementation:** Production-ready with MVC architecture
-- **Reproducible Research:** Open source with documented APIs
-
----
-
-## 🚀 **Deployment & Usage**
-
-### **Quick Start**
-```bash
-make setup       # optional: create virtualenv and install dependencies
-make dashboard   # launches `streamlit run src/app.py`
-# or manually: streamlit run src/app.py --server.port 8501
-```
-
-### **Production Features**
-- ✅ **Enterprise Architecture** with Clean Code principles
-- ✅ **Type Safety** with comprehensive data models
-- ✅ **API Cost Optimization** with intelligent caching
-- ✅ **Health Monitoring** with automated diagnostics
-- ✅ **Professional UI/UX** with modern design patterns
-- ✅ **Academic Compliance** with conservative methodology
-
-### **Development Standards**
-- 🔧 **MVC Pattern** for maintainable code
-- 📊 **Domain Models** with business logic separation
-- 🎯 **Single Responsibility Principle** in all components
-- 🔒 **Type Hints** for code safety and documentation
-- 🎓 **Academic Documentation** with uncertainty acknowledgment
-
----
-
-## 📈 **Performance Characteristics**
-
-### **⚡ Optimized Performance**
-- **30-second dashboard load time** (cold start)
-- **2-second page navigation** (cached data)
-- **75% reduction in API costs** through intelligent caching
-- **Production-grade error handling** with graceful degradation
-
-### **🏗️ Scalability Features**
-- **Modular architecture** for easy feature addition
-- **Clean separation** allows independent component development
-- **Professional caching strategy** scales to enterprise usage
-- **Type-safe interfaces** prevent integration errors
-
----
-
-*This architecture demonstrates enterprise-level software development skills suitable for Bachelor thesis presentation and future professional development.*
+## 9. Weiterführende Dokumente
+- `docs/implementation-guide.md` – detaillierte Schritte zur Inbetriebnahme.
+- `docs/calculations.md` – verwendete Formeln und Unsicherheiten.
+- `docs/cloudtrail-methodology.md` – präzise Laufzeiterfassung.
+- `docs/validation-results.md` – Ergebnisse der Integrationsläufe.

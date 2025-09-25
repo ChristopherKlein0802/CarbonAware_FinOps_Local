@@ -4,6 +4,7 @@ Professional SME-focused dashboard with German grid status and business value
 """
 
 import streamlit as st
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 from src.constants import AcademicConstants
@@ -12,6 +13,46 @@ from src.utils.performance import (
     render_4_column_metrics,
     render_grid_status_hero
 )
+
+
+def _load_recent_carbon_series() -> list[tuple[datetime, float]]:
+    """Fetch and normalize the latest 24h carbon intensity series."""
+    try:
+        from src.api.client import unified_api_client
+
+        historical_data = unified_api_client.electricity_api.get_carbon_intensity_24h("eu-central-1")
+        if not historical_data:
+            historical_data = unified_api_client.electricity_api.get_self_collected_24h_data("eu-central-1")
+    except Exception as error:  # pragma: no cover - external API resilience
+        st.warning(f"⚠️ Unable to load 24h carbon data: {error}")
+        return []
+
+    if not historical_data:
+        return []
+
+    normalized_points: dict[datetime, float] = {}
+    for point in historical_data:
+        timestamp_raw = point.get("datetime") or point.get("hour_key")
+        if not timestamp_raw:
+            continue
+
+        try:
+            ts = datetime.fromisoformat(str(timestamp_raw).replace("Z", "+00:00"))
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=timezone.utc)
+        except ValueError:
+            continue
+
+        value = point.get("carbonIntensity") or point.get("value")
+        if value is None:
+            continue
+        try:
+            normalized_points[ts] = float(value)
+        except (TypeError, ValueError):
+            continue
+
+    sorted_points = sorted((ts.astimezone(), value) for ts, value in normalized_points.items())
+    return sorted_points
 
 
 def _render_compact_grid_status(dashboard_data: Any) -> None:
@@ -124,6 +165,129 @@ def _render_sme_sizing_reference() -> None:
         st.caption("€1,500-3,000/month typical AWS")
 
     st.info("💡 **Note:** Optimization potential scales with infrastructure size and usage patterns")
+
+
+def _render_csrd_readiness(dashboard_data: Any) -> None:
+    """Show CSRD readiness indicators for German SMEs."""
+    st.markdown("### 🏛️ CSRD Readiness Snapshot")
+
+    total_instances = len(dashboard_data.instances)
+    measured_instances = len([
+        i for i in dashboard_data.instances if getattr(i, "data_quality", "") == "measured"
+    ])
+    runtime_tracked = len([
+        i for i in dashboard_data.instances if getattr(i, "runtime_hours", None) is not None
+    ])
+
+    grid_available = dashboard_data.carbon_intensity is not None
+    cost_available = dashboard_data.total_cost_eur > 0
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        scope2_status = "✅ Live" if grid_available else "⚠️ Missing"
+        grid_value = dashboard_data.carbon_intensity.value if grid_available else 0
+        st.metric("Scope 2 – Grid", f"{grid_value:.0f} g CO₂/kWh" if grid_available else "No data", scope2_status)
+        st.caption("ElectricityMaps live feed for German grid")
+
+    with col2:
+        if total_instances:
+            measured_ratio = measured_instances / total_instances * 100
+            st.metric("Scope 3 – Cloud", f"{measured_ratio:.0f}% covered", f"{measured_instances}/{total_instances} measured")
+        else:
+            st.metric("Scope 3 – Cloud", "0%", "No instances")
+        st.caption("Boavizta + CloudTrail coverage for emissions")
+
+    with col3:
+        validation_badge = "✅" if cost_available and runtime_tracked == total_instances else "⚠️"
+        st.metric("FinOps Controls", f"{validation_badge} AWS Cost + Runtime", f"Runtime data for {runtime_tracked}/{total_instances}")
+        st.caption("Required for CSRD audit trails")
+
+    st.info("📘 **Interpretation**: CSRD requires belastbare Scope‑2/3 Nachweise. Sobald alle Instanzen Laufzeit- und Emissionsdaten liefern, ist der Prototyp berichtsbereit.")
+
+
+def _render_carbon_scheduling_insight(dashboard_data: Any, carbon_series: list[tuple[datetime, float]]) -> None:
+    """Summarise low-carbon scheduling opportunities from 24h series."""
+    st.markdown("### ⏱️ Carbon-Aware Scheduling Window")
+
+    if not dashboard_data.carbon_intensity or not carbon_series:
+        st.warning("⚠️ 24h carbon dataset noch nicht vollständig – siehe Carbon-Seite für Details.")
+        return
+
+    current_value = dashboard_data.carbon_intensity.value
+    best_point = min(carbon_series, key=lambda entry: entry[1], default=None)
+
+    if not best_point:
+        st.warning("⚠️ Nicht genügend Datenpunkte für Scheduling-Auswertung")
+        return
+
+    best_time, best_value = best_point
+    potential_delta = current_value - best_value
+    potential_pct = (potential_delta / current_value * 100) if current_value else 0
+
+    schedule_col1, schedule_col2, schedule_col3 = st.columns(3)
+
+    with schedule_col1:
+        st.metric("Aktuelle Intensität", f"{current_value:.0f} g CO₂/kWh", "Jetzt")
+
+    with schedule_col2:
+        st.metric("Niedrigster Slot", f"{best_value:.0f} g CO₂/kWh", best_time.strftime("%a %H:%M"))
+
+    with schedule_col3:
+        delta_text = f"-{potential_delta:.0f} g ({potential_pct:.0f}%)" if potential_delta > 0 else "Stabil"
+        st.metric("Shift Potenzial", delta_text, "gegenüber jetzt")
+
+    recommendation = "Verschiebe batch-lastige Tasks" if potential_delta > 0 else "Netz bereits günstig"
+    st.info(
+        f"🗓️ **Empfehlung**: {recommendation} auf {best_time.strftime('%d.%m. %H:%M')} (lokal)."
+        " Prüfe, ob Workloads aus dem Infrastruktur-Tab planbar sind."
+    )
+
+
+def _render_action_recommendations(dashboard_data: Any, carbon_series: list[tuple[datetime, float]]) -> None:
+    """Highlight top optimisation ideas for SME decision makers."""
+    st.markdown("### 🎯 Top Action Recommendations")
+
+    instances = dashboard_data.instances or []
+    if not instances:
+        st.info("Keine Instanzen vorhanden – keine Maßnahmen erforderlich")
+        return
+
+    recommendations: list[str] = []
+
+    low_cpu_candidates = []
+    for inst in instances:
+        state_value = (getattr(inst, "state", "") or "").lower()
+        cpu_value = getattr(inst, "cpu_utilization", None)
+        if state_value == "running" and cpu_value is not None and cpu_value < 15:
+            low_cpu_candidates.append(inst)
+    if low_cpu_candidates:
+        target = max(low_cpu_candidates, key=lambda i: getattr(i, "monthly_cost_eur", 0.0) or 0.0)
+        name = target.instance_name or target.instance_id
+        recommendations.append(
+            f"💤 **Rightsize {name}** – {target.cpu_utilization:.1f}% CPU bei €{(target.monthly_cost_eur or 0):.2f}/Monat."
+            " Nutze kleinere Instanzklasse oder automatisiertes Stopp-Scheduling."
+        )
+
+    missing_runtime = [inst for inst in instances if getattr(inst, "runtime_hours", None) is None]
+    if missing_runtime:
+        recommendations.append(
+            "📡 **CloudTrail aktiv halten** – bei" +
+            f" {len(missing_runtime)} Instanz(en) fehlen Laufzeitdaten. Führe `aws cloudtrail` Logging dauerhaft, damit CSRD-Audits belastbar bleiben."
+        )
+
+    if carbon_series:
+        best_time, best_value = min(carbon_series, key=lambda entry: entry[1])
+        recommendations.append(
+            f"🗓️ **Workloads verschieben** – plane energieintensive Jobs auf {best_time.strftime('%d.%m. %H:%M')} (≈{best_value:.0f} g CO₂/kWh) für zusätzlichen Fußabdruck-Vorteil."
+        )
+
+    if not recommendations:
+        st.success("Alle Instanzen arbeiten effizient – keine unmittelbaren Maßnahmen notwendig.")
+        return
+
+    for rec in recommendations[:3]:
+        st.markdown(f"- {rec}")
 
 
 def _render_integration_excellence(dashboard_data: Any) -> None:
@@ -387,6 +551,22 @@ def render_overview_page(dashboard_data: Optional[Any]) -> None:
     # Quick business case summary
     _render_business_case_summary(dashboard_data)
 
+    st.markdown("---")
+
+    carbon_series = _load_recent_carbon_series()
+
+    _render_csrd_readiness(dashboard_data)
+    _render_carbon_scheduling_insight(dashboard_data, carbon_series)
+    _render_action_recommendations(dashboard_data, carbon_series)
+
+    st.markdown("---")
+
+    _render_system_status(dashboard_data)
+    _render_integration_excellence(dashboard_data)
+    _render_precision_insights(dashboard_data)
+    _render_data_quality_summary(dashboard_data)
+    _render_sme_sizing_reference()
+
 
 def _render_business_case_summary(dashboard_data: Any) -> None:
     """Render quick business case summary for SME decision makers"""
@@ -398,13 +578,45 @@ def _render_business_case_summary(dashboard_data: Any) -> None:
 
     business_case = dashboard_data.business_case
 
+    def _format_eur(amount: float) -> str:
+        """Format EUR values with precision that keeps small amounts visible"""
+        if amount is None:
+            return "€0.00"
+        absolute = abs(amount)
+        if absolute >= 1000:
+            return f"€{amount:,.0f}".replace(",", " ")
+        if absolute >= 100:
+            return f"€{amount:,.0f}"
+        if absolute >= 10:
+            return f"€{amount:,.1f}"
+        return f"€{amount:.2f}"
+
+    def _format_co2(amount: float) -> str:
+        """Format CO₂ values to avoid rounding tiny improvements to zero"""
+        if amount is None:
+            return "0.00 kg"
+        absolute = abs(amount)
+        if absolute >= 100:
+            return f"{amount:.0f} kg"
+        if absolute >= 10:
+            return f"{amount:.1f} kg"
+        return f"{amount:.2f} kg"
+
     # Visual business case with simple graphics
     impact_col1, impact_col2 = st.columns(2)
 
     with impact_col1:
         st.markdown("**💰 Financial Impact**")
-        st.metric("Monthly Savings", f"€{business_case.integrated_savings_eur:.0f}", "vs current spending")
-        st.metric("Annual ROI", f"€{business_case.integrated_savings_eur * 12:.0f}", "yearly optimization")
+        st.metric(
+            "Monthly Savings",
+            _format_eur(business_case.integrated_savings_eur),
+            "vs current spending"
+        )
+        st.metric(
+            "Annual ROI",
+            _format_eur((business_case.integrated_savings_eur or 0.0) * 12),
+            "yearly optimization"
+        )
 
     with impact_col2:
         st.markdown("**🌍 Environmental Impact**")
@@ -412,13 +624,17 @@ def _render_business_case_summary(dashboard_data: Any) -> None:
         co2_savings = business_case.integrated_co2_reduction_kg or (current_co2 * 0.08 if current_co2 else 0.0)
         st.metric(
             "CO₂ Reduction",
-            f"{co2_savings:.1f} kg/month",
+            f"{_format_co2(co2_savings)} /month",
             "Literature-aligned scenario" if business_case.integrated_co2_reduction_kg else "Heuristic (8%)"
         )
 
         # EU carbon pricing Sensitivität
         eu_carbon_value = (co2_savings / 1000) * AcademicConstants.EU_ETS_PRICE_PER_TONNE if co2_savings else 0.0
-        st.metric("Carbon Value", f"€{eu_carbon_value:.2f}/month", "EU ETS sensitivity")
+        st.metric(
+            "Carbon Value",
+            f"{_format_eur(eu_carbon_value)}/month",
+            "EU ETS sensitivity"
+        )
 
     info_message = "🎯 **Key Benefit (theoretical)**: Carbon-aware scheduling kombiniert Kosten- und CO₂-Effekte basierend auf Literaturwerten."
     if getattr(business_case, "source_notes", None):

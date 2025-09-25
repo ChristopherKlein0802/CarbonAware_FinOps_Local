@@ -79,13 +79,14 @@ class DataProcessor:
 
         logger.info("✅ Data Processor initialized")
 
-    def get_infrastructure_data(self) -> Optional[DashboardData]:
+    def get_infrastructure_data(self, *, force_refresh: bool = False) -> Optional[DashboardData]:
         """
         Main controller method - orchestrates all data processing
 
         Returns:
             DashboardData: Complete dashboard data structure or None
         """
+        carbon_intensity = None
         try:
             # Get carbon intensity (30min cache)
             carbon_intensity = unified_api_client.get_current_carbon_intensity("eu-central-1")
@@ -107,7 +108,11 @@ class DataProcessor:
             # Process each instance with API data and enhanced tracking
             processed_instances = []
             for instance in instances:
-                processed_instance = self.runtime_tracker.process_instance_enhanced(instance, carbon_intensity.value)
+                processed_instance = self.runtime_tracker.process_instance_enhanced(
+                    instance,
+                    carbon_intensity.value,
+                    force_refresh=force_refresh,
+                )
                 if processed_instance:
                     processed_instances.append(processed_instance)
 
@@ -154,6 +159,16 @@ class DataProcessor:
             logger.info(f"✅ Infrastructure analysis complete: {len(processed_instances)} instances, €{total_cost_eur:.2f} monthly")
             return dashboard_data
 
+        except (NoCredentialsError, SSOError, UnauthorizedSSOTokenError) as auth_error:
+            logger.error("🚫 AWS authentication error: %s", auth_error)
+            return self._create_auth_error_response(
+                carbon_intensity,
+                ErrorConstants.AWS_SSO_EXPIRED_MSG
+            )
+        except ClientError as client_error:
+            logger.error("❌ AWS client error: %s", client_error)
+            message = client_error.response.get("Error", {}).get("Message") if hasattr(client_error, "response") else str(client_error)
+            return self._create_minimal_response(carbon_intensity, message or "AWS client error occurred")
         except (ValueError, TypeError, KeyError) as e:
             logger.error(f"❌ Data validation/type error: {e}")
             return self._create_empty_response(f"Data validation error: {str(e)}")
@@ -164,7 +179,14 @@ class DataProcessor:
             logger.error(f"❌ Network/API error: {e}")
             return self._create_empty_response(f"Network error: {str(e)}")
 
-    def _build_api_health_status(self, *, carbon_available: bool, cost_available: bool, processed_instances: List[EC2Instance]) -> Dict[str, APIHealthStatus]:
+    def _build_api_health_status(
+        self,
+        *,
+        carbon_available: bool,
+        cost_available: bool,
+        processed_instances: List[EC2Instance],
+        aws_auth_issue: bool = False
+    ) -> Dict[str, APIHealthStatus]:
         """Create API health status objects for dashboard display"""
         now = datetime.now()
 
@@ -175,26 +197,45 @@ class DataProcessor:
                 return "degraded", False
             return "error", False
 
+        def _derive_status(has_full: bool, has_partial: bool, *, partial_message: str, missing_message: str) -> tuple[str, bool, Optional[str]]:
+            if aws_auth_issue:
+                return "degraded", False, ErrorConstants.AWS_SSO_EXPIRED_MSG
+            if not processed_instances:
+                return "degraded", False, missing_message
+            if has_full:
+                return "healthy", True, None
+            if has_partial:
+                return "degraded", False, partial_message
+            return "error", False, missing_message
+
         runtime_instances = [inst for inst in processed_instances if inst.runtime_hours is not None]
         cpu_instances = [inst for inst in processed_instances if inst.cpu_utilization is not None]
         pricing_instances = [inst for inst in processed_instances if inst.hourly_price_usd is not None]
         power_instances = [inst for inst in processed_instances if inst.power_watts is not None]
 
-        cloudtrail_status, cloudtrail_healthy = _status(
-            healthy=processed_instances and len(runtime_instances) == len(processed_instances),
-            degraded=bool(runtime_instances)
+        cloudtrail_status, cloudtrail_healthy, cloudtrail_message = _derive_status(
+            len(runtime_instances) == len(processed_instances),
+            bool(runtime_instances),
+            partial_message="Partial runtimes",
+            missing_message="Runtime data unavailable"
         )
-        cloudwatch_status, cloudwatch_healthy = _status(
-            healthy=processed_instances and len(cpu_instances) == len(processed_instances),
-            degraded=bool(cpu_instances)
+        cloudwatch_status, cloudwatch_healthy, cloudwatch_message = _derive_status(
+            len(cpu_instances) == len(processed_instances),
+            bool(cpu_instances),
+            partial_message="Partial CPU data",
+            missing_message="CPU metrics missing"
         )
-        pricing_status, pricing_healthy = _status(
-            healthy=processed_instances and len(pricing_instances) == len(processed_instances),
-            degraded=bool(pricing_instances)
+        pricing_status, pricing_healthy, pricing_message = _derive_status(
+            len(pricing_instances) == len(processed_instances),
+            bool(pricing_instances),
+            partial_message="Partial pricing",
+            missing_message="Pricing unavailable"
         )
-        power_status, power_healthy = _status(
-            healthy=processed_instances and len(power_instances) == len(processed_instances),
-            degraded=bool(power_instances)
+        power_status, power_healthy, power_message = _derive_status(
+            len(power_instances) == len(processed_instances),
+            bool(power_instances),
+            partial_message="Partial power data",
+            missing_message="Power model data unavailable"
         )
 
         statuses: Dict[str, APIHealthStatus] = {
@@ -211,8 +252,10 @@ class DataProcessor:
                 status="healthy" if cost_available else "degraded",
                 response_time_ms=0.0,
                 last_check=now,
-                healthy=cost_available,
-                error_message=None if cost_available else "Cost validation pending"
+                healthy=cost_available and not aws_auth_issue,
+                error_message=None
+                if cost_available
+                else (ErrorConstants.AWS_SSO_EXPIRED_MSG if aws_auth_issue else "Cost validation pending")
             ),
             "CloudTrail": APIHealthStatus(
                 service="CloudTrail",
@@ -220,7 +263,7 @@ class DataProcessor:
                 response_time_ms=0.0,
                 last_check=now,
                 healthy=cloudtrail_healthy,
-                error_message=None if cloudtrail_healthy else ("Partial runtimes" if runtime_instances else "No audit data")
+                error_message=cloudtrail_message
             ),
             "AWS Pricing": APIHealthStatus(
                 service="AWS Pricing",
@@ -228,7 +271,7 @@ class DataProcessor:
                 response_time_ms=0.0,
                 last_check=now,
                 healthy=pricing_healthy,
-                error_message=None if pricing_healthy else ("Partial pricing" if pricing_instances else "Pricing unavailable")
+                error_message=pricing_message
             ),
             "Boavizta": APIHealthStatus(
                 service="Boavizta",
@@ -236,7 +279,7 @@ class DataProcessor:
                 response_time_ms=0.0,
                 last_check=now,
                 healthy=power_healthy,
-                error_message=None if power_healthy else ("Partial power data" if power_instances else "Power model missing")
+                error_message=power_message
             ),
             "CloudWatch": APIHealthStatus(
                 service="CloudWatch",
@@ -244,7 +287,7 @@ class DataProcessor:
                 response_time_ms=0.0,
                 last_check=now,
                 healthy=cloudwatch_healthy,
-                error_message=None if cloudwatch_healthy else ("Partial CPU data" if cpu_instances else "CPU metrics missing")
+                error_message=cloudwatch_message
             )
         }
 
@@ -267,7 +310,8 @@ class DataProcessor:
             api_health_status=self._build_api_health_status(
                 carbon_available=False,
                 cost_available=False,
-                processed_instances=[]
+                processed_instances=[],
+                aws_auth_issue=False
             ),
             validation_factor=None,
             accuracy_status=None
@@ -290,7 +334,33 @@ class DataProcessor:
             api_health_status=self._build_api_health_status(
                 carbon_available=carbon_intensity is not None,
                 cost_available=False,
-                processed_instances=[]
+                processed_instances=[],
+                aws_auth_issue=False
+            ),
+            validation_factor=None,
+            accuracy_status=None
+        )
+
+    def _create_auth_error_response(self, carbon_intensity, error_message: str) -> DashboardData:
+        """Create response when AWS authentication is missing"""
+        guidance = ErrorConstants.AWS_SSO_FIX_MSG
+        return DashboardData(
+            instances=[],
+            carbon_intensity=carbon_intensity,
+            total_cost_eur=0.0,
+            total_co2_kg=0.0,
+            business_case=None,
+            data_freshness=datetime.now(),
+            uncertainty_ranges=self.ACADEMIC_CONSTANTS,
+            academic_disclaimers=[
+                error_message,
+                guidance
+            ],
+            api_health_status=self._build_api_health_status(
+                carbon_available=carbon_intensity is not None,
+                cost_available=False,
+                processed_instances=[],
+                aws_auth_issue=True
             ),
             validation_factor=None,
             accuracy_status=None
