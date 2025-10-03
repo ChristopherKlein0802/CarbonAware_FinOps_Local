@@ -71,6 +71,10 @@ class UnifiedAPIClient:
         """Get monthly AWS costs for validation with 6-hour caching"""
         return self.aws_api.get_monthly_costs()
 
+    def get_hourly_costs(self, hours: int = 48) -> Optional[list[dict]]:
+        """Get recent hourly EC2 costs from AWS Cost Explorer."""
+        return self.aws_api.get_hourly_costs(hours)
+
 
 # Global instance
 unified_api_client = UnifiedAPIClient()

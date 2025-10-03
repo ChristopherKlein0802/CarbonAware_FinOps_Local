@@ -63,16 +63,18 @@ class ElectricityMapsAPI:
         ensure_cache_dir(cache_path)
 
         # Check cache first (2 hours - optimized for cost vs accuracy)
-        if is_cache_valid(cache_path, CacheTTL.CARBON_DATA * 4):
+        if is_cache_valid(cache_path, CacheTTL.CARBON_DATA):
             try:
                 with open(cache_path, "r") as f:
                     cached_data = json.load(f)
-                logger.info(f"✅ Using cached carbon data for {region}")
+                logger.debug(f"✅ Using cached carbon data for {region}")
+                fetched_at = datetime.fromtimestamp(os.path.getmtime(cache_path), tz=timezone.utc)
                 return CarbonIntensity(
                     value=cached_data["value"],
                     timestamp=parse_iso_datetime(cached_data["timestamp"]),
                     region=cached_data["region"],
-                    source=cached_data["source"]
+                    source=cached_data["source"],
+                    fetched_at=fetched_at
                 )
             except (FileNotFoundError, PermissionError, OSError):
                 pass  # Cache miss - use fresh API call
@@ -103,11 +105,13 @@ class ElectricityMapsAPI:
                 logger.error(f"❌ ElectricityMap API returned invalid data")
                 return None
 
+            fetched_at = datetime.now(timezone.utc)
             carbon_data = CarbonIntensity(
                 value=float(data["carbonIntensity"]),
                 timestamp=parse_iso_datetime(data["datetime"]),
                 region=region,
-                source="electricitymap"
+                source="electricitymap",
+                fetched_at=fetched_at
             )
 
             # Cache the result
@@ -116,11 +120,12 @@ class ElectricityMapsAPI:
                     "value": carbon_data.value,
                     "timestamp": carbon_data.timestamp.isoformat(),
                     "region": carbon_data.region,
-                    "source": carbon_data.source
+                    "source": carbon_data.source,
+                    "fetched_at": carbon_data.fetched_at.isoformat() if carbon_data.fetched_at else None
                 }
                 with open(cache_path, "w") as f:
                     json.dump(cache_data, f)
-                logger.info(f"✅ Carbon intensity: {carbon_data.value}g CO2/kWh (cached 30min)")
+                logger.info(f"✅ Carbon intensity: {carbon_data.value}g CO2/kWh (cached 60min)")
             except (PermissionError, OSError):
                 pass  # Cache write failed - data still available
 
@@ -162,7 +167,7 @@ class ElectricityMapsAPI:
             try:
                 with open(cache_path, "r") as f:
                     cached_data = json.load(f)
-                logger.info(f"✅ Using cached 24h carbon data for {region}")
+                logger.debug(f"✅ Using cached 24h carbon data for {region}")
                 return cached_data["history"]
             except (FileNotFoundError, PermissionError, json.JSONDecodeError, KeyError) as e:
                 logger.warning(f"⚠️ 24h carbon cache read failed: {e}")
@@ -391,7 +396,7 @@ class ElectricityMapsAPI:
         """Read and process collected hourly data for 24h visualization"""
         try:
             if not os.path.exists(collection_file):
-                logger.info("📊 No hourly collection data yet - building dataset over time")
+                logger.debug("📊 No hourly collection data yet - building dataset over time")
                 return None
 
             with open(collection_file, 'r') as f:
@@ -410,10 +415,10 @@ class ElectricityMapsAPI:
             ]
 
             if len(recent_data) >= 6:  # At least 6 hours of data to show meaningful trend
-                logger.info(f"📊 Retrieved {len(recent_data)} hours of self-collected carbon data")
+                logger.debug(f"📊 Retrieved {len(recent_data)} hours of self-collected carbon data")
                 return recent_data
             else:
-                logger.info(f"📊 Only {len(recent_data)} hours collected so far - need more time to build 24h dataset")
+                logger.debug(f"📊 Self-collected dataset currently at {len(recent_data)} hour(s) - building towards 24h")
                 return None
 
         except (FileNotFoundError, PermissionError, json.JSONDecodeError, ValueError) as e:
