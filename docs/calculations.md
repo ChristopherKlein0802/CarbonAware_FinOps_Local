@@ -41,7 +41,13 @@ Dieses Dokument beschreibt die Formeln und Annahmen, die in der Bachelorarbeit s
 3. Summieren der Differenzen für den Betrachtungszeitraum.
 4. Ergebnisse werden in `RuntimeTracker.process_instance_enhanced` gespeichert und für Kosten- und CO₂-Berechnungen genutzt.
 
-## 5. Unsicherheiten und Annahmen
+## 5. Stündliche Kosten-/CO₂-Zeitreihe im Dashboard
+- Der `DataProcessor` erzeugt für die letzten 48 Stunden eine Serie aus AWS-Cost-Explorer-Kosten (`€/h`) und ElectricityMaps-Intensitäten (`g CO₂/kWh`).
+- Das stündliche CO₂-Äquivalent basiert auf dem gemessenen Monatswert (`total_co2_kg / 730 h`) und wird mit dem Verhältnis der jeweiligen Netzdichte zum Durchschnitt der verfügbaren Stunden gewichtet.
+- Bei fehlender Intensität wird der Basiswert (durchschnittliche Emission pro Stunde) angezeigt; es werden keine synthetischen Peaks erzeugt.
+- Die Methode liefert relative Verläufe für die Interpretierbarkeit im Dashboard und ersetzt keine vollständige Monatsverlaufsmessung.
+
+## 6. Unsicherheiten und Annahmen
 | Parameter | Unsicherheit | Quelle/Begründung |
 |-----------|-------------|-------------------|
 | ElectricityMaps Netzintensität | ±5 % | Anbieterangabe und Literatur [16], [17] |
@@ -52,7 +58,7 @@ Dieses Dokument beschreibt die Formeln und Annahmen, die in der Bachelorarbeit s
 
 Die kombinierte Unsicherheit für CO₂- und Kostenschätzungen liegt konservativ bei etwa ±12 % (Root-Sum-of-Squares).
 
-## 6. Literaturbezug
+## 7. Literaturbezug
 - Barroso, L. A.; Hölzle, U. (2007): *The Case for Energy-Proportional Computing*.
 - International Energy Agency (2022): *Global Energy & CO₂ Status Report*.
 - Green Software Foundation (2023): *Software Carbon Intensity Specification*.

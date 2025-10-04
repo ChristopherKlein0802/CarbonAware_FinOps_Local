@@ -39,6 +39,7 @@ CloudTrail wird bislang primär für Compliance genutzt [13]. Die Arbeit untersu
 - **Kosten & Emissionen:** Aktuell nur Literatur-basierte Einsparpotenziale; empirische Bestätigung benötigt reale CloudTrail- und Cost-Explorer-Daten.
 - **Genauigkeit:** Ohne vollständige CloudTrail-Daten bleibt der Validierungsfaktor theoriegeleitet.
 - **Neue Kennzahlen:** Das Dashboard speichert stündliche Snapshots aus AWS Cost Explorer und ElectricityMaps und berechnet daraus Time Alignment Coverage (TAC) sowie Cost-MAPE für die Validierung gegen den Cost Explorer.
+- **Zeitscheiben-Gewichtung:** Die 48h-Visualisierung skaliert den gemessenen Monatswert (`total_co2_kg/730 h`) anhand der relativen Netzdichte je Stunde, um Trends ohne synthetische Extremwerte zu zeigen.
 
 ## 7. Offene Arbeiten
 1. Regelmäßige Auswertung realer CloudTrail-Events.

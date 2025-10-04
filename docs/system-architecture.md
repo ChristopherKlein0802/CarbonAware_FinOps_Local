@@ -103,7 +103,7 @@ Die Cache-Funktionen (`src/utils/cache.py`) verwalten Pfade, TTLs und Bereinigun
 - **Reproduzierbarkeit:** Makefile-Workflows und Requirements-Dateien sichern Wiederholbarkeit der Experimente.
 
 ## 9. Weiterführende Dokumente
-- `docs/implementation-guide.md` – detaillierte Schritte zur Inbetriebnahme.
+- `docs/user-guide.md` – detaillierte Schritte zur Inbetriebnahme.
 - `docs/calculations.md` – verwendete Formeln und Unsicherheiten.
 - `docs/cloudtrail-methodology.md` – präzise Laufzeiterfassung.
 - `docs/validation-results.md` – Ergebnisse der Integrationsläufe.

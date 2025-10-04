@@ -26,6 +26,15 @@ def render_carbon_page(dashboard_data: Optional[Any]) -> None:
     """
     st.header("🇩🇪 Carbon-Aware Optimization")
 
+    with st.expander("ℹ️ What this page shows", expanded=False):
+        st.markdown(
+            """
+            - Visualises the last 24 hours of German grid intensity to spot low-carbon windows.
+            - Combines live ElectricityMaps data with the self-collected cache when the API is unavailable.
+            - Highlights how scheduling workloads into low-carbon hours reduces CO₂ exposure.
+            """
+        )
+
     if not dashboard_data or not dashboard_data.carbon_intensity:
         st.warning("⚠️ No carbon intensity data available. Check ElectricityMaps API.")
         return
@@ -169,9 +178,7 @@ def _render_dynamic_carbon_chart(
         if historical_points < 6:
             st.info(f"🔄 Building dataset: {historical_points + 1} hours available")
         elif historical_points < 18:
-            st.success(f"📈 Growing dataset: {historical_points + 1} hours available")
-        else:
-            st.success(f"✅ Full dataset: {historical_points + 1} hourly measurements (24h pattern)")
+            st.info(f"📈 Growing dataset: {historical_points + 1} hours available")
     else:
         st.warning("⚠️ Starting data collection - First hour collected")
         historical_points = 0

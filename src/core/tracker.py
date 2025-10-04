@@ -77,7 +77,7 @@ class RuntimeTracker:
             return []
 
     def get_precise_runtime_hours(self, instance: Dict, *, force_refresh: bool = False) -> Optional[float]:
-        """Calculate runtime hours from CloudTrail start/stop events."""
+        """Calculate runtime hours from CloudTrail start/stop events for the past 30 days."""
         instance_id = instance["instance_id"]
         region = instance.get("region", "eu-central-1")
 
@@ -117,48 +117,32 @@ class RuntimeTracker:
                 launch_time = launch_time.replace(tzinfo=timezone.utc)
 
             lookback_days = 30
-            max_lookback_days = 120
-            lookback_step = 30
             relevant_events: List[Dict] = []
             lookback_start = end_time - timedelta(days=lookback_days)
 
-            while True:
-                base_start = end_time - timedelta(days=lookback_days)
-                if launch_time:
-                    earliest_required = launch_time - timedelta(hours=1)
-                    start_time = min(base_start, earliest_required) if earliest_required < base_start else base_start
-                else:
-                    start_time = base_start
+            if launch_time:
+                earliest_required = launch_time - timedelta(hours=1)
+                start_time = min(lookback_start, earliest_required)
+            else:
+                start_time = lookback_start
 
-                lookup_params = {
-                    "LookupAttributes": [
-                        {
-                            "AttributeKey": "ResourceName",
-                            "AttributeValue": instance_id,
-                        }
-                    ],
-                    "StartTime": start_time,
-                    "EndTime": end_time,
-                }
+            lookup_params = {
+                "LookupAttributes": [
+                    {
+                        "AttributeKey": "ResourceName",
+                        "AttributeValue": instance_id,
+                    }
+                ],
+                "StartTime": start_time,
+                "EndTime": end_time,
+            }
 
-                events: List[Dict] = []
-                paginator = cloudtrail.get_paginator("lookup_events")
-                for page in paginator.paginate(**lookup_params):
-                    events.extend(page.get("Events", []))
+            events: List[Dict] = []
+            paginator = cloudtrail.get_paginator("lookup_events")
+            for page in paginator.paginate(**lookup_params):
+                events.extend(page.get("Events", []))
 
-                relevant_events = self._extract_relevant_events(events, instance_id)
-                lookback_start = start_time
-
-                has_start_event = any(event["name"] in {"RunInstances", "StartInstances"} for event in relevant_events)
-                window_exhausted = lookback_days >= max_lookback_days
-                reached_launch = launch_time is not None and start_time <= (launch_time - timedelta(minutes=5))
-
-                if relevant_events and (has_start_event or reached_launch or window_exhausted):
-                    break
-                if not relevant_events and (window_exhausted or reached_launch):
-                    break
-
-                lookback_days += lookback_step
+            relevant_events = self._extract_relevant_events(events, instance_id)
 
             if not relevant_events:
                 state = (instance.get("state") or "").lower()

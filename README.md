@@ -34,11 +34,13 @@ Zur Beantwortung werden folgende Teilfragen adressiert:
 ## Systemarchitektur und Komponenten
 - **Streamlit Frontend (`src/app.py`):** Navigierbares Dashboard mit Executive Summary, Carbon-Ansicht und Infrastrukturübersicht.
 - **Datenorchestrierung (`src/core/processor.py`):** Aggregiert API-Daten, validiert Unsicherheiten und erstellt `DashboardData`-Payloads.
-- **Zeitreihen & TAC:** `DataProcessor` synchronisiert stündliche EC2-Kosten aus dem AWS Cost Explorer mit ElectricityMaps-Intensitäten (`TimeSeriesPoint`) als Grundlage für Time Alignment Coverage und Cost-MAPE.
+- **Zeitreihen & TAC:** `DataProcessor` synchronisiert stündliche EC2-Kosten aus dem AWS Cost Explorer mit ElectricityMaps-Intensitäten (`TimeSeriesPoint`), gewichtet den gemessenen Monatsfußabdruck anhand der tatsächlichen Netzdichte und berechnet daraus Time Alignment Coverage und Cost-MAPE.
 - **Laufzeittracking (`src/core/tracker.py`):** Nutzt CloudTrail-Events und CloudWatch-Metriken für präzise Betriebsstunden.
 - **Berechnungen (`src/core/calculator.py` & `src/utils/calculations.py`):** Emissions- und Kostenmodelle auf Basis Boavizta, ElectricityMaps und FinOps-Szenarien.
 - **API-Clients (`src/api/`):** Kapseln Zugriffe auf ElectricityMaps, AWS Cost Explorer, AWS Pricing, CloudWatch und optionale Datenquellen.
 - **Infrastruktur (`terraform/`):** Referenzumgebung zur Reproduktion der Experimente mit AWS-Workloads im KMU-Skalierungsbereich.
+
+- **Validierungsmetriken (`src/utils/validation.py`, `src/views/overview.py`):** Erfassen Laufzeit-, Preis- und Emissionsabdeckung je Instanz und stellen den Data-Precision-Score im Dashboard bereit.
 
 ```
 CarbonAware_FinOps_Local/
@@ -58,9 +60,10 @@ CarbonAware_FinOps_Local/
 
 ## Evaluationskonzept
 - **Zeithorizont:** 30 Tage Beobachtung in einer kontrollierten AWS-Testumgebung.
-- **Metriken:** Datenverfügbarkeit je API, TAC (Time Alignment Coverage), Cost-MAPE vs. AWS Billing, CO₂/kg je Instanz, Aggregationstreue gegenüber ElectricityMaps-Daten, Dashboard-Latenz.
+- **Metriken:** Datenverfügbarkeit je API, TAC (Time Alignment Coverage), Cost-MAPE vs. AWS Billing, CO₂/kg je Instanz, Aggregationstreue gegenüber ElectricityMaps-Daten, Dashboard-Latenz sowie Data-Precision-Score.
 - **Vergleichsbasis:** Manuell gepflegte Kostenreports und separate CO₂-Tracker (Baseline) vs. integrierte Darstellung im Dashboard.
-- **Dokumentation:** Ergebnisse und Unsicherheiten werden in `docs/evaluation/` sowie direkt im Dashboard ausgewiesen.
+- **Dokumentation:** Ergebnisse und Unsicherheiten werden in `docs/validation-results.md` sowie direkt im Dashboard ausgewiesen.
+- **Aktueller Fokus:** Szenario-Integrationstests (z. B. geplante Start/Stop-Sequenzen), wiederholte CloudTrail-Analysen und der Aufbau eines belastbaren Messdatensatzes (siehe `docs/thesis-documentation.md`).
 
 ## Schnellstart
 ```bash
@@ -71,12 +74,23 @@ cd CarbonAware_FinOps_Local
 # Virtuelle Umgebung einrichten
 make setup
 
+# (Optional) Tests vorbereiten – pytest installieren, falls nicht Bestandteil der Umgebung
+# python3 -m pip install pytest
+
 # Dashboard starten
 make dashboard
 
 # Browser öffnen (Standardport)
 # http://localhost:8501
+
+# Tests ausführen (optional, nach Installation von pytest)
+# python3 -m pytest
 ```
+
+## Aktueller Status & Offene Arbeiten
+- Wiederholte CloudTrail-/Cost-Explorer-Abgleiche zur Reduktion des Validierungsfaktors sind geplant.
+- Szenario-Integrationstests (Start/Stop, Carbon-aware Scheduling) werden vorbereitet, um Literaturannahmen empirisch zu belegen.
+- Aufbau eines Messdatensatzes und Dokumentation der 48 h-Zeitreihen für die schriftliche Arbeit laufen (`docs/thesis-documentation.md`).
 
 ## Optionale AWS-Integration
 ```bash

@@ -5,6 +5,7 @@ Professional SME-focused dashboard with German grid status and business value
 
 import streamlit as st
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 from typing import Any, Optional
 
 from src.constants import AcademicConstants
@@ -167,6 +168,8 @@ def _render_system_status(dashboard_data: Any) -> None:
         }
 
         status_rows: list[dict[str, str]] = []
+        berlin_tz = ZoneInfo("Europe/Berlin")
+
         for service, status in sorted(api_health.items()):
             label = display_labels.get(service, service.replace('_', ' '))
             state = getattr(status, "status", "unknown").replace('_', ' ').title()
@@ -179,9 +182,9 @@ def _render_system_status(dashboard_data: Any) -> None:
                 try:
                     ts_obj = last_check
                     if hasattr(ts_obj, "tzinfo") and ts_obj.tzinfo is not None:
-                        localized = ts_obj.astimezone()
+                        localized = ts_obj.astimezone(berlin_tz)
                     else:
-                        localized = ts_obj.replace(tzinfo=timezone.utc).astimezone()
+                        localized = ts_obj.replace(tzinfo=berlin_tz)
                     # Show relative age if older than 24 hours, else absolute time
                     age_hours = (datetime.now(timezone.utc) - localized.astimezone(timezone.utc)).total_seconds() / 3600
                     if age_hours > 24:
@@ -197,9 +200,9 @@ def _render_system_status(dashboard_data: Any) -> None:
             else:
                 try:
                     if hasattr(api_call, "tzinfo") and api_call.tzinfo is not None:
-                        api_call_local = api_call.astimezone()
+                        api_call_local = api_call.astimezone(berlin_tz)
                     else:
-                        api_call_local = api_call.replace(tzinfo=timezone.utc).astimezone()
+                        api_call_local = api_call.replace(tzinfo=berlin_tz)
                     last_api_call = api_call_local.strftime("%d.%m.%Y %H:%M")
                 except Exception:  # pragma: no cover - defensive formatting
                     last_api_call = str(api_call)
@@ -363,9 +366,9 @@ def _render_precision_insights(dashboard_data: Any) -> None:
     with st.expander("ℹ️ What this section shows", expanded=False):
         st.markdown(
             """
-            - "Data precision" summarises overall measurement coverage across all instances.
-            - "Cost validation" compares calculated costs with AWS Cost Explorer to assess accuracy.
             - Coverage metrics show what share of instances has runtime, pricing, and fully measured data.
+            - "Cost validation" compares calculated costs with AWS Cost Explorer to assess accuracy.
+            - "Data precision" summarises overall measurement coverage across all instances.
             """
         )
 
@@ -418,20 +421,42 @@ def _render_precision_insights(dashboard_data: Any) -> None:
     row2_col1, row2_col2, row2_col3 = st.columns(3)
 
     with row2_col1:
-        if validation_factor:
+        if validation_factor is not None:
+            delta_pct = abs(1 - validation_factor) * 100
+
             if validation_factor > 100:
                 st.metric("📊 Cost Validation", "Runtime limited", "Need more runtime data")
             elif validation_factor > 10:
                 st.metric("📊 Cost Validation", "Building", f"Factor {validation_factor:.1f}")
-            elif validation_factor < 0.1:
-                st.metric("📊 Cost Validation", "Excellent", f"±{((1-validation_factor)*100):.0f}%")
+            elif delta_pct <= 30:
+                st.metric("📊 Cost Validation", "Excellent", f"±{delta_pct:.0f}% vs AWS")
+            elif delta_pct <= 60:
+                st.metric("📊 Cost Validation", "Good", f"±{delta_pct:.0f}% vs AWS")
             else:
-                st.metric("📊 Cost Validation", f"{validation_factor:.2f}", "Actual vs calculated")
+                accuracy_label = accuracy_status or "Variance"
+                if "-" in accuracy_label:
+                    accuracy_label = accuracy_label.split("-")[0].strip()
+                accuracy_label = accuracy_label.title()
+                st.metric("📊 Cost Validation", accuracy_label, f"±{delta_pct:.0f}% vs AWS")
         else:
             st.metric("📊 Cost Validation", "No data", "Fetching AWS costs...")
 
+    precision_pct = (quality_score or 0.0) * 100
+    if quality_score is None:
+        precision_label = "Unknown"
+    elif quality_score >= 0.8:
+        precision_label = "High"
+    elif quality_score >= 0.5:
+        precision_label = "Moderate"
+    else:
+        precision_label = "Low"
+
     with row2_col2:
-        st.metric("🎯 Data Precision", "High", f"All {total_instances} instances")
+        st.metric(
+            "🎯 Data Precision",
+            f"{precision_pct:.0f}%",
+            f"{precision_label} coverage",
+        )
 
     with row2_col3:
         st.empty()

@@ -105,27 +105,11 @@ class BusinessCaseCalculator:
         integrated_cost_reduction = scenario_b_cost_reduction
         integrated_co2_reduction = scenario_b_co2_reduction
 
-        # PRAGMATIC CONFIDENCE ASSESSMENT
-        data_integration_confidence = 0.90    # 90% - APIs work, integration implemented
-        methodology_confidence = 0.85         # 85% - CloudTrail approach is sound
-        scenario_applicability = 0.60         # 60% - scenarios are demonstrative, not predictive
-
-        # Weighted confidence based on thesis focus (integration excellence)
-        overall_confidence = (data_integration_confidence * 0.4 +
-                            methodology_confidence * 0.4 +
-                            scenario_applicability * 0.2)
-
         logger.info(f"🎯 DYNAMIC Business Case Calculation:")
         logger.info(f"   💰 Baseline Cost: €{baseline_cost:.2f} → Scale Factor: {cost_scaling:.1f}")
         logger.info(f"   📊 Validation Factor: {validation_factor:.2f} → Quality Tier: {'Good' if validation_factor <= 1.5 else 'Moderate' if validation_factor <= 5.0 else 'Limited'}")
         logger.info(f"   🎯 Conservative Scenario: {scenario_a_factor:.1%} reduction → €{scenario_a_cost_reduction:.2f}")
         logger.info(f"   🚀 Moderate Scenario: {scenario_b_factor:.1%} reduction → €{scenario_b_cost_reduction:.2f}")
-
-        logger.info(f"🎯 PRAGMATIC Academic Assessment:")
-        logger.info(f"   🚀 Data Integration: {data_integration_confidence:.0%} (5-API orchestration working)")
-        logger.info(f"   📊 Methodology: {methodology_confidence:.0%} (CloudTrail precision implemented)")
-        logger.info(f"   📈 Scenarios: {scenario_applicability:.0%} (dynamic, validation-aware)")
-        logger.info(f"   🎓 Overall: {overall_confidence:.0%} (excellent for methodology thesis)")
 
         return BusinessCase(
             baseline_cost_eur=baseline_cost,

@@ -4,9 +4,13 @@ AWS services for pricing and cost data
 """
 
 import json
-import boto3
+import os
+import subprocess
+from pathlib import Path
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+
+import boto3
 from botocore.exceptions import ClientError
 
 from ..utils.cache import is_cache_valid, get_standard_cache_path, ensure_cache_dir, CacheTTL
@@ -24,6 +28,43 @@ class AWSAPIClient:
     def __init__(self, aws_profile: str = None):
         """Initialize AWS API client with optional profile"""
         self.aws_profile = aws_profile
+
+    @staticmethod
+    def _map_cost_explorer_region(region: Optional[str]) -> Optional[str]:
+        if not region:
+            return None
+
+        region_mapping = {
+            "eu-central-1": "EU (Frankfurt)",
+            "eu-west-1": "EU (Ireland)",
+            "us-east-1": "US East (N. Virginia)",
+            "us-west-2": "US West (Oregon)",
+        }
+        return region_mapping.get(region, None)
+
+    def _ensure_session(self) -> None:
+        """Ensure AWS SSO session is active, invoking helper script when present."""
+
+        script_path = Path(__file__).resolve().parents[2] / "scripts" / "ensure_aws_session.sh"
+        if not script_path.exists():
+            return
+
+        profile = self.aws_profile or os.environ.get("AWS_PROFILE")
+        command = [str(script_path)]
+        if profile:
+            command.append(profile)
+
+        env = os.environ.copy()
+        if profile:
+            env.setdefault("AWS_PROFILE", profile)
+
+        try:
+            subprocess.run(command, check=True, env=env)
+        except FileNotFoundError:
+            logger.warning("AWS SSO helper script missing: %s", script_path)
+        except subprocess.CalledProcessError as error:
+            logger.error("AWS SSO auto-login failed for profile %s", profile or "default")
+            raise RuntimeError("AWS SSO auto-login failed") from error
 
     def get_instance_pricing(self, instance_type: str, region: str = "eu-central-1") -> Optional[float]:
         """Get AWS EC2 instance pricing from AWS Pricing API with 7-day caching"""
@@ -44,6 +85,7 @@ class AWSAPIClient:
 
         # Fetch fresh pricing from AWS Pricing API
         try:
+            self._ensure_session()
             session = boto3.Session(profile_name=self.aws_profile)
             pricing_client = session.client('pricing', region_name='us-east-1')
 
@@ -125,11 +167,12 @@ class AWSAPIClient:
                 logger.error(f"❌ AWS Pricing API runtime error for {instance_type}: {e}")
             return None
 
-    def get_hourly_costs(self, hours: int = 48) -> Optional[list[dict]]:
+    def get_hourly_costs(self, hours: int = 48, region: str = "eu-central-1") -> Optional[list[dict]]:
         """Fetch hourly EC2 costs from AWS Cost Explorer for the recent window."""
 
         hours = max(1, min(hours, 336))  # Cost Explorer limits hourly data to ~14 Tage
-        cache_path = get_standard_cache_path("cost_series", f"hourly_{hours}")
+        cache_key = f"hourly_{region.replace('-', '_')}_{hours}"
+        cache_path = get_standard_cache_path("cost_series", cache_key)
         ensure_cache_dir(cache_path)
 
         if is_cache_valid(cache_path, CacheTTL.COST_DATA):
@@ -142,6 +185,7 @@ class AWSAPIClient:
                 logger.warning("⚠️ Unable to read hourly cost cache: %s", error)
 
         try:
+            self._ensure_session()
             session = boto3.Session(profile_name=self.aws_profile)
             cost_client = session.client("ce", region_name="us-east-1")
 
@@ -157,6 +201,31 @@ class AWSAPIClient:
             series: list[dict] = []
 
             day_cursor = start_day
+            filter_conditions = [
+                {
+                    "Dimensions": {
+                        "Key": "SERVICE",
+                        "Values": ["Amazon Elastic Compute Cloud - Compute"],
+                    }
+                }
+            ]
+
+            region_label = self._map_cost_explorer_region(region)
+            if region_label:
+                filter_conditions.append(
+                    {
+                        "Dimensions": {
+                            "Key": "REGION",
+                            "Values": [region_label],
+                        }
+                    }
+                )
+
+            if len(filter_conditions) == 1:
+                filter_payload = filter_conditions[0]
+            else:
+                filter_payload = {"And": filter_conditions}
+
             while day_cursor <= end_day:
                 next_day = day_cursor + timedelta(days=1)
 
@@ -168,12 +237,7 @@ class AWSAPIClient:
                         TimePeriod={"Start": start_iso, "End": end_iso},
                         Granularity="HOURLY",
                         Metrics=["UnblendedCost"],
-                        Filter={
-                            "Dimensions": {
-                                "Key": "SERVICE",
-                                "Values": ["Amazon Elastic Compute Cloud - Compute"],
-                            }
-                        },
+                        Filter=filter_payload,
                     )
                 except ClientError as error:
                     code = error.response.get("Error", {}).get("Code")
@@ -235,9 +299,10 @@ class AWSAPIClient:
             logger.error("❌ AWS Cost Explorer runtime error: %s", error)
             return None
 
-    def get_monthly_costs(self) -> Optional[AWSCostData]:
+    def get_monthly_costs(self, region: str = "eu-central-1") -> Optional[AWSCostData]:
         """Get monthly AWS costs for validation with 6-hour caching"""
-        cache_path = get_standard_cache_path("cost_data", "monthly")
+        cache_key = f"monthly_{region.replace('-', '_')}"
+        cache_path = get_standard_cache_path("cost_data", cache_key)
         ensure_cache_dir(cache_path)
 
         # Check cache first (6 hours - AWS Cost Explorer updates daily)
@@ -254,24 +319,46 @@ class AWSAPIClient:
 
         # Fetch fresh data from AWS Cost Explorer for validation
         try:
+            self._ensure_session()
             session = boto3.Session(profile_name=self.aws_profile)
             cost_client = session.client("ce", region_name="us-east-1")
 
             logger.info("💰 Fetching Cost Explorer data for validation")
 
-            # Get current month cost data
+            # Get trailing 30-day period (end is exclusive per AWS API)
             end_date = datetime.now().date()
-            start_date = end_date.replace(day=1)  # First day of current month
+            start_date = (datetime.now() - timedelta(days=30)).date()
 
-            response = cost_client.get_cost_and_usage(
-                TimePeriod={
+            region_label = self._map_cost_explorer_region(region)
+
+            request_kwargs = {
+                "TimePeriod": {
                     "Start": start_date.strftime("%Y-%m-%d"),
                     "End": end_date.strftime("%Y-%m-%d")
                 },
-                Granularity="MONTHLY",
-                Metrics=["UnblendedCost"],
-                GroupBy=[{"Type": "DIMENSION", "Key": "SERVICE"}]
-            )
+                "Granularity": "DAILY",
+                "Metrics": ["UnblendedCost"],
+                "GroupBy": [{"Type": "DIMENSION", "Key": "SERVICE"}],
+            }
+
+            filter_conditions = []
+            if region_label:
+                filter_conditions.append(
+                    {
+                        "Dimensions": {
+                            "Key": "REGION",
+                            "Values": [region_label],
+                        }
+                    }
+                )
+
+            if filter_conditions:
+                if len(filter_conditions) == 1:
+                    request_kwargs["Filter"] = filter_conditions[0]
+                else:
+                    request_kwargs["Filter"] = {"And": filter_conditions}
+
+            response = cost_client.get_cost_and_usage(**request_kwargs)
 
             service_costs: dict[str, float] = {}
             total_cost = 0.0
@@ -281,24 +368,30 @@ class AWSAPIClient:
                 "EC2",
             )
 
-            for result in response["ResultsByTime"]:
-                for group in result["Groups"]:
-                    if group["Keys"]:
-                        service_name = group["Keys"][0]
-                        cost_amount_str = group["Metrics"]["UnblendedCost"]["Amount"]
+            for result in response.get("ResultsByTime", []):
+                for group in result.get("Groups", []):
+                    keys = group.get("Keys") or []
+                    if not keys:
+                        continue
+                    service_name = keys[0]
+                    cost_amount_str = (
+                        group.get("Metrics", {})
+                        .get("UnblendedCost", {})
+                        .get("Amount", "0")
+                    )
 
-                        try:
-                            cost_amount = float(cost_amount_str)
-                            if cost_amount < 0:
-                                cost_amount = 0.0
-                        except (ValueError, TypeError):
+                    try:
+                        cost_amount = float(cost_amount_str)
+                        if cost_amount < 0:
                             cost_amount = 0.0
+                    except (ValueError, TypeError):
+                        cost_amount = 0.0
 
-                        service_costs[service_name] = cost_amount
-                        total_cost += cost_amount
+                    service_costs[service_name] = service_costs.get(service_name, 0.0) + cost_amount
+                    total_cost += cost_amount
 
-                        if any(keyword in service_name for keyword in ec2_keywords):
-                            ec2_cost += cost_amount
+                    if any(keyword in service_name for keyword in ec2_keywords):
+                        ec2_cost += cost_amount
             # Focus on EC2 costs for validation
             if ec2_cost == 0.0 and total_cost > 0.0:
                 logger.info(

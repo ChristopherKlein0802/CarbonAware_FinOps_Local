@@ -37,6 +37,24 @@ aws configure sso --profile <profilname>
 aws sso login --profile <profilname>
 ```
 
+### 3.1 AWS Identity Center Sitzungsverwaltung
+- **Interactive Session Duration** im IAM Identity Center auf den Maximalwert (30 Tage) setzen (`Settings → Security → User session`).
+- **Remember devices** aktivieren, damit MFA nur bei Gerätewechseln gefordert wird.
+- Nach Änderungen einmal `aws sso login --profile <profilname>` ausführen; die CLI nutzt danach automatisch den verlängerten Cache.
+- Hinweis: Trotz 30 Tagen Gerätetreue müssen Cost-Explorer-Tokens weiterhin gemäß Permission-Set-Laufzeit (z. B. 12 h) erneuert werden.
+- Die Session-Dauer wird je Permission Set gesetzt. Für persönliche Ausnahmen: eigenes Permission Set anlegen (z. B. `FinOps-Extended`), nur deinem Benutzer zuweisen und dort die 12 h aktivieren. Code-seitig lässt sich diese AWS-Einstellung nicht überschreiben.
+
+### 3.2 Cost-Explorer-Konfiguration im Dashboard-Account
+- Cost Explorer im Management- oder Billing-Account aktivieren und **Hourly and Resource Level Data** freischalten (`Billing → Cost Explorer → Preferences`).
+- Dem genutzten Permission Set mindestens `arn:aws:iam::aws:policy/AWSCostExplorerReadOnlyAccess` zuweisen; optional `Billing`-Leserechte für konsistente Monatsdaten.
+- Sicherstellen, dass `us-east-1` als Cost-Explorer-Region freigeschaltet ist (API-Standardregion).
+- Im Dashboard vor dem Start `aws sts get-caller-identity --profile <profilname>` prüfen; bei Fehlern erneut `aws sso login` ausführen, um frische Tokens zu holen.
+
+### 3.3 Automatischer Login-Check im Projekt
+- `scripts/ensure_aws_session.sh <profilname>` prüft die Sitzung und startet bei Bedarf `aws sso login`.
+- `make`-Kommandos mit AWS-Bezug (z. B. `make validate-aws`, `make plan`, `make dashboard`) sowie die Dashboard-AWS-Clients rufen das Skript automatisch auf.
+- Das Skript benötigt weiterhin eine bestätigte IAM-Identity-Center-Session (z. B. per „Remember devices“); bei Ablauf öffnet sich der Browser zum Login.
+
 ## 4. Datenintegration und Infrastruktur
 | Dienst | Zweck | Modul | Hinweis |
 |--------|-------|-------|---------|

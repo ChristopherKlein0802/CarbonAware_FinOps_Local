@@ -62,13 +62,13 @@ class UnifiedAPIClient:
         """Get AWS EC2 instance pricing from AWS Pricing API with 7-day caching"""
         return self.aws_api.get_instance_pricing(instance_type, region)
 
-    def get_monthly_costs(self) -> Optional[AWSCostData]:
+    def get_monthly_costs(self, region: str = "eu-central-1") -> Optional[AWSCostData]:
         """Get monthly AWS costs for validation with 6-hour caching"""
-        return self.aws_api.get_monthly_costs()
+        return self.aws_api.get_monthly_costs(region)
 
-    def get_hourly_costs(self, hours: int = 48) -> Optional[list[dict]]:
+    def get_hourly_costs(self, hours: int = 48, region: str = "eu-central-1") -> Optional[list[dict]]:
         """Get recent hourly EC2 costs from AWS Cost Explorer."""
-        return self.aws_api.get_hourly_costs(hours)
+        return self.aws_api.get_hourly_costs(hours, region)
 
 
 # Global instance

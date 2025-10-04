@@ -24,6 +24,15 @@ def render_infrastructure_page(dashboard_data: Optional[Any]) -> None:
     """
     st.header("🏗️ Infrastructure Analytics")
 
+    with st.expander("ℹ️ What this page shows", expanded=False):
+        st.markdown(
+            """
+            - Summarises runtime, power and cost metrics gathered from CloudTrail, Boavizta and AWS Pricing.
+            - Highlights data-quality gaps following the strict NO-FALLBACK policy (⚠️ markers).
+            - Provides a detailed instance table so FinOps and DevOps teams can trace CO₂ and cost calculations.
+            """
+        )
+
     if not dashboard_data or not dashboard_data.instances:
         st.warning("⚠️ No infrastructure data available. Check API connections.")
         return
@@ -39,7 +48,7 @@ def _render_infrastructure_overview(dashboard_data: Any) -> None:
     """Render essential infrastructure metrics"""
     running_instances = len([i for i in dashboard_data.instances if i.state == "running"])
     total_instances = len(dashboard_data.instances)
-    total_power = sum(i.power_watts for i in dashboard_data.instances if i.power_watts)
+    total_power = sum(i.power_watts for i in dashboard_data.instances if i.power_watts is not None)
     avg_cost_per_instance = dashboard_data.total_cost_eur / len(dashboard_data.instances) if dashboard_data.instances else 0
 
     # Essential metrics only
@@ -122,9 +131,9 @@ def _render_instance_detail_table(dashboard_data: Any) -> None:
                 "Estimated figures are omitted to preserve academic integrity.")
 
         # Summary insights
-        total_cost = sum(i.monthly_cost_eur for i in dashboard_data.instances if i.monthly_cost_eur)
-        total_co2 = sum(i.monthly_co2_kg for i in dashboard_data.instances if i.monthly_co2_kg)
-        total_power = sum(i.power_watts for i in dashboard_data.instances if i.power_watts)
+        total_cost = sum(i.monthly_cost_eur for i in dashboard_data.instances if i.monthly_cost_eur is not None)
+        total_co2 = sum(i.monthly_co2_kg for i in dashboard_data.instances if i.monthly_co2_kg is not None)
+        total_power = sum(i.power_watts for i in dashboard_data.instances if i.power_watts is not None)
 
         # Show calculation transparency
         col1, col2, col3 = st.columns(3)

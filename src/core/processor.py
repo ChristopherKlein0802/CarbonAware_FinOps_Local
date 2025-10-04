@@ -7,6 +7,7 @@ import os
 import json
 import logging
 import boto3
+from pathlib import Path
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Optional, Any
 from botocore.exceptions import ClientError, NoCredentialsError, SSOError, TokenRetrievalError, UnauthorizedSSOTokenError
@@ -123,20 +124,14 @@ class DataProcessor:
                 logger.warning("❌ No EC2 instances found - but preserving available API data")
                 return self._create_minimal_response(carbon_intensity, "No instances found")
 
-            # Get cost data once for proportional allocation
-            cost_data = unified_api_client.get_monthly_costs()
+            # Get cost data once for proportional allocation (region-specific)
+            cost_data = unified_api_client.get_monthly_costs("eu-central-1")
             fetched_at = getattr(cost_data, "fetched_at", None) if cost_data else None
             if isinstance(fetched_at, datetime):
                 if fetched_at.tzinfo is None:
                     fetched_at = fetched_at.replace(tzinfo=timezone.utc)
                 self.api_last_calls["AWS Cost Explorer"] = fetched_at
-            hourly_costs = unified_api_client.get_hourly_costs(48) or []
-            if hourly_costs:
-                now_ts = datetime.now(timezone.utc)
-                self.api_last_calls["AWS Cost Explorer (hourly)"] = now_ts
-                existing_ce = self.api_last_calls.get("AWS Cost Explorer")
-                if not existing_ce or (isinstance(existing_ce, datetime) and now_ts > existing_ce):
-                    self.api_last_calls["AWS Cost Explorer"] = now_ts
+            hourly_costs = unified_api_client.get_hourly_costs(48, "eu-central-1") or []
 
             # Process each instance with API data and enhanced tracking
             processed_instances = []
@@ -153,29 +148,64 @@ class DataProcessor:
                 logger.warning("❌ No instances could be processed")
                 return self._create_empty_response("Instance processing failed")
 
-            def _latest_for_source(marker: str) -> Optional[datetime]:
-                timestamps = [
-                    inst.last_updated
-                    for inst in processed_instances
-                    if inst.last_updated and inst.data_sources and marker in inst.data_sources
-                ]
-                if not timestamps:
+            def _cache_mtime(path: Optional[str]) -> Optional[datetime]:
+                if not path:
                     return None
-                latest = max(timestamps)
-                if latest.tzinfo is None:
-                    latest = latest.replace(tzinfo=timezone.utc)
-                return latest
+                cache_path = Path(path)
+                try:
+                    return datetime.fromtimestamp(cache_path.stat().st_mtime, tz=timezone.utc)
+                except (FileNotFoundError, OSError):
+                    return None
+
+            def _latest_for_source(marker: str, path_builder) -> Optional[datetime]:
+                timestamps: list[datetime] = []
+                for inst in processed_instances:
+                    if not (inst.data_sources and marker in inst.data_sources):
+                        continue
+
+                    cache_path = path_builder(inst)
+                    cache_timestamp = _cache_mtime(cache_path)
+                    if cache_timestamp:
+                        timestamps.append(cache_timestamp)
+                        continue
+
+                    inst_updated = getattr(inst, "last_updated", None)
+                    if inst_updated:
+                        if inst_updated.tzinfo is None:
+                            inst_updated = inst_updated.replace(tzinfo=timezone.utc)
+                        timestamps.append(inst_updated)
+
+                return max(timestamps) if timestamps else None
 
             source_mapping = {
-                "Boavizta": "boavizta",
-                "AWS Pricing": "aws_pricing",
-                "AWS CloudWatch": "cloudwatch",
-                "AWS CloudTrail": "cloudtrail_audit",
+                "Boavizta": (
+                    "boavizta",
+                    lambda inst: get_standard_cache_path("boavizta_power", inst.instance_type),
+                ),
+                "AWS Pricing": (
+                    "aws_pricing",
+                    lambda inst: get_standard_cache_path(
+                        "pricing", f"{inst.instance_type}_{inst.region}"
+                    ),
+                ),
+                "AWS CloudWatch": (
+                    "cloudwatch",
+                    lambda inst: get_standard_cache_path("cpu_utilization", inst.instance_id),
+                ),
+                "AWS CloudTrail": (
+                    "cloudtrail_audit",
+                    lambda inst: get_standard_cache_path(
+                        "cloudtrail_runtime", f"{inst.instance_id}_{inst.region}"
+                    ),
+                ),
             }
-            for api_name, marker in source_mapping.items():
-                latest_ts = _latest_for_source(marker)
+
+            for api_name, (marker, path_builder) in source_mapping.items():
+                latest_ts = _latest_for_source(marker, path_builder)
                 if latest_ts:
                     self.api_last_calls[api_name] = latest_ts
+
+            logger.debug("API last call timestamps: %s", self.api_last_calls)
 
             # Calculate totals and business case
             total_cost_eur = sum(inst.monthly_cost_eur for inst in processed_instances if inst.monthly_cost_eur is not None)
@@ -263,7 +293,7 @@ class DataProcessor:
         aws_auth_issue: bool = False
     ) -> Dict[str, APIHealthStatus]:
         """Create API health status objects for dashboard display"""
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
 
         def _status(healthy: bool, degraded: bool = False) -> tuple[str, bool]:
             if healthy:
@@ -582,14 +612,30 @@ class DataProcessor:
         if not sorted_hours:
             sorted_hours = sorted(cost_map.keys())
 
-        co2_estimate = None
+        # Approximate hourly emissions by scaling the measured monthly footprint
+        base_hourly_co2 = None
         if total_co2_kg and len(sorted_hours) > 0:
-            co2_estimate = total_co2_kg / len(sorted_hours)
+            try:
+                base_hourly_co2 = float(total_co2_kg) / AcademicConstants.HOURS_PER_MONTH
+            except (TypeError, ValueError):
+                base_hourly_co2 = None
+
+        aligned_carbon_values = [carbon_map[hour] for hour in sorted_hours if hour in carbon_map]
+        if aligned_carbon_values:
+            avg_carbon_intensity = sum(aligned_carbon_values) / len(aligned_carbon_values)
+        else:
+            avg_carbon_intensity = None
 
         for hour in sorted_hours:
             cost_value = cost_map.get(hour, 0.0)
             carbon_value = carbon_map.get(hour)
-            co2_value = safe_round(co2_estimate, 6) if co2_estimate is not None else 0.0
+            if base_hourly_co2 is None:
+                co2_value = 0.0
+            elif carbon_value is not None and avg_carbon_intensity not in (None, 0.0):
+                adjustment_factor = carbon_value / avg_carbon_intensity
+                co2_value = safe_round(base_hourly_co2 * adjustment_factor, 6)
+            else:
+                co2_value = safe_round(base_hourly_co2, 6)
             points.append(
                 TimeSeriesPoint(
                     timestamp=hour,
