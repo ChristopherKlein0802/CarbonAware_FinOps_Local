@@ -10,11 +10,18 @@
 CarbonAware_FinOps_Local/
 ├── src/
 │   ├── app.py               # Streamlit-Einstieg und Seitenrouting
-│   ├── api/                 # Integrationen: ElectricityMaps, AWS, Boavizta
+│   ├── infrastructure/      # Infrastruktur-Layer
+│   │   ├── clients/         # API-Adapter: ElectricityMaps, AWS, Boavizta
+│   │   ├── cache.py         # Zentrale Cache-Repository
+│   │   └── time_series.py   # Zeitreihen-Persistierung
+│   ├── config/              # Pydantic-Settings und Konfiguration
+│   ├── services/            # Domain-Services (Runtime, Carbon, Business)
 │   ├── core/                # DataProcessor, Tracker, Kalkulatoren
 │   ├── models/              # Dataclasses für Dashboard-, Business- und AWS-Objekte
-│   ├── utils/               # Cache-, Berechnungs-, Logging- und Validierungshilfen
-│   └── views/               # Streamlit-Komponenten (Übersicht, Carbon, Infrastruktur)
+│   ├── utils/               # Validierungs-, Berechnungs- und UI-Hilfen
+│   ├── views/               # Streamlit-Seiten (overview, carbon, infrastructure)
+│   │   └── components/      # Wiederverwendbare UI-Komponenten
+│   └── vendor/              # Externe Stub-Implementierungen
 ├── docs/                    # Methodik, Architektur, Evaluation, Literatur
 ├── tests/                   # Unit- und Integrationstests
 ├── terraform/               # Reproduzierbare AWS-Testumgebung
@@ -25,30 +32,42 @@ CarbonAware_FinOps_Local/
 ## 3. Schichtenmodell
 - **Präsentation (`src/app.py`, `src/views/`)**
   - Streamlit-basierte Oberfläche mit Executive Summary, Carbon-Analyse und Infrastrukturdetail.
+  - Modulare UI-Komponenten in `src/views/components/` (Grid Status, Metrics, Business Case, Validation, Time Series).
   - Einheitliche UI-Hilfen über `src/utils/ui.py` und CSS-Assets.
+- **Domain-Services (`src/services/`)**
+  - `RuntimeService`: EC2-Discovery, CloudTrail-basierte Laufzeitberechnung, CPU-Enrichment via CloudWatch.
+  - `CarbonDataService`: ElectricityMaps-Integration, Zeitreihen-Aggregation, TAC (Time Alignment Coverage)-Berechnung.
+  - `BusinessInsightsService`: Business-Case-Modelle, Kosten-Validierung gegen AWS Cost Explorer.
+  - Factory-Pattern in `services/__init__.py` für Dependency Injection.
 - **Verarbeitung (`src/core/`)**
-  - `DataProcessor`: Orchestriert API-Aufrufe, konsolidiert Messwerte und erstellt `DashboardData`.
-  - `RuntimeTracker`: Greift auf CloudTrail-Events zu und ermittelt Laufzeiten mit Auditgranularität.
-  - `CarbonCalculator`/`BusinessCaseCalculator`: Abbildung von Emissions- und Wirtschaftlichkeitslogik.
-- **Integration (`src/api/`)**
-  - Kapselt ElectricityMaps-, Boavizta- und AWS-spezifische Endpunkte.
-  - Einheitlicher Zugriff über `unified_api_client` mit Caching und Fehlertoleranz.
+  - `DataProcessor`: Orchestriert Domain-Services, konsolidiert Messwerte und erstellt `DashboardData`.
+  - `BusinessCaseCalculator`: Wirtschaftlichkeits- und Emissionslogik.
+  - `RuntimeTracker`: Legacy-Komponente (größtenteils zu `RuntimeService` migriert).
+- **Integration (`src/infrastructure/`)**
+  - `clients/` kapselt ElectricityMaps-, Boavizta- und AWS-spezifische Adapter.
+  - `InfrastructureGateway`: Aggregiert alle API-Clients in einer einheitlichen Schnittstelle.
+  - `cache.py` & `time_series.py` stellen wiederverwendbare Infrastruktur-Bausteine bereit.
 - **Domänenmodell (`src/models/`)**
   - Typisierte Dataclasses für EC2-Instanzen, Carbon-Metriken, Business Cases und Dashboard-Responses.
   - Enthalten Metadaten zu Datenquellen, Unsicherheiten und Aktualität.
+  - Vollständige Type Hints (z.B. `CarbonIntensity` statt `Any`).
+- **Konfiguration (`src/config/`)**
+  - `settings.py`: Zentralisierte Pydantic-Settings mit Umgebungsvariablen-Support.
+  - Finanzielle Konstanten (z.B. `EUR_USD_RATE`) jetzt konfigurierbar via `.env`.
 - **Querschnitt (`src/utils/`)**
-  - `cache.py`: Standardisierte Cachepfade, TTL-Verwaltung, Reinigung.
-  - `calculations.py`: Mathematische Kernfunktionen (z. B. Leistungsmodell, Rundungslogik).
+  - `calculations.py`: Mathematische Kernfunktionen (z. B. Leistungsmodell, Rundungslogik).
   - `validation.py` und `errors.py`: Gemeinsame Validierungs- und Fehlermeldungsstrukturen.
+  - `ui.py`: UI-Hilfsfunktionen (Grid-Status-Berechnung, Trade-off-Kalkulation).
+
 
 ## 4. Datenfluss
 ```mermaid
 graph TD
     A[Streamlit UI] -->|User Request| B[DataProcessor]
     B --> C[RuntimeTracker]
-    B --> D[CarbonCalculator]
+    B --> D[CO2 Calculations (utils)]
     B --> E[BusinessCaseCalculator]
-    B --> F[Unified API Client]
+    B --> F[Infrastructure Gateway]
     F --> G[ElectricityMaps]
     F --> H[Boavizta]
     F --> I[AWS Services]
@@ -60,11 +79,11 @@ graph TD
 ```
 
 ## 5. API-Layer und Datenmodelle
-- **UnifiedAPIClient (`src/api/client.py`):** Bündelt ElectricityMaps-, Boavizta- und AWS-Aufrufe und propagiert Fehler im Sinne der No-Fallback-Policy.
-- **AWS-Hilfsklassen (`src/api/aws.py`):** Stellt spezialisierte Clients für Cost Explorer, Pricing und CloudWatch bereit; nutzt gemeinsame Cache-Helfer.
-- **Stündliche Kostenserie:** `AWSAPIClient.get_hourly_costs` liefert EC2-Kosten (USD→EUR) für die letzten 48 h als Basis für TAC.
-- **ElectricityMaps (`src/api/electricity.py`):** Liefert aktuelle Intensitäten sowie 24h-Historien für die deutsche Zone.
-- **Boavizta (`src/api/boavizta.py`):** Berechnet Leistungsprofile für AWS-Instanzen.
+- **InfrastructureGateway (`src/infrastructure/clients/__init__.py`):** Aggregiert ElectricityMaps-, Boavizta- und AWS-Adapter und stellt eine einheitliche Schnittstelle für die Domain bereit.
+- **AWS-Billing-Client (`src/infrastructure/clients/aws.py`):** Spezialisiert auf Cost Explorer & Pricing, inklusive Cache-Schicht.
+- **AWS-Runtime-Gateway (`src/infrastructure/clients/aws_runtime.py`):** Umhüllt EC2-, CloudTrail- und CloudWatch-Aufrufe für Laufzeit- und Leistungsdaten.
+- **ElectricityMaps (`src/infrastructure/clients/electricity.py`):** Liefert aktuelle Intensitäten sowie 24h-Historien inklusive Self-Collection.
+- **Boavizta (`src/infrastructure/clients/boavizta.py`):** Berechnet Leistungsprofile für AWS-Instanzen.
 
 | Methode | Quelle | Zweck | Rückgabe |
 |---------|--------|-------|----------|
@@ -80,16 +99,16 @@ graph TD
 ## 6. Cache-Mechanismen
 | Datenquelle | Modul | Cache-TTL (`CacheTTL`) | Begründung |
 |-------------|-------|------------------------|------------|
-| ElectricityMaps (aktuell) | `src/api/electricity.py` | 30 Minuten (`CARBON_DATA`) | Netzintensität ändert sich im 15–60-Minuten-Takt.
-| ElectricityMaps (24h) | `src/api/electricity.py` | 24 Stunden (`CARBON_24H`) | Historische Daten sind stabil.
-| Boavizta Hardwareprofile | `src/api/boavizta.py` | 7 Tage (`POWER_DATA`) | Instanzmodelle ändern sich selten.
-| AWS Pricing | `src/api/aws.py` | 7 Tage (`PRICING_DATA`) | Listenpreise werden selten angepasst.
-| AWS Cost Explorer | `src/api/aws.py` | 6 Stunden (`COST_DATA`) | Abrechnungsdaten werden täglich aktualisiert.
-| AWS CloudWatch | `src/api/aws.py` | 3 Stunden (`CPU_UTILIZATION`) | Balance aus Aktualität und API-Kosten.
-| AWS CloudTrail | `src/core/tracker.py` | 24 Stunden (`CLOUDTRAIL_EVENTS`) | Events sind unveränderlich, tägliche Synchronisation genügt.
+| ElectricityMaps (aktuell) | `src/infrastructure/clients/electricity.py` | 60 Minuten (`CARBON_DATA`) | Netzintensität ändert sich stündlich.
+| ElectricityMaps (24h) | `src/infrastructure/clients/electricity.py` | 2 Stunden (`CARBON_24H`) | Historische Daten können länger gecacht werden.
+| Boavizta Hardwareprofile | `src/infrastructure/clients/boavizta.py` | 7 Tage (`POWER_DATA`) | Instanzmodelle ändern sich selten.
+| AWS Pricing | `src/infrastructure/clients/aws.py` | 7 Tage (`PRICING_DATA`) | Listenpreise werden selten angepasst.
+| AWS Cost Explorer | `src/infrastructure/clients/aws.py` | 6 Stunden (`COST_DATA`) | Abrechnungsdaten werden täglich aktualisiert.
+| AWS CloudWatch | `src/infrastructure/clients/aws_runtime.py` | 3 Stunden (`CPU_UTILIZATION`) | Balance aus Aktualität und API-Kosten.
+| AWS CloudTrail | `src/services/runtime.py` | 24 Stunden (`CLOUDTRAIL_EVENTS`) | Events sind unveränderlich, tägliche Synchronisation genügt.
 | Cost/Carbon Time Series | `src/core/processor.py` | 48 Stunden (lokale JSON-Snapshots) | Grundlage für TAC und Trade-off-Visualisierung.
 
-Die Cache-Funktionen (`src/utils/cache.py`) verwalten Pfade, TTLs und Bereinigung; `clean_old_cache_files` verhindert überalterte Artefakte. Dadurch sinkt das API-Aufkommen um >80 % und die Betriebskosten bleiben im KMU-Rahmen.
+Die Cache-Funktionen (`src/infrastructure/cache.py`) verwalten Pfade, TTLs und Bereinigung; `FileCacheRepository.clean_old` verhindert überalterte Artefakte. Dadurch sinkt das API-Aufkommen um >80 % und die Betriebskosten bleiben im KMU-Rahmen.
 
 ## 7. Qualitätsmechanismen
 - **No-Fallback-Policy:** Jeder API-Ausfall wird sichtbar gemacht (`None`/Warnungen statt synthetischer Werte).

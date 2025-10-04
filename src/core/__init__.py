@@ -4,12 +4,11 @@ Modular architecture for maintainability and testing
 """
 
 from .processor import DataProcessor
-from .calculator import CarbonCalculator, BusinessCaseCalculator
+from .calculator import BusinessCaseCalculator
 from .tracker import RuntimeTracker
 
 __all__ = [
     'DataProcessor',
-    'CarbonCalculator',
     'BusinessCaseCalculator',
     'RuntimeTracker'
 ]

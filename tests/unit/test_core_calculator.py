@@ -1,66 +1,13 @@
 """
 Tests for src.core.calculator module
-Testing CarbonCalculator and BusinessCaseCalculator functionality
+Testing BusinessCaseCalculator functionality
 """
 
 import unittest
-from unittest.mock import Mock, patch
-from datetime import datetime
+from unittest.mock import Mock
 
-from src.core.calculator import CarbonCalculator, BusinessCaseCalculator
+from src.core.calculator import BusinessCaseCalculator
 from src.models.business import BusinessCase
-
-
-class TestCarbonCalculator(unittest.TestCase):
-    """Test cases for CarbonCalculator class"""
-
-    def setUp(self):
-        """Set up test fixtures"""
-        self.calculator = CarbonCalculator()
-
-    def test_initialization(self):
-        """Test CarbonCalculator initialization"""
-        calculator = CarbonCalculator()
-        self.assertIsInstance(calculator, CarbonCalculator)
-
-    def test_calculate_instance_emissions_normal(self):
-        """Test normal CO2 emissions calculation"""
-        power_watts = 15.0
-        carbon_intensity = 350.0  # g CO2/kWh
-        runtime_hours = 720.0  # 30 days
-
-        result = self.calculator.calculate_instance_emissions(power_watts, carbon_intensity, runtime_hours)
-
-        # Expected: (15 * 350 / 1000) * 720 / 1000 = 3.78 kg CO2
-        expected = 3.78
-        self.assertAlmostEqual(result, expected, places=2)
-
-    def test_calculate_instance_emissions_zero_power(self):
-        """Test CO2 calculation with zero power"""
-        result = self.calculator.calculate_instance_emissions(0.0, 350.0, 720.0)
-        self.assertEqual(result, 0.0)
-
-    def test_calculate_instance_emissions_zero_carbon(self):
-        """Test CO2 calculation with zero carbon intensity"""
-        result = self.calculator.calculate_instance_emissions(15.0, 0.0, 720.0)
-        self.assertEqual(result, 0.0)
-
-    def test_calculate_instance_emissions_zero_runtime(self):
-        """Test CO2 calculation with zero runtime"""
-        result = self.calculator.calculate_instance_emissions(15.0, 350.0, 0.0)
-        self.assertEqual(result, 0.0)
-
-    def test_calculate_instance_emissions_high_values(self):
-        """Test CO2 calculation with high values"""
-        power_watts = 100.0
-        carbon_intensity = 600.0
-        runtime_hours = 8760.0  # Full year
-
-        result = self.calculator.calculate_instance_emissions(power_watts, carbon_intensity, runtime_hours)
-
-        # Expected: (100 * 600 / 1000) * 8760 / 1000 = 525.6 kg CO2
-        expected = 525.6
-        self.assertAlmostEqual(result, expected, places=1)
 
 
 class TestBusinessCaseCalculator(unittest.TestCase):
@@ -114,20 +61,6 @@ class TestBusinessCaseCalculator(unittest.TestCase):
 
         # Validation factor should be included in validation_status
         self.assertIn("2.00", result.validation_status)
-
-    def test_calculate_scenario_savings_normal(self):
-        """Test scenario savings calculation"""
-        baseline_cost = 100.0
-        scenario_factor = 0.15  # 15%
-
-        result = self.calculator.calculate_scenario_savings(baseline_cost, scenario_factor)
-
-        self.assertEqual(result, 15.0)
-
-    def test_calculate_scenario_savings_zero(self):
-        """Test scenario savings with zero baseline"""
-        result = self.calculator.calculate_scenario_savings(0.0, 0.15)
-        self.assertEqual(result, 0.0)
 
     def test_calculate_cloudtrail_enhanced_accuracy_no_cost_data(self):
         """Test accuracy calculation without cost data"""

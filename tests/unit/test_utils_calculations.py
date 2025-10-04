@@ -4,12 +4,11 @@ Academic-grade testing for core calculation functions
 """
 
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from src.utils.calculations import (
-    safe_round, calculate_simple_power_consumption,
-    calculate_co2_emissions, calculate_monthly_cost,
-    calculate_scenario_savings, calculate_confidence_score,
-    validate_calculation_inputs
+    safe_round,
+    calculate_simple_power_consumption,
+    calculate_co2_emissions,
 )
 
 
@@ -107,127 +106,6 @@ class TestCO2Emissions(unittest.TestCase):
         """Test that CO2 calculation logs debug information"""
         calculate_co2_emissions(1000.0, 400.0, 1.0)
         mock_logger.debug.assert_called_once()
-
-
-class TestMonthlyCost(unittest.TestCase):
-    """Test monthly cost calculation"""
-
-    def test_calculate_monthly_cost_normal(self):
-        """Test cost calculation with normal values"""
-        # $0.10/h * 730h * 0.92 EUR/USD = €67.16
-        result = calculate_monthly_cost(0.10, 730.0, 0.92)
-        self.assertEqual(result, 67.16)
-
-        # $1.00/h * 365h * 0.92 EUR/USD = €335.8
-        result = calculate_monthly_cost(1.00, 365.0, 0.92)
-        self.assertEqual(result, 335.8)
-
-    def test_calculate_monthly_cost_zero_values(self):
-        """Test cost calculation with zero values"""
-        self.assertEqual(calculate_monthly_cost(0.0, 730.0, 0.92), 0.0)
-        self.assertEqual(calculate_monthly_cost(0.10, 0.0, 0.92), 0.0)
-
-    def test_calculate_monthly_cost_none_values(self):
-        """Test cost calculation with None values"""
-        self.assertEqual(calculate_monthly_cost(None, 730.0, 0.92), 0.0)
-        self.assertEqual(calculate_monthly_cost(0.10, None, 0.92), 0.0)
-
-    @patch('src.utils.calculations.logger')
-    def test_calculate_monthly_cost_logging(self, mock_logger):
-        """Test that cost calculation logs debug information"""
-        calculate_monthly_cost(0.10, 730.0, 0.92)
-        mock_logger.debug.assert_called_once()
-
-
-class TestScenarioSavings(unittest.TestCase):
-    """Test scenario savings calculation"""
-
-    def test_calculate_scenario_savings_normal(self):
-        """Test scenario savings calculation"""
-        # €1000 * 0.20 = €200 savings
-        result = calculate_scenario_savings(1000.0, 0.20)
-        self.assertEqual(result, 200.0)
-
-        # €500 * 0.10 = €50 savings
-        result = calculate_scenario_savings(500.0, 0.10)
-        self.assertEqual(result, 50.0)
-
-    def test_calculate_scenario_savings_edge_cases(self):
-        """Test scenario savings with edge cases"""
-        # Zero baseline cost
-        self.assertEqual(calculate_scenario_savings(0.0, 0.20), 0.0)
-
-        # None baseline cost
-        self.assertEqual(calculate_scenario_savings(None, 0.20), 0.0)
-
-        # Zero scenario factor
-        self.assertEqual(calculate_scenario_savings(1000.0, 0.0), 0.0)
-
-        # Negative scenario factor
-        self.assertEqual(calculate_scenario_savings(1000.0, -0.10), 0.0)
-
-
-class TestConfidenceScore(unittest.TestCase):
-    """Test confidence score calculation"""
-
-    def test_calculate_confidence_score_normal(self):
-        """Test confidence score with normal values"""
-        # Geometric mean of 0.8, 0.9, 0.7 ≈ 0.796
-        result = calculate_confidence_score(0.8, 0.9, 0.7)
-        self.assertAlmostEqual(result, 0.796, places=3)
-
-        # Single factor
-        result = calculate_confidence_score(0.85)
-        self.assertEqual(result, 0.85)
-
-    def test_calculate_confidence_score_edge_cases(self):
-        """Test confidence score with edge cases"""
-        # No factors
-        self.assertEqual(calculate_confidence_score(), 0.0)
-
-        # Zero factors should be filtered out
-        result = calculate_confidence_score(0.0, 0.8, 0.9)
-        self.assertAlmostEqual(result, 0.849, places=3)
-
-        # All zero factors
-        self.assertEqual(calculate_confidence_score(0.0, 0.0), 0.0)
-
-
-class TestValidationInputs(unittest.TestCase):
-    """Test input validation"""
-
-    def test_validate_calculation_inputs_valid(self):
-        """Test validation with valid inputs"""
-        self.assertTrue(validate_calculation_inputs(
-            power_watts=100.0,
-            runtime_hours=24.0,
-            carbon_intensity=400.0
-        ))
-
-    def test_validate_calculation_inputs_invalid(self):
-        """Test validation with invalid inputs"""
-        # Negative values should fail
-        self.assertFalse(validate_calculation_inputs(
-            power_watts=-100.0,
-            runtime_hours=24.0,
-            carbon_intensity=400.0
-        ))
-
-        # None values should fail
-        self.assertFalse(validate_calculation_inputs(
-            power_watts=None,
-            runtime_hours=24.0,
-            carbon_intensity=400.0
-        ))
-
-    def test_validate_calculation_inputs_non_required(self):
-        """Test validation ignores non-required fields"""
-        self.assertTrue(validate_calculation_inputs(
-            other_field="ignored",
-            power_watts=100.0,
-            runtime_hours=24.0,
-            carbon_intensity=400.0
-        ))
 
 
 if __name__ == '__main__':

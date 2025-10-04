@@ -3,25 +3,30 @@ Data Processing Controller for Carbon-Aware FinOps Dashboard
 Main orchestration layer for all data processing and business calculations
 """
 
-import os
-import json
 import logging
-import boto3
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Optional, Any
 from botocore.exceptions import ClientError, NoCredentialsError, SSOError, TokenRetrievalError, UnauthorizedSSOTokenError
 
-from ..constants import AcademicConstants, ErrorConstants
-from ..api.client import unified_api_client
+from ..constants import AcademicConstants
+from ..config import settings
+from ..utils.errors import AWSAuthenticationError, ErrorMessages
 from ..models.aws import EC2Instance
 from ..models.business import BusinessCase
 from ..models.dashboard import DashboardData, APIHealthStatus, TimeSeriesPoint
 from ..utils.calculations import safe_round
-from ..utils.cache import is_cache_valid, get_standard_cache_path, ensure_cache_dir, CacheTTL
-from .tracker import RuntimeTracker
-from .calculator import CarbonCalculator, BusinessCaseCalculator
-from ..utils.errors import AWSAuthenticationError
+from ..services import (
+    RuntimeService,
+    CarbonDataService,
+    BusinessInsightsService,
+    create_runtime_service,
+    create_carbon_data_service,
+    create_business_insights_service,
+)
+from ..infrastructure.cache import FileCacheRepository
+from ..infrastructure.clients import InfrastructureGateway, create_default_gateway
+from ..infrastructure.clients.aws_runtime import AWSRuntimeGateway
 
 logger = logging.getLogger(__name__)
 
@@ -37,54 +42,35 @@ class DataProcessor:
     - Academic integrity (no fallback data)
     """
 
-    def __init__(self):
-        """Initialize data processor using centralized constants"""
+    def __init__(
+        self,
+        *,
+        runtime_service: Optional[RuntimeService] = None,
+        carbon_service: Optional[CarbonDataService] = None,
+        business_service: Optional[BusinessInsightsService] = None,
+        repository: Optional[FileCacheRepository] = None,
+        gateway: Optional[InfrastructureGateway] = None,
+        runtime_gateway: Optional[AWSRuntimeGateway] = None,
+    ):
+        """Initialize data processor with optional service overrides."""
 
-        # Initialize core components
-        self.runtime_tracker = RuntimeTracker()
-        self.carbon_calculator = CarbonCalculator()
-        self.business_calculator = BusinessCaseCalculator()
+        self.repository = repository or FileCacheRepository(settings.cache_root)
+        self.gateway = gateway or create_default_gateway(self.repository)
+        self.runtime_gateway = runtime_gateway or AWSRuntimeGateway(profile=settings.aws_profile)
+
+        self.runtime_service = runtime_service or create_runtime_service(
+            repository=self.repository,
+            gateway=self.gateway,
+            runtime_gateway=self.runtime_gateway,
+        )
+        self.carbon_service = carbon_service or create_carbon_data_service(
+            repository=self.repository,
+            gateway=self.gateway,
+        )
+        self.business_service = business_service or create_business_insights_service()
 
         # Track last API call timestamps for dashboard transparency
         self.api_last_calls: Dict[str, Optional[datetime]] = {}
-
-        # Local persistence for hourly-aligned cost/carbon snapshots
-        self._timeseries_path = get_standard_cache_path("timeseries", "cost_carbon")
-        ensure_cache_dir(self._timeseries_path)
-
-        # INTEGRATION EXCELLENCE FOCUS - The real thesis contribution
-        self.METHODOLOGY_ACHIEVEMENTS = {
-            "DATA_INTEGRATION": {
-                "description": "5-API orchestration with optimized caching strategies",
-                "apis": ["ElectricityMaps", "AWS Cost Explorer", "AWS CloudTrail", "Boavizta", "AWS CloudWatch"],
-                "cost_optimization": "€5/month vs €200+ separate tools",
-                "evidence_level": "IMPLEMENTED",
-                "academic_contribution": "First integrated carbon+cost+precision tool for German SMEs"
-            },
-            "CLOUDTRAIL_INNOVATION": {
-                "description": "Runtime precision via AWS audit events instead of estimates",
-                "innovation": "State change timestamps for exact runtime calculation",
-                "comparison": "Exact vs estimated runtime (eliminates guesswork)",
-                "evidence_level": "IMPLEMENTED",
-                "academic_contribution": "Novel application of AWS CloudTrail for environmental optimization"
-            },
-            "REGIONAL_SPECIALIZATION": {
-                "description": "German grid carbon intensity integration (EU-Central-1 focus)",
-                "variability_range": "250-550g CO2/kWh observed in German grid",
-                "business_relevance": "EU Green Deal compliance for German SME market",
-                "evidence_level": "DATA_VERIFIED",
-                "academic_contribution": "Regional carbon optimization vs generic EU averages"
-            },
-            "_thesis_focus": "Methodology and integration excellence, not optimization predictions"
-        }
-
-        # Academic constants for uncertainty documentation
-        self.ACADEMIC_CONSTANTS = {
-            "cloudtrail_precision": "±5% accuracy vs ±40% estimates",
-            "carbon_uncertainty": "±15% typical ElectricityMaps range",
-            "cost_uncertainty": "±10% AWS billing reconciliation",
-            "methodology": "Conservative estimates with documented ranges"
-        }
 
         logger.info("✅ Data Processor initialized")
 
@@ -100,8 +86,8 @@ class DataProcessor:
             # Reset API call log for this processing cycle
             self.api_last_calls = {}
 
-            # Get carbon intensity (30min cache)
-            carbon_intensity = unified_api_client.get_current_carbon_intensity("eu-central-1")
+            # Get carbon intensity (1h cache)
+            carbon_intensity = self.carbon_service.get_current_intensity(region="eu-central-1")
 
             if not carbon_intensity:
                 logger.warning("❌ No carbon intensity data available")
@@ -113,47 +99,49 @@ class DataProcessor:
                 self.api_last_calls["ElectricityMaps"] = datetime.now(timezone.utc)
 
             # Collect historical carbon data for TAC calculation
-            carbon_history = unified_api_client.get_carbon_intensity_24h("eu-central-1")
-            if not carbon_history:
-                carbon_history = unified_api_client.get_self_collected_24h_data("eu-central-1")
+            carbon_history = self.carbon_service.get_recent_history(region="eu-central-1")
+            self_collected_history = self.carbon_service.get_self_collected_history(region="eu-central-1")
+            history_for_alignment = carbon_history or self_collected_history
 
             # Get EC2 instances (live AWS data)
-            instances = self.runtime_tracker.get_all_ec2_instances()
+            instances = self.runtime_service.list_instances()
 
             if not instances:
                 logger.warning("❌ No EC2 instances found - but preserving available API data")
                 return self._create_minimal_response(carbon_intensity, "No instances found")
 
             # Get cost data once for proportional allocation (region-specific)
-            cost_data = unified_api_client.get_monthly_costs("eu-central-1")
+            cost_data = self.gateway.get_monthly_costs("eu-central-1")
             fetched_at = getattr(cost_data, "fetched_at", None) if cost_data else None
             if isinstance(fetched_at, datetime):
                 if fetched_at.tzinfo is None:
                     fetched_at = fetched_at.replace(tzinfo=timezone.utc)
                 self.api_last_calls["AWS Cost Explorer"] = fetched_at
-            hourly_costs = unified_api_client.get_hourly_costs(48, "eu-central-1") or []
+
+            # Get hourly costs for last 24h (aligned with carbon data window)
+            hourly_costs = self.gateway.get_hourly_costs(24, "eu-central-1") or []
+            logger.info(f"📊 Retrieved {len(hourly_costs)} hourly cost entries from AWS Cost Explorer")
 
             # Process each instance with API data and enhanced tracking
-            processed_instances = []
+            processed_instances: List[EC2Instance] = []
             for instance in instances:
-                processed_instance = self.runtime_tracker.process_instance_enhanced(
+                enriched = self.runtime_service.enrich_instance(
                     instance,
-                    carbon_intensity.value,
+                    carbon_intensity=carbon_intensity.value,
                     force_refresh=force_refresh,
                 )
-                if processed_instance:
-                    processed_instances.append(processed_instance)
+                if enriched:
+                    processed_instances.append(enriched)
 
             if not processed_instances:
                 logger.warning("❌ No instances could be processed")
                 return self._create_empty_response("Instance processing failed")
 
-            def _cache_mtime(path: Optional[str]) -> Optional[datetime]:
+            def _cache_mtime(path: Optional[Path]) -> Optional[datetime]:
                 if not path:
                     return None
-                cache_path = Path(path)
                 try:
-                    return datetime.fromtimestamp(cache_path.stat().st_mtime, tz=timezone.utc)
+                    return datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
                 except (FileNotFoundError, OSError):
                     return None
 
@@ -180,23 +168,19 @@ class DataProcessor:
             source_mapping = {
                 "Boavizta": (
                     "boavizta",
-                    lambda inst: get_standard_cache_path("boavizta_power", inst.instance_type),
+                    lambda inst: self.repository.path("boavizta_power", inst.instance_type),
                 ),
                 "AWS Pricing": (
                     "aws_pricing",
-                    lambda inst: get_standard_cache_path(
-                        "pricing", f"{inst.instance_type}_{inst.region}"
-                    ),
+                    lambda inst: self.repository.path("pricing", f"{inst.instance_type}_{inst.region}"),
                 ),
                 "AWS CloudWatch": (
                     "cloudwatch",
-                    lambda inst: get_standard_cache_path("cpu_utilization", inst.instance_id),
+                    lambda inst: self.repository.path("cpu_utilization", inst.instance_id),
                 ),
                 "AWS CloudTrail": (
                     "cloudtrail_audit",
-                    lambda inst: get_standard_cache_path(
-                        "cloudtrail_runtime", f"{inst.instance_id}_{inst.region}"
-                    ),
+                    lambda inst: self.repository.path("cloudtrail_runtime", f"{inst.instance_id}_{inst.region}"),
                 ),
             }
 
@@ -212,13 +196,16 @@ class DataProcessor:
             total_co2_kg = sum(inst.monthly_co2_kg for inst in processed_instances if inst.monthly_co2_kg is not None)
 
             # Enhanced validation: Compare calculated costs with actual AWS spending
-            validation_factor = self.business_calculator.calculate_cloudtrail_enhanced_accuracy(processed_instances, total_cost_eur, cost_data, instances)
-            accuracy_status = getattr(self.business_calculator, '_last_accuracy_status', None)
+            validation_factor, accuracy_status = self.business_service.validate_costs(
+                processed_instances,
+                total_cost_eur,
+                cost_data,
+            )
 
             # Persist hourly-aligned snapshot and compute TAC
-            time_series_points, tac_score, tac_aligned_hours = self._build_time_series(
+            time_series_points, tac_score, tac_aligned_hours = self.carbon_service.build_time_series(
                 hourly_costs,
-                carbon_history,
+                history_for_alignment,
                 total_co2_kg,
             )
 
@@ -226,11 +213,18 @@ class DataProcessor:
             if validation_factor and validation_factor not in (0, float('inf')):
                 try:
                     cost_mape = abs(1 - (1 / validation_factor))
+                    logger.info(f"📊 Cost MAPE calculated: {cost_mape * 100:.1f}% (validation_factor={validation_factor:.2f})")
                 except ZeroDivisionError:
                     cost_mape = None
+            else:
+                logger.warning(f"⚠️ Cost MAPE not calculated: validation_factor={validation_factor}")
 
             # Calculate business case with validation factor awareness
-            business_case = self.business_calculator.calculate_business_case(total_cost_eur, total_co2_kg, validation_factor)
+            business_case = self.business_service.calculate_business_case(
+                baseline_cost_eur=total_cost_eur,
+                baseline_co2_kg=total_co2_kg,
+                validation_factor=validation_factor,
+            )
 
             api_health_status = self._build_api_health_status(
                 carbon_available=carbon_intensity is not None,
@@ -246,7 +240,6 @@ class DataProcessor:
                 total_co2_kg=total_co2_kg,
                 business_case=business_case,
                 data_freshness=datetime.now(),
-                uncertainty_ranges=self.ACADEMIC_CONSTANTS,
                 academic_disclaimers=[
                     "All optimization calculations require empirical validation",
                     "Conservative estimates with ±15% uncertainty range",
@@ -258,7 +251,9 @@ class DataProcessor:
                 time_series=time_series_points,
                 tac_score=tac_score,
                 tac_aligned_hours=tac_aligned_hours,
-                cost_mape=cost_mape
+                cost_mape=cost_mape,
+                carbon_history=carbon_history or [],
+                self_collected_carbon_history=self_collected_history or [],
             )
 
             logger.info(f"✅ Infrastructure analysis complete: {len(processed_instances)} instances, €{total_cost_eur:.2f} monthly")
@@ -268,7 +263,7 @@ class DataProcessor:
             logger.error("🚫 AWS authentication error: %s", auth_error)
             return self._create_auth_error_response(
                 carbon_intensity,
-                ErrorConstants.AWS_SSO_EXPIRED_MSG
+                ErrorMessages.AWS_SSO_EXPIRED
             )
         except ClientError as client_error:
             logger.error("❌ AWS client error: %s", client_error)
@@ -304,7 +299,7 @@ class DataProcessor:
 
         def _derive_status(has_full: bool, has_partial: bool, *, partial_message: str, missing_message: str) -> tuple[str, bool, Optional[str]]:
             if aws_auth_issue:
-                return "degraded", False, ErrorConstants.AWS_SSO_EXPIRED_MSG
+                return "degraded", False, ErrorMessages.AWS_SSO_EXPIRED
             if not processed_instances:
                 return "degraded", False, missing_message
             if has_full:
@@ -364,7 +359,7 @@ class DataProcessor:
                 healthy=cost_available and not aws_auth_issue,
                 error_message=None
                 if cost_available
-                else (ErrorConstants.AWS_SSO_EXPIRED_MSG if aws_auth_issue else "Cost validation pending"),
+                else (ErrorMessages.AWS_SSO_EXPIRED if aws_auth_issue else "Cost validation pending"),
                 last_api_call=_api_call_time("AWS Cost Explorer"),
             ),
             "AWS CloudTrail": APIHealthStatus(
@@ -416,7 +411,6 @@ class DataProcessor:
             total_co2_kg=0.0,
             business_case=None,
             data_freshness=datetime.now(),
-            uncertainty_ranges=self.ACADEMIC_CONSTANTS,
             academic_disclaimers=[
                 error_message,
                 "Academic integrity maintained - no fallback data used"
@@ -429,7 +423,7 @@ class DataProcessor:
             ),
             validation_factor=None,
             accuracy_status=None,
-            time_series=self._load_time_series(),
+            time_series=self.carbon_service.get_cached_time_series(),
             tac_score=None,
             tac_aligned_hours=None,
             cost_mape=None
@@ -444,7 +438,6 @@ class DataProcessor:
             total_co2_kg=0.0,
             business_case=None,
             data_freshness=datetime.now(),
-            uncertainty_ranges=self.ACADEMIC_CONSTANTS,
             academic_disclaimers=[
                 error_message,
                 "Academic integrity maintained - preserving available API data"
@@ -457,7 +450,7 @@ class DataProcessor:
             ),
             validation_factor=None,
             accuracy_status=None,
-            time_series=self._load_time_series(),
+            time_series=self.carbon_service.get_cached_time_series(),
             tac_score=None,
             tac_aligned_hours=None,
             cost_mape=None
@@ -465,7 +458,7 @@ class DataProcessor:
 
     def _create_auth_error_response(self, carbon_intensity, error_message: str) -> DashboardData:
         """Create response when AWS authentication is missing"""
-        guidance = ErrorConstants.AWS_SSO_FIX_MSG
+        guidance = ErrorMessages.AWS_SSO_FIX
         return DashboardData(
             instances=[],
             carbon_intensity=carbon_intensity,
@@ -473,7 +466,6 @@ class DataProcessor:
             total_co2_kg=0.0,
             business_case=None,
             data_freshness=datetime.now(),
-            uncertainty_ranges=self.ACADEMIC_CONSTANTS,
             academic_disclaimers=[
                 error_message,
                 guidance
@@ -486,182 +478,13 @@ class DataProcessor:
             ),
             validation_factor=None,
             accuracy_status=None,
-            time_series=self._load_time_series(),
+            time_series=self.carbon_service.get_cached_time_series(),
             tac_score=None,
             tac_aligned_hours=None,
             cost_mape=None
         )
 
     # All specialized functionality now properly delegated to dedicated modules:
-    # - RuntimeTracker: EC2 collection, runtime calculation, instance processing
-    # - BusinessCaseCalculator: Business case scenarios and cost validation
-    # - CarbonCalculator: CO2 emissions calculation
-
-    def _load_time_series(self) -> List[TimeSeriesPoint]:
-        """Load cached cost/carbon time series data."""
-
-        if not os.path.exists(self._timeseries_path):
-            return []
-
-        try:
-            with open(self._timeseries_path, "r", encoding="utf-8") as handle:
-                payload = json.load(handle)
-        except (OSError, ValueError, TypeError) as error:
-            logger.warning("⚠️ Failed to load time series cache: %s", error)
-            return []
-
-        points: List[TimeSeriesPoint] = []
-        for entry in payload:
-            try:
-                raw_timestamp = entry.get("timestamp")
-                if not raw_timestamp:
-                    continue
-                timestamp = datetime.fromisoformat(str(raw_timestamp))
-                points.append(
-                    TimeSeriesPoint(
-                        timestamp=timestamp,
-                        cost_eur_per_hour=float(entry.get("cost_eur_per_hour", 0.0)),
-                        co2_kg_per_hour=float(entry.get("co2_kg_per_hour", 0.0)),
-                        carbon_intensity=entry.get("carbon_intensity"),
-                    )
-                )
-            except (ValueError, TypeError) as error:
-                logger.debug("⚠️ Skipping corrupt time series entry: %s", error)
-
-        return sorted(points, key=lambda point: point.timestamp)
-
-    def _save_time_series(self, points: List[TimeSeriesPoint]) -> None:
-        """Persist cost/carbon time series data."""
-
-        serialised = [
-            {
-                "timestamp": point.timestamp.isoformat(),
-                "cost_eur_per_hour": safe_round(point.cost_eur_per_hour, 6),
-                "co2_kg_per_hour": safe_round(point.co2_kg_per_hour, 6),
-                "carbon_intensity": point.carbon_intensity,
-            }
-            for point in points
-        ]
-
-        try:
-            with open(self._timeseries_path, "w", encoding="utf-8") as handle:
-                json.dump(serialised, handle, indent=2)
-        except OSError as error:
-            logger.warning("⚠️ Failed to persist time series cache: %s", error)
-
-    def _build_time_series(
-        self,
-        hourly_costs: List[Dict[str, Any]],
-        carbon_history: Optional[List[Dict[str, Any]]],
-        total_co2_kg: float,
-    ) -> tuple[List[TimeSeriesPoint], Optional[float], Optional[int]]:
-        """Merge AWS cost series with carbon intensity for TAC calculation."""
-
-        if not hourly_costs:
-            # Return cached series so that UI still shows previous values
-            cached = self._load_time_series()
-            return cached, None, None
-
-        cost_map: Dict[datetime, float] = {}
-        for entry in hourly_costs:
-            timestamp_raw = entry.get("timestamp")
-            cost_value = entry.get("cost_eur")
-            if timestamp_raw is None or cost_value is None:
-                continue
-            try:
-                if isinstance(timestamp_raw, datetime):
-                    ts = timestamp_raw
-                else:
-                    ts = datetime.fromisoformat(str(timestamp_raw).replace("Z", "+00:00"))
-            except ValueError:
-                continue
-
-            normalized = self._normalize_hour(ts)
-            if normalized is None:
-                continue
-            cost_map[normalized] = float(cost_value)
-
-        if not cost_map:
-            cached = self._load_time_series()
-            return cached, None, None
-
-        carbon_map: Dict[datetime, float] = {}
-        for entry in carbon_history or []:
-            ts_raw = entry.get("datetime") or entry.get("hour_key")
-            value = entry.get("carbonIntensity") or entry.get("value")
-            if ts_raw is None or value is None:
-                continue
-            try:
-                ts_obj = datetime.fromisoformat(str(ts_raw).replace("Z", "+00:00"))
-            except ValueError:
-                continue
-            normalized = self._normalize_hour(ts_obj)
-            if normalized is None:
-                continue
-            try:
-                carbon_map[normalized] = float(value)
-            except (TypeError, ValueError):
-                continue
-
-        window_start = self._normalize_hour(datetime.now(timezone.utc) - timedelta(hours=48))
-        if window_start is None:
-            window_start = datetime.now().replace(minute=0, second=0, microsecond=0)
-
-        points: List[TimeSeriesPoint] = []
-        sorted_hours = sorted(hour for hour in cost_map.keys() if hour >= window_start)
-        if not sorted_hours:
-            sorted_hours = sorted(cost_map.keys())
-
-        # Approximate hourly emissions by scaling the measured monthly footprint
-        base_hourly_co2 = None
-        if total_co2_kg and len(sorted_hours) > 0:
-            try:
-                base_hourly_co2 = float(total_co2_kg) / AcademicConstants.HOURS_PER_MONTH
-            except (TypeError, ValueError):
-                base_hourly_co2 = None
-
-        aligned_carbon_values = [carbon_map[hour] for hour in sorted_hours if hour in carbon_map]
-        if aligned_carbon_values:
-            avg_carbon_intensity = sum(aligned_carbon_values) / len(aligned_carbon_values)
-        else:
-            avg_carbon_intensity = None
-
-        for hour in sorted_hours:
-            cost_value = cost_map.get(hour, 0.0)
-            carbon_value = carbon_map.get(hour)
-            if base_hourly_co2 is None:
-                co2_value = 0.0
-            elif carbon_value is not None and avg_carbon_intensity not in (None, 0.0):
-                adjustment_factor = carbon_value / avg_carbon_intensity
-                co2_value = safe_round(base_hourly_co2 * adjustment_factor, 6)
-            else:
-                co2_value = safe_round(base_hourly_co2, 6)
-            points.append(
-                TimeSeriesPoint(
-                    timestamp=hour,
-                    cost_eur_per_hour=safe_round(cost_value, 6),
-                    co2_kg_per_hour=co2_value,
-                    carbon_intensity=carbon_value,
-                )
-            )
-
-        self._save_time_series(points)
-
-        cost_hours = set(sorted_hours)
-        carbon_hours = {hour for hour in carbon_map.keys() if hour in cost_hours}
-        aligned_hours = len(carbon_hours)
-        tac_score = aligned_hours / len(cost_hours) if cost_hours else None
-
-        return points, tac_score, aligned_hours
-
-    def _normalize_hour(self, timestamp: datetime) -> Optional[datetime]:
-        """Normalize timestamps to naive hours in local timezone."""
-
-        if timestamp is None:
-            return None
-
-        if timestamp.tzinfo is None:
-            timestamp = timestamp.replace(tzinfo=timezone.utc)
-
-        localized = timestamp.astimezone().replace(minute=0, second=0, microsecond=0)
-        return localized.replace(tzinfo=None)
+    # - RuntimeService: EC2 collection, runtime calculation, instance enrichment
+    # - BusinessInsightsService: Business case scenarios and cost validation
+    # - CarbonDataService: Carbon intensity queries and time-series management

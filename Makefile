@@ -79,7 +79,11 @@ setup: ## Complete environment setup
 	$(PIP) install --upgrade pip
 	$(PIP) install -r requirements.txt
 	@echo "$(GREEN)✅ Setup complete!$(NC)"
-	@echo "$(BLUE)💡 Next: Copy .env.example to .env and run 'make dashboard'$(NC)"
+	@echo "$(BLUE)💡 Next steps:$(NC)"
+	@echo "  1. Copy .env.example to .env and configure API keys"
+	@echo "  2. Ensure AWS SSO is configured: aws configure sso --profile $(AWS_PROFILE)"
+	@echo "  3. Run 'make validate-aws' to verify AWS access"
+	@echo "  4. Run 'make dashboard' to start the application"
 
 validate: ## Validate system configuration
 	@echo "$(YELLOW)🔍 Validating system configuration...$(NC)"

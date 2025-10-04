@@ -34,28 +34,35 @@ Zur Beantwortung werden folgende Teilfragen adressiert:
 ## Systemarchitektur und Komponenten
 - **Streamlit Frontend (`src/app.py`):** Navigierbares Dashboard mit Executive Summary, Carbon-Ansicht und Infrastrukturübersicht.
 - **Datenorchestrierung (`src/core/processor.py`):** Aggregiert API-Daten, validiert Unsicherheiten und erstellt `DashboardData`-Payloads.
-- **Zeitreihen & TAC:** `DataProcessor` synchronisiert stündliche EC2-Kosten aus dem AWS Cost Explorer mit ElectricityMaps-Intensitäten (`TimeSeriesPoint`), gewichtet den gemessenen Monatsfußabdruck anhand der tatsächlichen Netzdichte und berechnet daraus Time Alignment Coverage und Cost-MAPE.
-- **Laufzeittracking (`src/core/tracker.py`):** Nutzt CloudTrail-Events und CloudWatch-Metriken für präzise Betriebsstunden.
+- **Domain-Services (`src/services/`):** `runtime.py` (CloudTrail & CloudWatch), `carbon.py` (ElectricityMaps & Time-Series), `business.py` (Validierung & Business Case).
+- **Zeitreihen & TAC:** Die Services synchronisieren stündliche EC2-Kosten aus dem AWS Cost Explorer mit ElectricityMaps-Intensitäten (`TimeSeriesPoint`) und berechnen Time Alignment Coverage sowie Cost-MAPE.
 - **Berechnungen (`src/core/calculator.py` & `src/utils/calculations.py`):** Emissions- und Kostenmodelle auf Basis Boavizta, ElectricityMaps und FinOps-Szenarien.
-- **API-Clients (`src/api/`):** Kapseln Zugriffe auf ElectricityMaps, AWS Cost Explorer, AWS Pricing, CloudWatch und optionale Datenquellen.
+- **Infrastructure-Layer (`src/infrastructure/`):** `clients/` kapselt ElectricityMaps, Boavizta und AWS SDKs; `cache.py` und `time_series.py` liefern wiederverwendbare Persistenz-Utilities.
+- **UI-Komponenten (`src/views/components/`):** Modulare, wiederverwendbare View-Komponenten (Grid Status, Metrics, Business Case, Validation, Time Series).
 - **Infrastruktur (`terraform/`):** Referenzumgebung zur Reproduktion der Experimente mit AWS-Workloads im KMU-Skalierungsbereich.
 
-- **Validierungsmetriken (`src/utils/validation.py`, `src/views/overview.py`):** Erfassen Laufzeit-, Preis- und Emissionsabdeckung je Instanz und stellen den Data-Precision-Score im Dashboard bereit.
+- **Validierungsmetriken (`src/utils/validation.py`, `src/views/components/validation.py`):** Erfassen Laufzeit-, Preis- und Emissionsabdeckung je Instanz und stellen den Data-Precision-Score im Dashboard bereit.
 
 ```
 CarbonAware_FinOps_Local/
 ├── src/
-│   ├── api/              # Externe Schnittstellen zu ElectricityMaps, AWS, Boavizta
-│   ├── core/             # DataProcessor, Tracker, Business- und Carbon-Kalkulatoren
+│   ├── infrastructure/   # Infrastruktur-Adapter (APIs, Cache, Zeitreihen)
+│   │   ├── clients/      # ElectricityMaps, Boavizta, AWS-Adapter
+│   │   ├── cache.py      # Zentrale Cache-Repository
+│   │   └── time_series.py # Zeitreihen-Persistierung
+│   ├── config/           # Pydantic-basierte Settings (`settings.py`)
+│   ├── core/             # DataProcessor, Kalkulatoren, Tracker
+│   ├── services/         # Runtime-, Carbon- und Business-Domain-Services
 │   ├── models/           # Dataclasses für Dashboard-, Business- und AWS-Objekte
-│   ├── utils/            # Cache-, Validierungs- und Berechnungshilfen
-│   └── views/            # Streamlit-Komponenten und Layout-Logik
+│   ├── utils/            # Validierungs-, Berechnungs- und UI-Hilfen
+│   ├── views/            # Streamlit-Seiten (overview, carbon, infrastructure)
+│   │   └── components/   # Wiederverwendbare UI-Komponenten
+│   └── vendor/           # Externe Stub-Implementierungen (httpx)
 ├── docs/                 # Literaturarbeit, Methodik, Evaluationsprotokolle
 ├── tests/                # Unit-Tests für Kernlogik und Integrationspunkte
 ├── terraform/            # Infrastruktur-Templates für Evaluationsszenarien
 ├── Makefile              # Wiederholbare Befehle (Setup, Tests, Dashboard)
-├── requirements.txt      # Abhängigkeitsbasis für die Entwicklungsumgebung
-└── requirements-frozen.txt # Reproduzierbare Referenzumgebung
+└── requirements.txt      # Abhängigkeiten (streamlit, boto3, pandas, plotly, etc.)
 ```
 
 ## Evaluationskonzept

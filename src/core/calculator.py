@@ -9,41 +9,9 @@ from datetime import datetime
 
 from ..models.aws import EC2Instance, AWSCostData
 from ..models.business import BusinessCase
-from ..utils.calculations import safe_round, calculate_simple_power_consumption
 from ..constants import AcademicConstants
 
 logger = logging.getLogger(__name__)
-
-
-class CarbonCalculator:
-    """Calculator for carbon emissions and environmental impact"""
-
-    def __init__(self):
-        """Initialize carbon calculator
-
-        Sets up the carbon calculator for CO2 emissions calculations
-        based on power consumption, carbon intensity, and runtime hours.
-        """
-        logger.info("✅ Carbon Calculator initialized")
-
-    def calculate_instance_emissions(self, power_watts: float, carbon_intensity: float, runtime_hours: float) -> float:
-        """Calculate CO2 emissions for an instance
-
-        Args:
-            power_watts: Effective power consumption in watts (after CPU utilization adjustment)
-            carbon_intensity: Carbon intensity in g CO2/kWh
-            runtime_hours: Actual runtime hours (from CloudTrail)
-
-        Returns:
-            float: Monthly CO2 emissions in kg
-        """
-        # Use academically validated CO2 calculation from utils/calculations.py
-        from ..utils.calculations import calculate_co2_emissions
-        monthly_co2_kg = calculate_co2_emissions(power_watts, carbon_intensity, runtime_hours)
-
-        power_kw = power_watts / 1000.0  # For logging
-        logger.info(f"🌱 CO2 calculation: {power_kw:.3f}kW × {carbon_intensity:.0f}g/kWh × {runtime_hours:.1f}h = {monthly_co2_kg:.3f}kg CO2")
-        return monthly_co2_kg
 
 
 class BusinessCaseCalculator:
@@ -126,11 +94,6 @@ class BusinessCaseCalculator:
             source_notes="Factors derived from McKinsey [7] cost studies and MIT carbon-aware scheduling [20]"
         )
 
-    def calculate_scenario_savings(self, baseline_cost: float, scenario_factor: float) -> float:
-        """Calculate savings for optimization scenarios"""
-        logger.info("📊 Calculating scenario savings")
-        return baseline_cost * scenario_factor
-
     def calculate_cloudtrail_enhanced_accuracy(self, instances: List[EC2Instance], calculated_cost_eur: float, cost_data: Optional[AWSCostData], original_instances: Optional[List[Any]] = None) -> float:
         """Enhanced validation with state-awareness and runtime factors
 
@@ -146,7 +109,7 @@ class BusinessCaseCalculator:
             return 1.0
 
         # Convert actual AWS costs to EUR
-        actual_cost_eur = cost_data.monthly_cost_usd * 0.92  # EUR_USD_RATE
+        actual_cost_eur = cost_data.monthly_cost_usd * AcademicConstants.EUR_USD_RATE
 
         # Calculate expected accuracy based on instance states
         running_instances = [i for i in instances if i.state == "running"]

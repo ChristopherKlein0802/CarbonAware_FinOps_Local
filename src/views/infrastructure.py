@@ -92,7 +92,8 @@ def _render_instance_detail_table(dashboard_data: Any) -> None:
             runtime_explanation = "CloudTrail data available"
         data_quality = data_quality_raw.lower()
 
-        # CO₂ Formula Components: Power(kW) × Grid_Intensity(g/kWh) × Runtime(h) ÷ 1000 = kg CO₂
+        # CO₂ Formula: Effective_Power(kW) × Grid_Intensity(g/kWh) × Runtime(h) ÷ 1000 = kg CO₂
+        # Where: Effective_Power = Base_Power × (0.3 + 0.7 × CPU_util/100)
         power_kw = f"{instance.power_watts / 1000:.3f}" if instance.power_watts is not None else "N/A"
         grid_intensity_display = f"{grid_intensity:.0f}" if grid_intensity else "N/A"
 
@@ -125,10 +126,7 @@ def _render_instance_detail_table(dashboard_data: Any) -> None:
         # Display table
         st.dataframe(df, width='stretch', hide_index=True)
 
-        # NO-FALLBACK Policy explanation
-        st.info("💡 **NO-FALLBACK Policy**: Only real API data is shown. "
-                "Missing values (⚠️) indicate that no verifiable CloudTrail or CloudWatch readings are available. "
-                "Estimated figures are omitted to preserve academic integrity.")
+        # NO-FALLBACK Policy is already explained in the expander above - no need to repeat
 
         # Summary insights
         total_cost = sum(i.monthly_cost_eur for i in dashboard_data.instances if i.monthly_cost_eur is not None)
@@ -148,7 +146,8 @@ def _render_instance_detail_table(dashboard_data: Any) -> None:
             st.metric("Total Power Draw", f"{total_power:.0f} W", "Current consumption")
 
         # Show CO₂ calculation formula with transparency
-        st.info("💡 **CO₂ Formula**: Power(kW) × Grid_Intensity(g/kWh) × Monthly_Runtime(h) ÷ 1000 = kg CO₂")
+        st.info("💡 **CO₂ Formula**: Effective_Power(W) = Base_Power × (0.3 + 0.7 × CPU/100) → "
+                "CO₂(kg) = Effective_Power(kW) × Grid_Intensity(g/kWh) × Runtime(h) ÷ 1000")
 
     else:
         st.error("No instance data available for detailed analysis")

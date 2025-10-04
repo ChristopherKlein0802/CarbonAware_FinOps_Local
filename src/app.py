@@ -36,6 +36,7 @@ for _logger_name in _NOISY_AWS_LOGGERS:
 # Import our modules
 from src.constants import APIConstants
 from src.core.processor import DataProcessor
+from src.models.dashboard import DashboardData
 
 # Initialize data processor (lazy loading)
 @st.cache_resource
@@ -103,7 +104,7 @@ def _clear_dashboard_cache() -> None:
     st.session_state.pop(_CACHE_TIMESTAMP_KEY, None)
 
 
-def _get_cached_dashboard_data() -> tuple[Optional[Any], Optional[datetime]]:
+def _get_cached_dashboard_data() -> tuple[Optional[DashboardData], Optional[datetime]]:
     """Retrieve cached dashboard data and its timestamp."""
     cached_data = st.session_state.get(_CACHE_KEY)
     cached_at = st.session_state.get(_CACHE_TIMESTAMP_KEY)
@@ -113,14 +114,22 @@ def _get_cached_dashboard_data() -> tuple[Optional[Any], Optional[datetime]]:
     return cached_data, cached_at
 
 
-def _cache_dashboard_data(data: Optional[Any]) -> None:
+def _cache_dashboard_data(data: Optional[DashboardData]) -> None:
     """Persist dashboard data and timestamp in session state."""
     st.session_state[_CACHE_KEY] = data
     st.session_state[_CACHE_TIMESTAMP_KEY] = datetime.now()
 
 
-def load_infrastructure_data(force_refresh: bool = False) -> Optional[Any]:
-    """Load infrastructure data with manual TTL caching and specific error handling."""
+def load_infrastructure_data(force_refresh: bool = False) -> Optional[DashboardData]:
+    """
+    Load infrastructure data with manual TTL caching and specific error handling.
+
+    Args:
+        force_refresh: If True, bypass cache and fetch fresh data
+
+    Returns:
+        DashboardData object with instances, metrics, and API status, or None on error
+    """
     if force_refresh:
         _clear_dashboard_cache()
 

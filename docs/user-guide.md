@@ -58,12 +58,12 @@ aws sso login --profile <profilname>
 ## 4. Datenintegration und Infrastruktur
 | Dienst | Zweck | Modul | Hinweis |
 |--------|-------|-------|---------|
-| ElectricityMaps | Aktuelle & historische CO₂-Intensität | `src/api/electricity.py` | API-Key erforderlich |
-| Boavizta | Hardware-Leistungsmodelle | `src/api/boavizta.py` | Optional, reduziert Unsicherheit |
-| AWS Cost Explorer | Kostenvalidierung | `src/api/aws.py` | Billing-Rechte notwendig |
-| AWS Pricing | On-Demand-Preise | `src/api/aws.py` | Standardregion `eu-central-1` |
-| AWS CloudTrail | Laufzeitpräzision | `src/core/tracker.py` | Trail für 30 Tage aktiv halten |
-| AWS CloudWatch | CPU-Auslastung | `src/api/aws.py` | Standardmetriken ausreichend |
+| ElectricityMaps | Aktuelle & historische CO₂-Intensität | `src/infrastructure/clients/electricity.py` | API-Key erforderlich |
+| Boavizta | Hardware-Leistungsmodelle | `src/infrastructure/clients/boavizta.py` | Optional, reduziert Unsicherheit |
+| AWS Cost Explorer | Kostenvalidierung | `src/infrastructure/clients/aws.py` | Billing-Rechte notwendig |
+| AWS Pricing | On-Demand-Preise | `src/infrastructure/clients/aws.py` | Standardregion `eu-central-1` |
+| AWS CloudTrail | Laufzeitpräzision | `src/services/runtime.py` | Trail für 30 Tage aktiv halten |
+| AWS CloudWatch | CPU-Auslastung | `src/infrastructure/clients/aws_runtime.py` | Standardmetriken ausreichend |
 
 Optional kann über `make deploy` eine Terraform-Testumgebung mit vier Instanzen provisioniert werden (`make status`, `make destroy` für Verwaltung).
 

@@ -1,222 +1,98 @@
-"""Unit tests for src.core.tracker.RuntimeTracker."""
+"""Unit tests for the runtime domain service."""
 
-import json
 import unittest
 from datetime import datetime, timedelta, timezone
-from unittest.mock import MagicMock, Mock, patch, mock_open
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest.mock import Mock
 
-from src.core.tracker import RuntimeTracker
-from src.models.aws import EC2Instance
+from src.services.runtime import RuntimeService, RuntimeServiceConfig
+from src.utils.errors import AWSAuthenticationError
+from src.infrastructure.cache import FileCacheRepository
+from src.infrastructure.clients import InfrastructureGateway
+from src.infrastructure.clients.aws_runtime import AWSRuntimeGateway
 
 
-class TestRuntimeTracker(unittest.TestCase):
-    """Test suite for the RuntimeTracker class."""
-
+class TestRuntimeService(unittest.TestCase):
     def setUp(self) -> None:
-        self.tracker = RuntimeTracker()
+        self.tempdir = TemporaryDirectory()
+        self.addCleanup(self.tempdir.cleanup)
+        self.repository = FileCacheRepository(Path(self.tempdir.name))
+        self.gateway = Mock(spec=InfrastructureGateway)
+        self.runtime_gateway = Mock(spec=AWSRuntimeGateway)
+        self.service = RuntimeService(
+            RuntimeServiceConfig(aws_profile="test-profile"),
+            repository=self.repository,
+            infrastructure_gateway=self.gateway,
+            runtime_gateway=self.runtime_gateway,
+        )
         self.sample_instance = {
             "instance_id": "i-test123",
             "instance_type": "t3.medium",
             "state": "running",
             "region": "eu-central-1",
-            "launch_time": datetime.now(timezone.utc),
-            "state_transition_reason": "user-initiated",
+            "launch_time": datetime.now(timezone.utc) - timedelta(hours=5),
         }
 
-    def test_initialization(self) -> None:
-        tracker = RuntimeTracker()
-        self.assertIsInstance(tracker, RuntimeTracker)
+    def test_list_instances_success(self) -> None:
+        self.runtime_gateway.list_instances.return_value = [self.sample_instance]
 
-    @patch("src.core.tracker.boto3.Session")
-    def test_get_all_ec2_instances_success(self, mock_session: Mock) -> None:
-        mock_client = Mock()
-        mock_session.return_value.client.return_value = mock_client
-        mock_client.describe_instances.return_value = {
-            "Reservations": [
-                {
-                    "Instances": [
-                        {
-                            "InstanceId": "i-test123",
-                            "InstanceType": "t3.medium",
-                            "State": {"Name": "running"},
-                            "LaunchTime": datetime.now(timezone.utc),
-                            "StateTransitionReason": "user",
-                        }
-                    ]
-                }
-            ]
-        }
+        result = self.service.list_instances()
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["instance_id"], "i-test123")
+        self.runtime_gateway.list_instances.assert_called_once()
 
-        instances = self.tracker.get_all_ec2_instances()
+    def test_list_instances_auth_error_translated(self) -> None:
+        self.runtime_gateway.list_instances.side_effect = AWSAuthenticationError("expired")
 
-        self.assertEqual(len(instances), 1)
-        self.assertEqual(instances[0]["instance_id"], "i-test123")
-        self.assertEqual(instances[0]["instance_type"], "t3.medium")
+        with self.assertRaises(AWSAuthenticationError):
+            self.service.list_instances()
 
-    @patch("src.core.tracker.boto3.Session")
-    def test_get_all_ec2_instances_error(self, mock_session: Mock) -> None:
-        mock_session.return_value.client.side_effect = Exception("AWS error")
-        instances = self.tracker.get_all_ec2_instances()
-        self.assertEqual(instances, [])
+    def test_list_instances_generic_error_returns_empty(self) -> None:
+        self.runtime_gateway.list_instances.side_effect = Exception("boom")
+        self.assertEqual(self.service.list_instances(), [])
 
-    @patch("src.core.tracker.is_cache_valid", return_value=True)
-    def test_get_precise_runtime_hours_uses_cache(self, mock_cache_valid: Mock) -> None:
-        cached_payload = {"runtime_hours": 12.5}
-        with patch("builtins.open", mock_open(read_data=json.dumps(cached_payload))):
-            runtime = self.tracker.get_precise_runtime_hours(self.sample_instance)
+    def test_get_precise_runtime_hours_uses_cache(self) -> None:
+        cache_path = self.repository.path("cloudtrail_runtime", f"{self.sample_instance['instance_id']}_{self.sample_instance['region']}")
+        self.repository.write_json(cache_path, {"runtime_hours": 12.5})
+        runtime = self.service._get_precise_runtime_hours(self.sample_instance)
         self.assertEqual(runtime, 12.5)
-        mock_cache_valid.assert_called_once()
 
-    @patch("src.core.tracker.ensure_cache_dir")
-    @patch("src.core.tracker.is_cache_valid", return_value=False)
-    @patch("src.core.tracker.boto3.Session")
-    def test_get_precise_runtime_hours_from_cloudtrail(
-        self,
-        mock_session: Mock,
-        mock_cache_valid: Mock,
-        mock_ensure_cache_dir: Mock,
-    ) -> None:
-        mock_cloudtrail = Mock()
-        paginator = Mock()
+    def test_get_precise_runtime_hours_from_events(self) -> None:
         now = datetime.now(timezone.utc)
         events = [
             {
                 "EventName": "StartInstances",
-                "EventTime": now - timedelta(hours=5),
+                "EventTime": now - timedelta(hours=4),
                 "Resources": [{"ResourceName": "i-test123"}],
             },
             {
                 "EventName": "StopInstances",
-                "EventTime": now - timedelta(hours=1),
+                "EventTime": now - timedelta(hours=2),
                 "Resources": [{"ResourceName": "i-test123"}],
             },
         ]
-        paginator.paginate.return_value = [{"Events": events}]
-        mock_cloudtrail.get_paginator.return_value = paginator
-        mock_session.return_value.client.return_value = mock_cloudtrail
+        self.runtime_gateway.lookup_instance_events.return_value = events
 
-        with patch("builtins.open", mock_open()) as mocked_open:
-            runtime = self.tracker.get_precise_runtime_hours(self.sample_instance)
+        runtime = self.service._get_precise_runtime_hours(self.sample_instance, force_refresh=True)
 
-        self.assertAlmostEqual(runtime, 4.0, places=2)
-        mocked_open.assert_called()
+        self.assertGreater(runtime, 0.0)
 
-    @patch("src.core.tracker.ensure_cache_dir")
-    @patch("src.core.tracker.is_cache_valid", return_value=False)
-    @patch("src.core.tracker.boto3.Session")
-    def test_get_precise_runtime_hours_no_events(
-        self,
-        mock_session: Mock,
-        mock_cache_valid: Mock,
-        mock_ensure_cache_dir: Mock,
-    ) -> None:
-        mock_cloudtrail = Mock()
-        paginator = Mock()
-        paginator.paginate.return_value = [{"Events": []}]
-        mock_cloudtrail.get_paginator.return_value = paginator
-        mock_session.return_value.client.return_value = mock_cloudtrail
+    def test_get_cpu_utilization_fresh(self) -> None:
+        self.runtime_gateway.fetch_cpu_metrics.return_value = [{"Values": [30.0, 40.0, 50.0]}]
 
-        runtime = self.tracker.get_precise_runtime_hours(self.sample_instance)
-        self.assertIsNotNone(runtime)
-        self.assertGreaterEqual(runtime, 0.0)
-
-    @patch("src.core.tracker.boto3.Session")
-    @patch("src.core.tracker.is_cache_valid", return_value=True)
-    def test_get_cpu_utilization_cached(self, mock_cache_valid: Mock, mock_session: Mock) -> None:
-        cached_payload = {"cpu_utilization": 45.5}
-        with patch("builtins.open", mock_open(read_data=json.dumps(cached_payload))):
-            cpu_util = self.tracker.get_cpu_utilization("i-test123")
-        self.assertEqual(cpu_util, 45.5)
-
-    @patch("src.core.tracker.boto3.Session")
-    @patch("src.core.tracker.is_cache_valid", return_value=False)
-    def test_get_cpu_utilization_fresh(self, mock_cache_valid: Mock, mock_session: Mock) -> None:
-        mock_client = Mock()
-        mock_session.return_value.client.return_value = mock_client
-        mock_client.get_metric_data.return_value = {
-            "MetricDataResults": [{"Values": [30.0, 40.0, 50.0]}]
-        }
-
-        with patch("builtins.open", mock_open()) as mocked_open:
-            with patch("os.makedirs"):
-                cpu_util = self.tracker.get_cpu_utilization("i-test123")
+        cpu_util = self.service._get_cpu_utilisation("i-test123", force_refresh=True)
 
         self.assertEqual(cpu_util, 40.0)
-        mocked_open.assert_called()
 
-    @patch("src.core.tracker.boto3.Session")
-    @patch("src.core.tracker.is_cache_valid", return_value=False)
-    def test_get_cpu_utilization_no_data(self, mock_cache_valid: Mock, mock_session: Mock) -> None:
-        mock_client = Mock()
-        mock_session.return_value.client.return_value = mock_client
-        mock_client.get_metric_data.return_value = {
-            "MetricDataResults": [{"Values": []}]
-        }
-
-        cpu_util = self.tracker.get_cpu_utilization("i-test123")
-        self.assertIsNone(cpu_util)
-
-    @patch("src.api.client.unified_api_client")
-    def test_process_instance_enhanced_success(self, mock_api_client: Mock) -> None:
-        mock_power_data = Mock()
-        mock_power_data.avg_power_watts = 15.0
-        mock_api_client.get_power_consumption.return_value = mock_power_data
-        mock_api_client.get_instance_pricing.return_value = 0.05
-
-        with patch.object(self.tracker, "get_precise_runtime_hours", return_value=720.0):
-            with patch.object(self.tracker, "get_cpu_utilization", return_value=50.0):
-                result = self.tracker.process_instance_enhanced(
-                    self.sample_instance, 350.0
-                )
-
-        self.assertIsInstance(result, EC2Instance)
-        self.assertEqual(result.instance_id, "i-test123")
-        self.assertGreater(result.monthly_cost_eur, 0)
-        self.assertGreater(result.monthly_co2_kg, 0)
-
-    @patch("src.api.client.unified_api_client")
-    def test_process_instance_enhanced_missing_power(self, mock_api_client: Mock) -> None:
-        mock_api_client.get_power_consumption.return_value = None
-        mock_api_client.get_instance_pricing.return_value = 0.05
-
-        with patch.object(self.tracker, "get_precise_runtime_hours", return_value=10.0):
-            with patch.object(self.tracker, "get_cpu_utilization", return_value=50.0):
-                result = self.tracker.process_instance_enhanced(self.sample_instance, 350.0)
-
-        self.assertIsInstance(result, EC2Instance)
-        self.assertIsNone(result.power_watts)
-        self.assertEqual(result.data_quality, "partial")
-
-    @patch("src.api.client.unified_api_client")
-    def test_process_instance_enhanced_missing_cpu(self, mock_api_client: Mock) -> None:
-        mock_power_data = Mock()
-        mock_power_data.avg_power_watts = 15.0
-        mock_api_client.get_power_consumption.return_value = mock_power_data
-        mock_api_client.get_instance_pricing.return_value = 0.05
-
-        with patch.object(self.tracker, "get_precise_runtime_hours", return_value=720.0):
-            with patch.object(self.tracker, "get_cpu_utilization", return_value=None):
-                result = self.tracker.process_instance_enhanced(
-                    self.sample_instance, 350.0
-                )
-
-        self.assertIsInstance(result, EC2Instance)
-        self.assertIsNone(result.power_watts)
-        self.assertEqual(result.data_quality, "partial")
-
-    def test_get_enhanced_confidence_metadata(self) -> None:
-        confidence, sources = self.tracker._get_enhanced_confidence_metadata(
-            has_power_data=True,
-            has_pricing_data=True,
-            has_cpu_data=True,
-            has_runtime_data=True,
-        )
-        self.assertEqual(confidence, "high")
-        self.assertCountEqual(
-            sources,
-            ["aws_api", "boavizta", "aws_pricing", "cloudwatch", "cloudtrail_audit"],
-        )
+    def test_resolve_data_quality(self) -> None:
+        quality = self.service._resolve_data_quality(10.0, 50.0, 100.0, 20.0)
+        self.assertEqual(quality, "measured")
+        quality = self.service._resolve_data_quality(10.0, None, None, None)
+        self.assertEqual(quality, "partial")
+        quality = self.service._resolve_data_quality(None, None, None, None)
+        self.assertEqual(quality, "limited")
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

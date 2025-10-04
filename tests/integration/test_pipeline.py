@@ -45,11 +45,25 @@ def test_full_pipeline_runs_and_exports_artifacts():
     with payload_path.open("w", encoding="utf-8") as fh:
         json.dump(asdict(dashboard_data), fh, default=str, indent=2)
 
+    def _serialise_api_health(statuses):
+        serialised = {}
+        for service, status in (statuses or {}).items():
+            serialised[service] = {
+                "service": status.service,
+                "status": status.status,
+                "response_time_ms": status.response_time_ms,
+                "last_check": status.last_check.isoformat() if status.last_check else None,
+                "error_message": status.error_message,
+                "healthy": status.healthy,
+                "last_api_call": status.last_api_call.isoformat() if status.last_api_call else None,
+            }
+        return serialised
+
     summary = {
         "timestamp": datetime.now().isoformat(),
         "instances": len(dashboard_data.instances or []),
         "carbon_intensity_available": dashboard_data.carbon_intensity is not None,
-        "api_health_status": dashboard_data.api_health_status,
+        "api_health_status": _serialise_api_health(dashboard_data.api_health_status),
         "academic_disclaimers": dashboard_data.academic_disclaimers,
     }
     summary_path = artifact_dir / "metadata.json"

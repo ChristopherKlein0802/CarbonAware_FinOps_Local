@@ -10,13 +10,6 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 
-
-
-
-
-
-
-
 def render_carbon_page(dashboard_data: Optional[Any]) -> None:
     """
     Render focused carbon optimization page
@@ -43,10 +36,9 @@ def render_carbon_page(dashboard_data: Optional[Any]) -> None:
     current_intensity = dashboard_data.carbon_intensity.value
     _render_current_grid_status(current_intensity)
 
-    # Core feature: 24h pattern visualization using ElectricityMap hourly history with cached fallback
-    from src.api.client import unified_api_client
-    historical_data = unified_api_client.electricity_api.get_carbon_intensity_24h("eu-central-1")
-    self_collected_data = unified_api_client.electricity_api.get_self_collected_24h_data("eu-central-1")
+    # Core feature: 24h pattern visualization using data provided by backend services
+    historical_data = getattr(dashboard_data, "carbon_history", None) or []
+    self_collected_data = getattr(dashboard_data, "self_collected_carbon_history", None) or []
 
     # Fallback: use self-collected cache if official API unavailable
     if not historical_data:
