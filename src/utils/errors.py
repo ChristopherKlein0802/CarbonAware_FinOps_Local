@@ -198,6 +198,13 @@ class ErrorMessages:
     CACHE_READ_FAILED = "Cache read failed (non-critical) - using fresh API call"
     CACHE_WRITE_FAILED = "Cache write failed (non-critical) - data still available"
 
+
+class AWSAuthenticationError(RuntimeError):
+    """Raised when AWS authentication fails (e.g., SSO token expired)."""
+
+    def __init__(self, message: str):
+        super().__init__(message)
+
     # Data Validation
     INVALID_INSTANCE_TYPE = "Invalid EC2 instance type provided"
     INVALID_REGION = "Invalid AWS region specified"

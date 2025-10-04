@@ -96,8 +96,8 @@ class APIConstants:
     AWS_DEFAULT_TIMEOUT: int = 30                 # AWS APIs timeout
 
     # Cache TTL Values (minutes) - From cache_utils.py
-    CARBON_DATA_TTL: int = 30                     # 30 minutes - ElectricityMaps updates
-    CARBON_24H_TTL: int = 1440                    # 24 hours - Historical data
+    CARBON_DATA_TTL: int = 60                     # 60 minutes - ElectricityMaps updates
+    CARBON_24H_TTL: int = 120                     # 2 hours - Refresh 24h history frequently
     POWER_DATA_TTL: int = 10080                   # 7 days - Hardware specs don't change
     PRICING_DATA_TTL: int = 10080                 # 7 days - AWS pricing stable
     COST_DATA_TTL: int = 360                      # 6 hours - Cost Explorer updates

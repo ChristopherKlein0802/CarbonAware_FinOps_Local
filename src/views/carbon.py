@@ -37,11 +37,13 @@ def render_carbon_page(dashboard_data: Optional[Any]) -> None:
     # Core feature: 24h pattern visualization using ElectricityMap hourly history with cached fallback
     from src.api.client import unified_api_client
     historical_data = unified_api_client.electricity_api.get_carbon_intensity_24h("eu-central-1")
+    self_collected_data = unified_api_client.electricity_api.get_self_collected_24h_data("eu-central-1")
 
     # Fallback: use self-collected cache if official API unavailable
     if not historical_data:
-        historical_data = unified_api_client.electricity_api.get_self_collected_24h_data("eu-central-1")
-    _render_dynamic_carbon_chart(historical_data, current_intensity)
+        historical_data = self_collected_data
+
+    _render_dynamic_carbon_chart(historical_data, current_intensity, self_collected_data)
 
     # Simple optimization message (Business Impact is on Executive Summary)
     st.success("🎯 **Key Insight**: Use carbon intensity data to schedule workloads during low-carbon hours for optimal environmental impact.")
@@ -53,31 +55,40 @@ def _render_current_grid_status(current_intensity: float) -> None:
     from src.utils.ui import determine_grid_status
     status_color, status_text, recommendation = determine_grid_status(current_intensity)
 
+    status_display = status_text.split()[0]
+    recommendation_display = recommendation.split(":")[0] if ":" in recommendation else recommendation
+
     # Visual status display
     col1, col2, col3 = st.columns(3)
     with col1:
         st.metric("Current Grid Intensity", f"{current_intensity:.0f} g CO₂/kWh", status_text)
     with col2:
-        st.metric("Status", f"{status_color} {status_text}", "German electricity grid")
+        st.metric("Status", f"{status_color} {status_display}", "German grid")
     with col3:
-        st.metric("Recommendation", recommendation[:15] + "...", "for cost & carbon optimization")
+        st.metric("Recommendation", recommendation_display, "Cost & carbon focus")
 
     # Current status summary
     st.info(f"{status_color} **{recommendation}**")
 
 
-def _render_dynamic_carbon_chart(historical_data: Optional[list], current_intensity: float) -> None:
+def _render_dynamic_carbon_chart(
+    historical_data: Optional[list],
+    current_intensity: float,
+    self_collected_data: Optional[list] = None,
+) -> None:
     """Render progressive 24h carbon chart with datetime axis"""
     from datetime import datetime, timedelta, timezone
     st.markdown("### 📊 German Grid 24h Carbon Intensity")
 
     current_time_local = datetime.now(timezone.utc).astimezone()
     current_time_utc = datetime.now(timezone.utc)
+    current_hour_local = current_time_local.replace(minute=0, second=0, microsecond=0)
+    current_hour_utc = current_time_utc.replace(minute=0, second=0, microsecond=0)
 
-    # Always include current data point with full timestamp
-    chart_datetimes = [current_time_local]
+    # Always include current data point snapped to hour
+    chart_datetimes = [current_hour_local]
     chart_values = [current_intensity]
-    chart_labels = [f"{current_time_local.strftime('%d.%m.%Y %H:00')} (Jetzt)"]
+    chart_labels = [f"{current_hour_local.strftime('%d.%m.%Y %H:00')} (Now)"]
 
     # Add historical data if available
     if historical_data:
@@ -104,11 +115,35 @@ def _render_dynamic_carbon_chart(historical_data: Optional[list], current_intens
 
             dedup_points[point_datetime] = value
 
+        # Merge self-collected readings to fill potential gaps
+        for data_point in self_collected_data or []:
+            timestamp_str = data_point.get("datetime") or data_point.get("hour_key")
+            if not timestamp_str:
+                continue
+            try:
+                point_datetime = datetime.fromisoformat(str(timestamp_str).replace('Z', '+00:00'))
+                if point_datetime.tzinfo is None:
+                    point_datetime = point_datetime.replace(tzinfo=timezone.utc)
+            except ValueError:
+                continue
+            value = data_point.get("carbonIntensity") or data_point.get("value")
+            if value is None:
+                continue
+            try:
+                value = float(value)
+            except (TypeError, ValueError):
+                continue
+            dedup_points[point_datetime] = value
+
         # Sort chronologically and extend chart data
+        now_utc = datetime.now(timezone.utc)
+
         for point_datetime, value in sorted(dedup_points.items()):
-            local_dt = point_datetime.astimezone()
-            if local_dt.hour == current_time_local.hour and local_dt.date() == current_time_local.date():
+            if point_datetime > now_utc:
+                continue  # Skip future datapoints not yet observed
+            if point_datetime == current_hour_utc:
                 continue  # Skip duplicate of current hour
+            local_dt = point_datetime.astimezone()
             chart_datetimes.append(local_dt)
             chart_values.append(value)
 
@@ -123,6 +158,12 @@ def _render_dynamic_carbon_chart(historical_data: Optional[list], current_intens
         # Sort by datetime for proper chronological order
         combined_data = sorted(zip(chart_datetimes, chart_values, chart_labels), key=lambda x: x[0])
         chart_datetimes, chart_values, chart_labels = map(list, zip(*combined_data))
+
+        # Ensure exactly 24 data points (current hour + previous 23 hours)
+        if len(chart_datetimes) > 24:
+            chart_datetimes = chart_datetimes[-24:]
+            chart_values = chart_values[-24:]
+            chart_labels = chart_labels[-24:]
 
         historical_points = max(len(chart_datetimes) - 1, 0)  # exclude current hour point
         if historical_points < 6:

@@ -156,8 +156,8 @@ def clean_old_cache_files(cache_dir: str, max_age_days: int = 7) -> int:
 # Constants for common cache TTLs (Time To Live in minutes)
 class CacheTTL:
     """Standard cache TTL values used across the application"""
-    CARBON_DATA = 30        # 30 minutes - ElectricityMaps updates
-    CARBON_24H = 1440       # 24 hours - Historical data doesn't change
+    CARBON_DATA = 60        # 60 minutes - ElectricityMaps updates
+    CARBON_24H = 120        # 2 hours - Refresh 24h history frequently
     POWER_DATA = 10080      # 7 days - Hardware specs don't change
     PRICING_DATA = 10080    # 7 days - AWS pricing relatively stable
     COST_DATA = 360         # 6 hours - Cost Explorer updates

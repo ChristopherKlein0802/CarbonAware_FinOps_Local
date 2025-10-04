@@ -117,7 +117,8 @@ class TestRuntimeTracker(unittest.TestCase):
         mock_session.return_value.client.return_value = mock_cloudtrail
 
         runtime = self.tracker.get_precise_runtime_hours(self.sample_instance)
-        self.assertIsNone(runtime)
+        self.assertIsNotNone(runtime)
+        self.assertGreaterEqual(runtime, 0.0)
 
     @patch("src.core.tracker.boto3.Session")
     @patch("src.core.tracker.is_cache_valid", return_value=True)

@@ -38,6 +38,7 @@ CloudTrail wird bislang primär für Compliance genutzt [13]. Die Arbeit untersu
 - **Testumgebung:** Vier AWS-Instanzen (t3.micro bis t3.large).
 - **Kosten & Emissionen:** Aktuell nur Literatur-basierte Einsparpotenziale; empirische Bestätigung benötigt reale CloudTrail- und Cost-Explorer-Daten.
 - **Genauigkeit:** Ohne vollständige CloudTrail-Daten bleibt der Validierungsfaktor theoriegeleitet.
+- **Neue Kennzahlen:** Das Dashboard speichert stündliche Snapshots aus AWS Cost Explorer und ElectricityMaps und berechnet daraus Time Alignment Coverage (TAC) sowie Cost-MAPE für die Validierung gegen den Cost Explorer.
 
 ## 7. Offene Arbeiten
 1. Regelmäßige Auswertung realer CloudTrail-Events.

@@ -51,3 +51,4 @@ class AWSCostData:
     service_costs: Dict[str, float]
     region: str
     source: str
+    fetched_at: Optional[datetime] = None

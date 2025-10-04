@@ -15,11 +15,15 @@ Voraussetzung: `AWS_PROFILE=carbon-finops-sandbox`, `ELECTRICITYMAP_API_KEY`.
 | Monatliche Gesamtkosten (EUR) | 0,74 | `dashboard_data.json → total_cost_eur` |
 | Monatlicher CO₂-Ausstoß (kg) | 0,004 | `dashboard_data.json → total_co2_kg` |
 | Laufzeitdaten verfügbar | 4/4 Instanzen | `dashboard_data.json → instances[*].runtime_hours` |
+| Time Alignment Coverage (TAC) | Wird mit jedem Lauf neu berechnet | `dashboard_data.json → tac_score` |
+| Cost MAPE | Wird nach erstem Kostenabgleich ausgewiesen | `dashboard_data.json → cost_mape` |
 
 ## 3. Interpretation
 - CloudTrail lieferte Laufzeitereignisse für alle vier Testinstanzen, sodass Messwerte statt Schätzungen vorliegen.
 - ElectricityMaps stellte eine gültige Intensität für `eu-central-1` bereit (78 g CO₂/kWh zum Messzeitpunkt).
 - Die geringen Gesamtwerte spiegeln die kurze Messdauer wider; sie dienen als Nachweis der Datenpipeline, nicht als belastbare Extrapolation.
+- TAC beruht auf stündlichen Cost-Explorer-Daten (48 h Fenster) und erscheint automatisch, sobald Kosten und Carbon-Daten überlappen.
+- MAPE erscheint im Dashboard, sobald ein Cost-Explorer-Abgleich mit den berechneten Werten durchgeführt wurde.
 
 ## 4. Abgleich mit Literaturerwartungen
 | Aspekt | Literatur | Beobachtung |

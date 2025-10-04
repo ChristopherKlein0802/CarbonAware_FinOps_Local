@@ -11,12 +11,14 @@ from botocore.exceptions import (
     ClientError,
     NoCredentialsError,
     SSOError,
+    TokenRetrievalError,
     UnauthorizedSSOTokenError,
 )
 
 from ..models.aws import EC2Instance
 from ..utils.cache import CacheTTL, ensure_cache_dir, get_standard_cache_path, is_cache_valid
 from ..constants import AcademicConstants
+from ..utils.errors import AWSAuthenticationError, ErrorMessages
 
 logger = logging.getLogger(__name__)
 
@@ -64,9 +66,9 @@ class RuntimeTracker:
             logger.info(f"✅ Found {len(instances)} instances in eu-central-1")
             return instances
 
-        except (UnauthorizedSSOTokenError, SSOError, NoCredentialsError) as auth_error:
+        except (UnauthorizedSSOTokenError, SSOError, NoCredentialsError, TokenRetrievalError) as auth_error:
             logger.error("🚫 AWS authentication required for EC2 discovery: %s", auth_error)
-            raise
+            raise AWSAuthenticationError(ErrorMessages.AWS_SSO_EXPIRED) from auth_error
         except ClientError as client_error:
             logger.error("❌ AWS EC2 client error: %s", client_error)
             raise
@@ -447,7 +449,7 @@ class RuntimeTracker:
                 data_quality=data_quality,  # NEW: Store data quality assessment
                 confidence_level=confidence_level,
                 data_sources=data_sources,
-                last_updated=datetime.now()
+                last_updated=datetime.now(timezone.utc)
             )
 
         except Exception as e:

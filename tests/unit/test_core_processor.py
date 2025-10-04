@@ -20,6 +20,9 @@ class TestDataProcessor(unittest.TestCase):
     def setUp(self):
         """Set up test fixtures"""
         self.processor = DataProcessor()
+        self.processor._load_time_series = Mock(return_value=[])
+        self.processor._save_time_series = Mock()
+        self.processor._build_time_series = Mock(return_value=([], None, None))
 
         # Sample carbon intensity
         self.sample_carbon_intensity = CarbonIntensity(
@@ -92,6 +95,8 @@ class TestDataProcessor(unittest.TestCase):
         # Mock API responses
         mock_api_client.get_current_carbon_intensity.return_value = self.sample_carbon_intensity
         mock_api_client.get_monthly_costs.return_value = Mock(monthly_cost_usd=100.0)
+        mock_api_client.get_carbon_intensity_24h.return_value = []
+        mock_api_client.get_hourly_costs.return_value = []
 
         # Mock tracker responses
         mock_instances_data = [{"instance_id": "i-test123", "instance_type": "t3.medium", "state": "running", "region": "eu-central-1"}]
@@ -111,6 +116,10 @@ class TestDataProcessor(unittest.TestCase):
         self.assertEqual(result.total_cost_eur, 45.0)
         self.assertEqual(result.total_co2_kg, 4.5)
         self.assertIsInstance(result.business_case, BusinessCase)
+        self.processor._build_time_series.assert_called_once()
+        self.assertEqual(result.time_series, [])
+        self.assertIsNone(result.tac_score)
+        self.assertEqual(result.cost_mape, 0.0)
 
     # Health monitoring removed after cleanup
     @patch('src.core.processor.unified_api_client')
@@ -118,6 +127,7 @@ class TestDataProcessor(unittest.TestCase):
         """Test infrastructure data retrieval without carbon intensity"""
         mock_api_client.get_current_carbon_intensity.return_value = None
         # Health monitoring simplified after cleanup
+        mock_api_client.get_hourly_costs.return_value = []
 
         # Mock EC2 to avoid real AWS calls
         with patch.object(self.processor.runtime_tracker, 'get_all_ec2_instances', return_value=[]):
@@ -135,6 +145,7 @@ class TestDataProcessor(unittest.TestCase):
         """Test infrastructure data retrieval without EC2 instances"""
         mock_api_client.get_current_carbon_intensity.return_value = self.sample_carbon_intensity
         # Health monitoring simplified after cleanup
+        mock_api_client.get_hourly_costs.return_value = []
 
         with patch.object(self.processor.runtime_tracker, 'get_all_ec2_instances', return_value=[]):
             result = self.processor.get_infrastructure_data()
@@ -150,6 +161,7 @@ class TestDataProcessor(unittest.TestCase):
         """Test infrastructure data retrieval when instances can't be processed"""
         mock_api_client.get_current_carbon_intensity.return_value = self.sample_carbon_intensity
         # Health monitoring simplified after cleanup
+        mock_api_client.get_hourly_costs.return_value = []
 
         mock_instances_data = [{"instance_id": "i-test123", "instance_type": "t3.medium", "state": "running", "region": "eu-central-1"}]
         with patch.object(self.processor.runtime_tracker, 'get_all_ec2_instances', return_value=mock_instances_data):
@@ -173,6 +185,8 @@ class TestDataProcessor(unittest.TestCase):
         self.assertIsNone(result.business_case)
         self.assertIn(error_message, result.academic_disclaimers)
         self.assertTrue(any("Academic integrity maintained" in disclaimer for disclaimer in result.academic_disclaimers))
+        self.assertEqual(result.time_series, [])
+        self.assertIsNone(result.tac_score)
 
     # Health monitoring removed after cleanup
     def test_create_minimal_response(self):
@@ -188,6 +202,7 @@ class TestDataProcessor(unittest.TestCase):
         self.assertEqual(result.carbon_intensity.value, 350.0)
         self.assertIn(error_message, result.academic_disclaimers)
         self.assertTrue(any("preserving available API data" in disclaimer for disclaimer in result.academic_disclaimers))
+        self.assertEqual(result.time_series, [])
 
     # Health monitoring removed after cleanup
     @patch('src.core.processor.unified_api_client')

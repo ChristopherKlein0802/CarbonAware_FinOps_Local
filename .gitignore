@@ -191,6 +191,7 @@ package-lock.json
 # Carbon API cache
 .carbon_cache/
 carbon_data_cache/
+.cache/
 
 # Generated documentation
 docs/build/

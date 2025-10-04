@@ -16,6 +16,23 @@ from typing import Optional, Any
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Reduce noisy boto3/botocore logging when AWS SSO tokens expire
+_NOISY_AWS_LOGGERS = (
+    "botocore",
+    "botocore.credentials",
+    "botocore.auth",
+    "botocore.session",
+    "botocore.utils",
+    "botocore.tokens",
+    "boto3",
+)
+for _logger_name in _NOISY_AWS_LOGGERS:
+    noisy_logger = logging.getLogger(_logger_name)
+    noisy_logger.handlers.clear()
+    noisy_logger.addHandler(logging.NullHandler())
+    noisy_logger.setLevel(logging.CRITICAL)
+    noisy_logger.propagate = False
+
 # Import our modules
 from src.constants import APIConstants
 from src.core.processor import DataProcessor
@@ -27,6 +44,10 @@ def get_data_processor():
     return DataProcessor()
 
 data_processor = get_data_processor()
+
+_CACHE_KEY = "dashboard_data_cache"
+_CACHE_TIMESTAMP_KEY = "dashboard_data_cache_timestamp"
+_CACHE_TTL_SECONDS = APIConstants.STREAMLIT_DYNAMIC_CALCULATIONS
 from src.views import (
     render_overview_page,
     render_infrastructure_page,
@@ -76,20 +97,53 @@ def load_custom_css() -> None:
     except (OSError, IOError) as e:
         logger.error(f"File system error loading CSS: {e} - using default Streamlit styles")
 
-@st.cache_resource(show_spinner="Loading infrastructure data...")  # Use cache_resource for complex objects
+def _clear_dashboard_cache() -> None:
+    """Remove cached dashboard data from session state."""
+    st.session_state.pop(_CACHE_KEY, None)
+    st.session_state.pop(_CACHE_TIMESTAMP_KEY, None)
+
+
+def _get_cached_dashboard_data() -> tuple[Optional[Any], Optional[datetime]]:
+    """Retrieve cached dashboard data and its timestamp."""
+    cached_data = st.session_state.get(_CACHE_KEY)
+    cached_at = st.session_state.get(_CACHE_TIMESTAMP_KEY)
+    if cached_at is not None and not isinstance(cached_at, datetime):
+        # Clean up unexpected types to prevent timedelta errors
+        cached_at = None
+    return cached_data, cached_at
+
+
+def _cache_dashboard_data(data: Optional[Any]) -> None:
+    """Persist dashboard data and timestamp in session state."""
+    st.session_state[_CACHE_KEY] = data
+    st.session_state[_CACHE_TIMESTAMP_KEY] = datetime.now()
+
+
 def load_infrastructure_data(force_refresh: bool = False) -> Optional[Any]:
-    """Load infrastructure data with proper caching and specific error handling"""
+    """Load infrastructure data with manual TTL caching and specific error handling."""
+    if force_refresh:
+        _clear_dashboard_cache()
+
+    cached_data, cached_at = _get_cached_dashboard_data()
+    if not force_refresh and cached_data is not None and cached_at is not None:
+        age_seconds = (datetime.now() - cached_at).total_seconds()
+        if age_seconds < _CACHE_TTL_SECONDS:
+            return cached_data
+
     try:
-        return data_processor.get_infrastructure_data(force_refresh=force_refresh)
+        with st.spinner("Loading infrastructure data..."):
+            dashboard_data = data_processor.get_infrastructure_data(force_refresh=force_refresh)
+        _cache_dashboard_data(dashboard_data)
+        return dashboard_data
     except (ConnectionError, TimeoutError) as e:
         logger.error(f"Network error loading infrastructure data: {e}")
-        return None
+        return cached_data if cached_data is not None else None
     except (ImportError, AttributeError) as e:
         logger.error(f"Module/attribute error in data processor: {e}")
-        return None
+        return cached_data if cached_data is not None else None
     except (RuntimeError, ValueError) as e:
         logger.error(f"Runtime/value error in data processor: {e}")
-        return None
+        return cached_data if cached_data is not None else None
 
 def main() -> None:
     """Main application entry point"""
@@ -109,9 +163,9 @@ def main() -> None:
         st.session_state["force_refresh"] = False
 
     st.sidebar.markdown("### 🔧 Actions")
-    if st.sidebar.button("🔄 Refresh data", use_container_width=True):
+    if st.sidebar.button("🔄 Refresh data", width='stretch'):
         st.session_state["force_refresh"] = True
-        load_infrastructure_data.clear()
+        _clear_dashboard_cache()
         st.sidebar.success("Refreshing API data…")
 
     # Simplified navigation menu - core features only
@@ -131,12 +185,19 @@ def main() -> None:
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 🔗 API Status")
 
+    display_labels = {
+        "CloudWatch": "AWS CloudWatch",
+        "CloudTrail": "AWS CloudTrail",
+        "Aws Cloudwatch": "AWS CloudWatch",
+        "Aws Cloudtrail": "AWS CloudTrail",
+    }
+
     if dashboard_data and getattr(dashboard_data, "api_health_status", None):
         api_statuses = dashboard_data.api_health_status
         online_count = sum(1 for status in api_statuses.values() if getattr(status, "healthy", False))
 
         for api_name, status in api_statuses.items():
-            label = api_name.replace("_", " ").title()
+            label = display_labels.get(api_name, api_name.replace("_", " "))
             status_code = getattr(status, "status", "error")
             if getattr(status, "healthy", False):
                 icon = "✅"
@@ -157,8 +218,8 @@ def main() -> None:
             "Boavizta",
             "AWS Cost Explorer",
             "AWS Pricing",
-            "CloudWatch",
-            "CloudTrail"
+            "AWS CloudWatch",
+            "AWS CloudTrail"
         ]
         for api_name in fallback_services:
             st.sidebar.write(f"❌ {api_name}")

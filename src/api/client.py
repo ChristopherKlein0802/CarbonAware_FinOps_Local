@@ -51,12 +51,7 @@ class UnifiedAPIClient:
         return self.electricity_api.get_carbon_intensity_24h(region)
 
     def get_self_collected_24h_data(self, region: str = "eu-central-1") -> Optional[List[Dict]]:
-        """
-        Get 24h carbon data from our own hourly collection system
-
-        Scientific approach: Collect real API data every hour to build our own 24h dataset
-        This maintains academic integrity - all data points are real ElectricityMaps data
-        """
+        """Optional hourly fallback controlled via `ENABLE_HOURLY_CARBON_COLLECTION`."""
         return self.electricity_api.get_self_collected_24h_data(region)
 
     def get_power_consumption(self, instance_type: str) -> Optional[PowerConsumption]:

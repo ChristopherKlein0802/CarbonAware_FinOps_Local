@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 from src.constants import AcademicConstants
-from src.utils.ui import determine_grid_status
+from src.utils.ui import determine_grid_status, calculate_weighted_tradeoff
 from src.utils.performance import (
     render_4_column_metrics,
     render_grid_status_hero
@@ -74,14 +74,13 @@ def _render_core_metrics(dashboard_data: Any) -> None:
     total_cost = dashboard_data.total_cost_eur
     total_co2 = dashboard_data.total_co2_kg
 
-    # Calculate potential savings
-    if dashboard_data.business_case:
-        potential_savings = dashboard_data.business_case.integrated_savings_eur
-        savings_text = f"€{potential_savings:.0f}/month"
-    else:
-        # Quick estimation: 8-15% typical optimization potential
-        estimated_savings = total_cost * 0.12  # 12% midpoint
-        savings_text = f"~€{estimated_savings:.0f}/month"
+    with st.expander("ℹ️ What this section shows", expanded=False):
+        st.markdown(
+            """
+            - **Monthly costs** derive from live AWS Cost Explorer data (6 h cache).
+            - **Carbon footprint** combines ElectricityMaps intensity with Boavizta power models.
+            """
+        )
 
     # Data quality assessment
     cost_quality = "🟢 Real API" if total_cost > 0 else "🔴 No Data"
@@ -93,29 +92,30 @@ def _render_core_metrics(dashboard_data: Any) -> None:
     has_instance_data = len(dashboard_data.instances) > 0
 
     # Core metrics with quality badges
-    col1, col2, col3 = st.columns(3)
+    col1, col2 = st.columns(2)
 
     with col1:
-        st.metric("💰 Monthly Costs", f"€{total_cost:.0f}", f"AWS Cost Explorer - {cost_quality}")
+        st.metric("💰 Monthly Costs", f"€{total_cost:.2f}", f"AWS Cost Explorer - {cost_quality}")
         if not has_real_cost:
             st.warning("⚠️ No real AWS cost data")
 
     with col2:
-        st.metric("🌍 Carbon Footprint", f"{total_co2:.1f} kg CO₂", f"ElectricityMaps+Boavizta - {co2_quality}")
+        st.metric("🌍 Carbon Footprint", f"{total_co2:.2f} kg CO₂", f"ElectricityMaps+Boavizta - {co2_quality}")
         if not has_carbon_data:
             st.warning("⚠️ No real carbon data")
-
-    with col3:
-        st.metric("🚀 Savings Potential", savings_text, "Through optimization")
-        if dashboard_data.business_case:
-            st.caption("🟢 Based on real data")
-        else:
-            st.caption("🟡 Estimated (8-12% typical)")
 
 
 def _render_system_status(dashboard_data: Any) -> None:
     """Render current system status"""
     st.markdown("### 📊 System Status")
+
+    with st.expander("ℹ️ What this section shows", expanded=False):
+        st.markdown(
+            """
+            - Displays how many instances are running and which data categories (cost/carbon) are live.
+            - Lists the health of each API integration with the role it plays and when the dashboard last checked it (local time).
+            """
+        )
 
     # Dynamic system metrics
     if dashboard_data and dashboard_data.instances:
@@ -144,32 +144,92 @@ def _render_system_status(dashboard_data: Any) -> None:
     ]
     render_4_column_metrics(status_metrics)
 
+    api_health = getattr(dashboard_data, 'api_health_status', {}) if dashboard_data else {}
+    if api_health:
+        import pandas as pd
 
-def _render_sme_sizing_reference() -> None:
-    """Render SME sizing reference without interactive calculator"""
-    st.markdown("### 🏢 SME Market Sizing Reference")
-    st.markdown("**Typical German SME cloud infrastructure patterns:**")
+        role_map = {
+            "ElectricityMaps": "Grid carbon intensity (30 min cache)",
+            "Boavizta": "Power models (7 day cache)",
+            "AWS Pricing": "Instance pricing (7 day cache)",
+            "AWS Cost Explorer": "Cost validation (6 h cache)",
+            "AWS CloudWatch": "CPU utilisation (3 h cache)",
+            "AWS CloudTrail": "Runtime tracking (24 h cache)",
+            "CloudWatch": "CPU utilisation (3 h cache)",
+            "CloudTrail": "Runtime tracking (24 h cache)"
+        }
 
-    col1, col2, col3 = st.columns(3)
+        display_labels = {
+            "CloudWatch": "AWS CloudWatch",
+            "CloudTrail": "AWS CloudTrail",
+            "Aws Cloudwatch": "AWS CloudWatch",
+            "Aws Cloudtrail": "AWS CloudTrail",
+        }
 
-    with col1:
-        st.metric("Small SME", "20 instances", "Startup/Small Team")
-        st.caption("€200-500/month typical AWS")
+        status_rows: list[dict[str, str]] = []
+        for service, status in sorted(api_health.items()):
+            label = display_labels.get(service, service.replace('_', ' '))
+            state = getattr(status, "status", "unknown").replace('_', ' ').title()
+            icon = "🟢" if getattr(status, "healthy", False) else ("🟡" if state.lower() == "degraded" else "🔴")
 
-    with col2:
-        st.metric("Medium SME", "50 instances", "Growing Business")
-        st.caption("€500-1,500/month typical AWS")
+            last_check = getattr(status, "last_check", None)
+            if last_check is None:
+                checked_at = "–"
+            else:
+                try:
+                    ts_obj = last_check
+                    if hasattr(ts_obj, "tzinfo") and ts_obj.tzinfo is not None:
+                        localized = ts_obj.astimezone()
+                    else:
+                        localized = ts_obj.replace(tzinfo=timezone.utc).astimezone()
+                    # Show relative age if older than 24 hours, else absolute time
+                    age_hours = (datetime.now(timezone.utc) - localized.astimezone(timezone.utc)).total_seconds() / 3600
+                    if age_hours > 24:
+                        checked_at = f"{age_hours:.0f}h ago"
+                    else:
+                        checked_at = localized.strftime("%d.%m.%Y %H:%M")
+                except Exception:  # pragma: no cover - defensive formatting
+                    checked_at = str(last_check)
 
-    with col3:
-        st.metric("Large SME", "100 instances", "Established Company")
-        st.caption("€1,500-3,000/month typical AWS")
+            api_call = getattr(status, "last_api_call", None)
+            if api_call is None:
+                last_api_call = "–"
+            else:
+                try:
+                    if hasattr(api_call, "tzinfo") and api_call.tzinfo is not None:
+                        api_call_local = api_call.astimezone()
+                    else:
+                        api_call_local = api_call.replace(tzinfo=timezone.utc).astimezone()
+                    last_api_call = api_call_local.strftime("%d.%m.%Y %H:%M")
+                except Exception:  # pragma: no cover - defensive formatting
+                    last_api_call = str(api_call)
 
-    st.info("💡 **Note:** Optimization potential scales with infrastructure size and usage patterns")
+            role = role_map.get(service, role_map.get(label, "Monitoring service"))
+
+            status_rows.append({
+                "Service": label,
+                "Status": f"{icon} {state}",
+                "Last check": checked_at,
+                "Last API call": last_api_call,
+                "Role": role,
+            })
+
+        df = pd.DataFrame(status_rows)
+        st.dataframe(df, hide_index=True, width='stretch')
 
 
 def _render_csrd_readiness(dashboard_data: Any) -> None:
     """Show CSRD readiness indicators for German SMEs."""
     st.markdown("### 🏛️ CSRD Readiness Snapshot")
+
+    with st.expander("ℹ️ What this section shows", expanded=False):
+        st.markdown(
+            """
+            - Scope 2: live grid intensity via ElectricityMaps (German compliance view).
+            - Scope 3: percentage of instances with measured emissions (AWS CloudTrail + Boavizta).
+            - FinOps Controls: cost validation coverage (Cost Explorer) and runtime tracking completeness.
+            """
+        )
 
     total_instances = len(dashboard_data.instances)
     measured_instances = len([
@@ -196,29 +256,37 @@ def _render_csrd_readiness(dashboard_data: Any) -> None:
             st.metric("Scope 3 – Cloud", f"{measured_ratio:.0f}% covered", f"{measured_instances}/{total_instances} measured")
         else:
             st.metric("Scope 3 – Cloud", "0%", "No instances")
-        st.caption("Boavizta + CloudTrail coverage for emissions")
+        st.caption("Boavizta + AWS CloudTrail coverage for emissions")
 
     with col3:
         validation_badge = "✅" if cost_available and runtime_tracked == total_instances else "⚠️"
         st.metric("FinOps Controls", f"{validation_badge} AWS Cost + Runtime", f"Runtime data for {runtime_tracked}/{total_instances}")
         st.caption("Required for CSRD audit trails")
 
-    st.info("📘 **Interpretation**: CSRD requires belastbare Scope‑2/3 Nachweise. Sobald alle Instanzen Laufzeit- und Emissionsdaten liefern, ist der Prototyp berichtsbereit.")
+    st.info("📘 **Interpretation**: CSRD reporting needs reliable Scope 2/3 evidence. Once every instance provides runtime and emission data, the prototype is ready for reporting.")
 
 
 def _render_carbon_scheduling_insight(dashboard_data: Any, carbon_series: list[tuple[datetime, float]]) -> None:
     """Summarise low-carbon scheduling opportunities from 24h series."""
     st.markdown("### ⏱️ Carbon-Aware Scheduling Window")
 
+    with st.expander("ℹ️ What this section shows", expanded=False):
+        st.markdown(
+            """
+            - Compares the current grid intensity with the lowest value observed in the past 24 hours.
+            - Highlights potential CO₂ savings (%) if workloads shift to the low-carbon slot.
+            """
+        )
+
     if not dashboard_data.carbon_intensity or not carbon_series:
-        st.warning("⚠️ 24h carbon dataset noch nicht vollständig – siehe Carbon-Seite für Details.")
+        st.warning("⚠️ 24h carbon dataset not complete yet – see Carbon tab for details.")
         return
 
     current_value = dashboard_data.carbon_intensity.value
     best_point = min(carbon_series, key=lambda entry: entry[1], default=None)
 
     if not best_point:
-        st.warning("⚠️ Nicht genügend Datenpunkte für Scheduling-Auswertung")
+        st.warning("⚠️ Not enough datapoints for scheduling analysis")
         return
 
     best_time, best_value = best_point
@@ -228,29 +296,31 @@ def _render_carbon_scheduling_insight(dashboard_data: Any, carbon_series: list[t
     schedule_col1, schedule_col2, schedule_col3 = st.columns(3)
 
     with schedule_col1:
-        st.metric("Aktuelle Intensität", f"{current_value:.0f} g CO₂/kWh", "Jetzt")
+        st.metric("Current intensity", f"{current_value:.0f} g CO₂/kWh", "Now")
 
     with schedule_col2:
-        st.metric("Niedrigster Slot", f"{best_value:.0f} g CO₂/kWh", best_time.strftime("%a %H:%M"))
+        st.metric("Lowest slot", f"{best_value:.0f} g CO₂/kWh", best_time.strftime("%a %H:%M"))
 
     with schedule_col3:
-        delta_text = f"-{potential_delta:.0f} g ({potential_pct:.0f}%)" if potential_delta > 0 else "Stabil"
-        st.metric("Shift Potenzial", delta_text, "gegenüber jetzt")
+        delta_text = f"-{potential_delta:.0f} g ({potential_pct:.0f}%)" if potential_delta > 0 else "Stable"
+        st.metric("Shift potential", delta_text, "vs. now")
 
-    recommendation = "Verschiebe batch-lastige Tasks" if potential_delta > 0 else "Netz bereits günstig"
-    st.info(
-        f"🗓️ **Empfehlung**: {recommendation} auf {best_time.strftime('%d.%m. %H:%M')} (lokal)."
-        " Prüfe, ob Workloads aus dem Infrastruktur-Tab planbar sind."
-    )
 
 
 def _render_action_recommendations(dashboard_data: Any, carbon_series: list[tuple[datetime, float]]) -> None:
     """Highlight top optimisation ideas for SME decision makers."""
     st.markdown("### 🎯 Top Action Recommendations")
 
+    with st.expander("ℹ️ What this section shows", expanded=False):
+        st.markdown(
+            """
+            - Right-sizing suggestions derived from low CPU utilisation metrics (AWS CloudWatch).
+            """
+        )
+
     instances = dashboard_data.instances or []
     if not instances:
-        st.info("Keine Instanzen vorhanden – keine Maßnahmen erforderlich")
+        st.info("No instances available – no actions required")
         return
 
     recommendations: list[str] = []
@@ -261,129 +331,43 @@ def _render_action_recommendations(dashboard_data: Any, carbon_series: list[tupl
         cpu_value = getattr(inst, "cpu_utilization", None)
         if state_value == "running" and cpu_value is not None and cpu_value < 15:
             low_cpu_candidates.append(inst)
-    if low_cpu_candidates:
-        target = max(low_cpu_candidates, key=lambda i: getattr(i, "monthly_cost_eur", 0.0) or 0.0)
-        name = target.instance_name or target.instance_id
+    for inst in sorted(low_cpu_candidates, key=lambda i: (i.monthly_cost_eur or 0), reverse=True):
+        name = inst.instance_name or inst.instance_id
         recommendations.append(
-            f"💤 **Rightsize {name}** – {target.cpu_utilization:.1f}% CPU bei €{(target.monthly_cost_eur or 0):.2f}/Monat."
-            " Nutze kleinere Instanzklasse oder automatisiertes Stopp-Scheduling."
+            f"💤 **Rightsize {name}** – {inst.cpu_utilization:.1f}% CPU at €{(inst.monthly_cost_eur or 0):.2f}/month."
+            " Consider a smaller instance class or automated stop scheduling."
         )
 
     missing_runtime = [inst for inst in instances if getattr(inst, "runtime_hours", None) is None]
     if missing_runtime:
         recommendations.append(
-            "📡 **CloudTrail aktiv halten** – bei" +
-            f" {len(missing_runtime)} Instanz(en) fehlen Laufzeitdaten. Führe `aws cloudtrail` Logging dauerhaft, damit CSRD-Audits belastbar bleiben."
+            "📡 **Keep AWS CloudTrail active** – "
+            f"runtime data missing for {len(missing_runtime)} instance(s). Maintain `aws cloudtrail` logging for CSRD-ready audit trails."
         )
 
-    if carbon_series:
-        best_time, best_value = min(carbon_series, key=lambda entry: entry[1])
-        recommendations.append(
-            f"🗓️ **Workloads verschieben** – plane energieintensive Jobs auf {best_time.strftime('%d.%m. %H:%M')} (≈{best_value:.0f} g CO₂/kWh) für zusätzlichen Fußabdruck-Vorteil."
-        )
+    # Scheduling tip omitted: current dataset only contains historical slots without forecast
 
     if not recommendations:
-        st.success("Alle Instanzen arbeiten effizient – keine unmittelbaren Maßnahmen notwendig.")
+        st.success("All instances run efficiently – no immediate actions required.")
         return
 
-    for rec in recommendations[:3]:
+    for rec in recommendations:
         st.markdown(f"- {rec}")
 
-
-def _render_integration_excellence(dashboard_data: Any) -> None:
-    """Render Integration Excellence Dashboard showcasing 5-API value"""
-    st.markdown("### 🚀 Integration Excellence Dashboard")
-
-    if not dashboard_data:
-        st.warning("No data available for integration analysis")
-        return
-
-    # API Integration Status
-    api_status_data = []
-    if hasattr(dashboard_data, 'api_health_status') and dashboard_data.api_health_status:
-        for api_name, health_status in dashboard_data.api_health_status.items():
-            api_display_name = api_name.replace("_", " ").title()
-
-            # Map API names to their value propositions
-            value_propositions = {
-                "ElectricityMaps": "Real-time German Grid (30min)",
-                "Boavizta": "Hardware Power Models",
-                "AWS Cost Explorer": "Actual Cost Validation",
-                "AWS Pricing": "Dynamic Cost Calculation",
-                "CloudWatch": "Resource Utilization"
-            }
-
-            value_prop = value_propositions.get(api_display_name, "Infrastructure Data")
-
-            api_status_data.append({
-                "API": api_display_name,
-                "Status": "🟢 Online" if health_status.healthy else "🔴 Offline",
-                "Response": f"{health_status.response_time_ms:.0f}ms",
-                "Value Proposition": value_prop
-            })
-
-    # Display API integration table
-    if api_status_data:
-        import pandas as pd
-        api_df = pd.DataFrame(api_status_data)
-        st.dataframe(api_df, width='stretch', hide_index=True)
-
-        # Integration metrics
-        online_apis = len([a for a in api_status_data if "🟢" in a["Status"]])
-        total_apis = len(api_status_data)
-        integration_score = (online_apis / total_apis) * 100 if total_apis > 0 else 0
-
-        excel_col1, excel_col2, excel_col3, excel_col4 = st.columns(4)
-
-        with excel_col1:
-            st.metric("🔗 API Integration", f"{online_apis}/{total_apis}", f"{integration_score:.0f}% operational")
-
-        with excel_col2:
-            # Calculate data freshness from available data
-            data_sources = 0
-            if dashboard_data.carbon_intensity:
-                data_sources += 1
-            if dashboard_data.instances and len(dashboard_data.instances) > 0:
-                data_sources += 1
-            if dashboard_data.total_cost_eur > 0:
-                data_sources += 1
-
-            st.metric("📊 Data Sources", f"{data_sources}/3", "Carbon+Cost+Infrastructure")
-
-        with excel_col3:
-            # Data quality coverage
-            total_instances = len(dashboard_data.instances)
-            st.metric("🎯 Data Quality", "High", f"{total_instances} instances")
-
-        with excel_col4:
-            # Integration value vs separate tools
-            if dashboard_data.business_case and dashboard_data.business_case.integrated_savings_eur > 0:
-                monthly_savings = dashboard_data.business_case.integrated_savings_eur
-                st.metric("💰 Integration Value", f"€{monthly_savings:.0f}", "vs €200+ separate")
-            else:
-                st.metric("💰 Cost Efficiency", "€20/month", "vs €200+ separate")
-
-        # Integration excellence insights
-        if integration_score >= 80:
-            st.success("🎯 **Integration Excellence**: 5-API orchestration operational - demonstrating superior data correlation vs separate tools")
-        elif integration_score >= 60:
-            st.info("🔄 **Integration Good**: Most APIs operational - showing integration value proposition")
-        else:
-            st.warning("⚠️ **Integration Limited**: Reduced API availability - check API connections")
-
-        # Academic value proposition
-        st.info("""
-        **🎓 Academic Contribution**: This integration demonstrates:
-        - **Real-time Correlation**: Carbon intensity + AWS costs + CloudTrail precision
-        - **German SME Focus**: Regional grid data + affordable API-only approach
-        - **Target Precision**: CloudTrail runtime auditing aims for ±5% accuracy once sufficient data is available (baseline ±40%)
-        - **Integration Efficiency**: €20/month vs €200+ for separate carbon + FinOps tools
-        """)
 
 
 def _render_precision_insights(dashboard_data: Any) -> None:
     """Render precision and validation insights with actual calculations"""
-    st.markdown("### 🎯 Integration Excellence Metrics")
+    st.markdown("### 🎯 Precision & Data Quality")
+
+    with st.expander("ℹ️ What this section shows", expanded=False):
+        st.markdown(
+            """
+            - "Data precision" summarises overall measurement coverage across all instances.
+            - "Cost validation" compares calculated costs with AWS Cost Explorer to assess accuracy.
+            - Coverage metrics show what share of instances has runtime, pricing, and fully measured data.
+            """
+        )
 
     if not dashboard_data or not dashboard_data.instances:
         st.warning("No data available for precision analysis")
@@ -407,128 +391,65 @@ def _render_precision_insights(dashboard_data: Any) -> None:
 
     # Calculate basic metrics
     total_instances = len(dashboard_data.instances)
+    measured_runtime = len([i for i in dashboard_data.instances if getattr(i, 'runtime_hours', None) is not None])
+    pricing_available = len([i for i in dashboard_data.instances if getattr(i, 'hourly_price_usd', None)])
+    measured_quality = len([i for i in dashboard_data.instances if getattr(i, 'data_quality', '') == 'measured'])
 
     validation_factor = getattr(dashboard_data, 'validation_factor', None)
     accuracy_status = getattr(dashboard_data, 'accuracy_status', 'UNKNOWN') or 'UNKNOWN'
 
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3 = st.columns(3)
 
-    with col1:
-        st.metric("🎯 Data Precision", "High", f"All {total_instances} instances")
+    runtime_pct = (measured_runtime / total_instances * 100) if total_instances else 0
+    pricing_pct = (pricing_available / total_instances * 100) if total_instances else 0
+    measured_pct = (measured_quality / total_instances * 100) if total_instances else 0
 
-    with col2:
+    row1_col1, row1_col2, row1_col3 = st.columns(3)
+
+    with row1_col1:
+        st.metric("Runtime coverage", f"{runtime_pct:.0f}%", f"{measured_runtime}/{total_instances} instances")
+
+    with row1_col2:
+        st.metric("Pricing coverage", f"{pricing_pct:.0f}%", f"{pricing_available}/{total_instances} instances")
+
+    with row1_col3:
+        st.metric("Measured quality", f"{measured_pct:.0f}%", f"{measured_quality}/{total_instances} instances")
+
+    row2_col1, row2_col2, row2_col3 = st.columns(3)
+
+    with row2_col1:
         if validation_factor:
             if validation_factor > 100:
-                st.metric("📊 Cost Validation", "Runtime Limited", "Need more runtime data")
+                st.metric("📊 Cost Validation", "Runtime limited", "Need more runtime data")
             elif validation_factor > 10:
-                st.metric("📊 Cost Validation", "Data Building", f"Factor: {validation_factor:.1f}")
+                st.metric("📊 Cost Validation", "Building", f"Factor {validation_factor:.1f}")
             elif validation_factor < 0.1:
-                st.metric("📊 Cost Validation", "Excellent", f"±{((1-validation_factor)*100):.0f}% accuracy")
+                st.metric("📊 Cost Validation", "Excellent", f"±{((1-validation_factor)*100):.0f}%")
             else:
-                st.metric("📊 Cost Validation", f"{validation_factor:.2f}", "Actual vs Calculated")
+                st.metric("📊 Cost Validation", f"{validation_factor:.2f}", "Actual vs calculated")
         else:
-            st.metric("📊 Cost Validation", "No Data", "Checking AWS costs...")
+            st.metric("📊 Cost Validation", "No data", "Fetching AWS costs...")
 
-    with col3:
-        st.metric("⚙️ Methodology", accuracy_status.split(' - ')[0], "Current status")
+    with row2_col2:
+        st.metric("🎯 Data Precision", "High", f"All {total_instances} instances")
 
-    with col4:
-        st.metric("💰 Tool Cost", "€20/month", "vs €200+ alternatives")
+    with row2_col3:
+        st.empty()
 
     # Show runtime insights if validation factor is problematic
     if validation_factor and validation_factor > 10:
         if validation_factor > 100:
-            st.error("⚠️ **Insufficient Runtime Data**: Cost validation requires instances to run for meaningful periods. Current data is too limited for accurate cost comparison.")
+            st.error(
+                "⚠️ **Insufficient Runtime Data**: Cost validation requires instances to run for meaningful periods. Current data is too limited for accurate cost comparison."
+            )
         else:
-            st.warning("⚠️ **Building Runtime History**: CloudTrail precision improves over time. Current validation factor indicates developing accuracy.")
-        st.info("💡 **Academic Outlook**: Mit ausreichender Laufzeit-Historie kann CloudTrail eine Zielgenauigkeit von ±5 % erreichen; derzeit liegen nur Schätzwerte vor (≈±40 %).")
+            st.warning(
+                "⚠️ **Building Runtime History**: AWS CloudTrail precision improves over time. Current validation factor indicates developing accuracy."
+            )
 
-
-def _render_data_quality_summary(dashboard_data: Any) -> None:
-    """Render complete data quality transparency summary"""
-    st.markdown("### 🔍 Data Quality Transparency")
-
-    if not dashboard_data or not dashboard_data.instances:
-        st.warning("No data available for quality analysis")
-        return
-
-    # Analyze data quality across all instances
-    total_instances = len(dashboard_data.instances)
-    measured_runtime = len([i for i in dashboard_data.instances if hasattr(i, 'runtime_hours') and i.runtime_hours is not None])
-    real_pricing = len([i for i in dashboard_data.instances if hasattr(i, 'hourly_price_usd') and i.hourly_price_usd])
-    measured_quality = len([i for i in dashboard_data.instances if hasattr(i, 'data_quality') and i.data_quality == 'measured'])
-    cpu_available = any(
-        hasattr(i, 'cpu_utilization') and i.cpu_utilization is not None
-        for i in dashboard_data.instances
-    )
-
-    quality_col1, quality_col2, quality_col3, quality_col4 = st.columns(4)
-
-    with quality_col1:
-        runtime_pct = (measured_runtime / total_instances * 100) if total_instances > 0 else 0
-        st.metric("🕒 Runtime Data", f"{runtime_pct:.0f}%", f"{measured_runtime}/{total_instances} instances")
-
-    with quality_col2:
-        pricing_pct = (real_pricing / total_instances * 100) if total_instances > 0 else 0
-        st.metric("💰 Pricing Data", f"{pricing_pct:.0f}%", f"{real_pricing}/{total_instances} instances")
-
-    with quality_col3:
-        measured_pct = (measured_quality / total_instances * 100) if total_instances > 0 else 0
-        st.metric("📊 Measured Quality", f"{measured_pct:.0f}%", f"{measured_quality}/{total_instances} instances")
-
-    with quality_col4:
-        apis_active = 0
-        if dashboard_data.carbon_intensity:
-            apis_active += 1
-        if dashboard_data.total_cost_eur > 0:
-            apis_active += 1
-        if dashboard_data.instances:
-            apis_active += 1
-        st.metric("🔗 Data Categories", f"{apis_active}/3", "Carbon / Cost / Infra")
-
-    # Data source details
-    st.markdown("**📋 Data Source Details:**")
-
-    def _format_timestamp(ts: Optional[Any]) -> str:
-        if not ts:
-            return ""
-        try:
-            if hasattr(ts, 'strftime'):
-                return ts.strftime('%d.%m.%Y %H:%M')
-            return str(ts)
-        except Exception:
-            return ""
-
-    service_descriptions = {
-        "ElectricityMaps": "Real German grid carbon intensity",
-        "Boavizta": "Hardware power consumption models",
-        "AWS Pricing": "Instance hourly rates",
-        "AWS Cost Explorer": "Actual billing data",
-        "CloudWatch": "CPU metrics for power scaling",
-        "CloudTrail": "Audit-grade runtime tracking"
-    }
-
-    data_sources: list[str] = []
-
-    api_health = getattr(dashboard_data, 'api_health_status', {})
-
-    for service, status in api_health.items():
-        label = service.replace('_', ' ').title()
-        description = service_descriptions.get(label, service_descriptions.get(service, "Data service"))
-        icon = "✅" if getattr(status, 'healthy', False) else ("⚠️" if getattr(status, 'status', '') == "degraded" else "❌")
-        timestamp = _format_timestamp(getattr(status, 'last_check', None))
-        stamp = f" (Stand {timestamp})" if timestamp else ""
-        note = f" – {status.error_message}" if getattr(status, 'error_message', None) and not getattr(status, 'healthy', False) else ""
-        data_sources.append(f"{icon} **{label}**: {description}{stamp}{note}")
-
-    if not data_sources:
-        data_sources.append("⚠️ Keine Service-Metadaten verfügbar")
-
-    for source in data_sources:
-        st.markdown(f"- {source}")
-
-    # Academic disclaimer
-    st.caption("🎓 **Bachelor Thesis Standards**: All calculations documented with source transparency and uncertainty ranges for academic rigor.")
+        st.info(
+            "💡 **Academic outlook**: With sufficient runtime history, AWS CloudTrail can reach ±5% accuracy; currently only indicative estimates (≈±40%) are available."
+        )
 
 
 def render_overview_page(dashboard_data: Optional[Any]) -> None:
@@ -550,6 +471,8 @@ def render_overview_page(dashboard_data: Optional[Any]) -> None:
 
     # Quick business case summary
     _render_business_case_summary(dashboard_data)
+    _render_tradeoff_controls(dashboard_data)
+    _render_cost_carbon_alignment(dashboard_data)
 
     st.markdown("---")
 
@@ -562,10 +485,7 @@ def render_overview_page(dashboard_data: Optional[Any]) -> None:
     st.markdown("---")
 
     _render_system_status(dashboard_data)
-    _render_integration_excellence(dashboard_data)
     _render_precision_insights(dashboard_data)
-    _render_data_quality_summary(dashboard_data)
-    _render_sme_sizing_reference()
 
 
 def _render_business_case_summary(dashboard_data: Any) -> None:
@@ -575,6 +495,16 @@ def _render_business_case_summary(dashboard_data: Any) -> None:
         return
 
     st.markdown("### 📈 Business Impact Summary")
+
+    with st.expander("ℹ️ What this section shows", expanded=False):
+        st.markdown(
+            """
+            - **Monthly savings / ROI** are derived from the `BusinessCaseCalculator` moderate scenario (literature-based 15–25 % factors).
+            - **CO₂ reduction** reuses the same scenario factors applied to the measured baseline footprint.
+            - The EU ETS value estimates the monetary impact of the reported CO₂ reduction.
+            - Sources: McKinsey [7] for cost factors, MIT carbon-aware scheduling [20] for emissions.
+            """
+        )
 
     business_case = dashboard_data.business_case
 
@@ -636,59 +566,164 @@ def _render_business_case_summary(dashboard_data: Any) -> None:
             "EU ETS sensitivity"
         )
 
-    info_message = "🎯 **Key Benefit (theoretical)**: Carbon-aware scheduling kombiniert Kosten- und CO₂-Effekte basierend auf Literaturwerten."
-    if getattr(business_case, "source_notes", None):
-        info_message += f" {business_case.source_notes}"
-    st.success(info_message)
 
-    # Data transparency section
-    st.markdown("---")
-    st.markdown("### 📊 Data Source Transparency")
+def _render_tradeoff_controls(dashboard_data: Any) -> None:
+    """Interactive slider to explore cost/CO₂ trade-offs."""
 
-    api_health = getattr(dashboard_data, 'api_health_status', {})
+    baseline_cost = getattr(dashboard_data, "total_cost_eur", 0.0) or 0.0
+    baseline_co2 = getattr(dashboard_data, "total_co2_kg", 0.0) or 0.0
 
-    def _format_timestamp(ts: Optional[Any]) -> str:
-        if not ts:
-            return ""
-        try:
-            if hasattr(ts, 'strftime'):
-                return ts.strftime('%d.%m.%Y %H:%M')
-            return str(ts)
-        except Exception:
-            return ""
+    if baseline_cost <= 0 and baseline_co2 <= 0:
+        st.info("⚠️ No valid baseline data – trade-off explorer requires real cost and CO₂ measurements.")
+        return
 
-    service_descriptions = {
-        "ElectricityMaps": "German grid carbon",
-        "Boavizta": "Power consumption models",
-        "AWS Pricing": "Instance hourly rates",
-        "AWS Cost Explorer": "Real billing",
-        "CloudWatch": "CPU metrics",
-        "CloudTrail": "Runtime tracking"
-    }
+    st.markdown("### ⚖️ Cost vs CO₂ Trade-off Explorer")
 
-    status_entries: list[tuple[str, str]] = []
-    for service, status in api_health.items():
-        label = service.replace('_', ' ').title()
-        description = service_descriptions.get(label, service_descriptions.get(service, "Data service"))
-        icon = "✅" if getattr(status, 'healthy', False) else ("⚠️" if getattr(status, 'status', '') == "degraded" else "❌")
-        timestamp = _format_timestamp(getattr(status, 'last_check', None))
-        stamp = f" (Stand {timestamp})" if timestamp else ""
-        note = f" – {status.error_message}" if getattr(status, 'error_message', None) and not getattr(status, 'healthy', False) else ""
-        status_entries.append((label, f"{icon} {label} – {description}{stamp}{note}"))
+    with st.expander("ℹ️ What this section shows", expanded=False):
+        st.markdown(
+            """
+            - The slider changes the weighting between cost and CO₂ priorities (0 % = full CO₂ focus, 100 % = full cost focus).
+            - Scenario factors (10 % conservative / 20 % moderate) stem from the same literature as the Business Impact summary (McKinsey [7], MIT carbon-aware scheduling [20]).
+            - Outputs show the adjusted cost and CO₂ reductions plus the absolute savings (EUR / kg CO₂).
+            """
+        )
 
-    status_entries.sort(key=lambda item: item[0])
+    cost_weight = st.slider(
+        "Cost vs. CO₂ priority",
+        min_value=0,
+        max_value=100,
+        value=60,
+        step=5,
+        help="0% = full CO₂ priority, 100% = full cost priority",
+        key="tradeoff_weight_slider",
+    )
 
-    if status_entries:
-        st.markdown("**Live Service Status:**")
-        api_col1, api_col2 = st.columns(2)
-        midpoint = (len(status_entries) + 1) // 2
-        with api_col1:
-            for _, entry in status_entries[:midpoint]:
-                st.markdown(entry)
-        with api_col2:
-            for _, entry in status_entries[midpoint:]:
-                st.markdown(entry)
-    else:
-        st.info("Keine Service-Metadaten verfügbar")
+    tradeoff = calculate_weighted_tradeoff(baseline_cost, baseline_co2, cost_weight)
 
-    st.caption("🔬 **NO-FALLBACK Policy**: Only real API data used - no synthetic estimates")
+    def _fmt_currency(value: float) -> str:
+        if value >= 100:
+            return f"€{value:,.0f}".replace(",", " ")
+        if value >= 10:
+            return f"€{value:,.1f}"
+        return f"€{value:.2f}"
+
+    def _fmt_co2(value: float) -> str:
+        if value >= 10:
+            return f"{value:.1f} kg"
+        return f"{value:.3f} kg"
+
+    col1, col2, col3 = st.columns(3)
+
+    summary_text = (tradeoff["summary"]
+                    .replace("Kostenfokus", "cost priority")
+                    .replace("Kostensenkung", "cost reduction")
+                    .replace("CO₂-Reduktion", "CO₂ reduction"))
+
+    with col1:
+        st.metric("Cost priority", f"{cost_weight}%", summary_text)
+
+    with col2:
+        st.metric(
+            "Expected cost reduction",
+            _fmt_currency(tradeoff["cost_reduction"]),
+            f"{tradeoff['cost_factor']:.1%} scenario"
+        )
+
+    with col3:
+        st.metric(
+            "Expected CO₂ reduction",
+            _fmt_co2(tradeoff["co2_reduction"]),
+            f"{tradeoff['co2_factor']:.1%} scenario"
+        )
+
+
+
+def _render_cost_carbon_alignment(dashboard_data: Any) -> None:
+    """Visualise hourly cost and CO₂ data to evidence TAC."""
+
+    series = getattr(dashboard_data, "time_series", []) or []
+    st.markdown("### ⏱️ Cost & CO₂ Trend (last 24 h)")
+
+    with st.expander("ℹ️ What this section shows", expanded=False):
+        st.markdown(
+            """
+            - Combines the past 24 hours of EC2 costs (AWS Cost Explorer, hourly granularity) with ElectricityMaps carbon intensity.
+            - TAC (Time Alignment Coverage) reports how many hourly cost points have matching carbon data (>95 % required by R1).
+            - Cost MAPE compares calculated costs vs. Cost Explorer and supports Requirement R2 (target <10 %).
+            """
+        )
+
+    if not series:
+        st.info("No historical datapoints yet – the dashboard will collect new values with each run.")
+        return
+
+    import pandas as pd  # Local import to avoid global dependency during tests
+    from plotly.subplots import make_subplots
+    import plotly.graph_objects as go
+
+    data = pd.DataFrame(
+        [
+            {
+                "timestamp": point.timestamp,
+                "cost_eur_per_hour": point.cost_eur_per_hour,
+                "co2_kg_per_hour": point.co2_kg_per_hour,
+            }
+            for point in series
+        ]
+    ).sort_values("timestamp")
+
+    if data.empty:
+        st.info("Keine auswertbaren Datenpunkte vorhanden.")
+        return
+
+    fig = make_subplots(specs=[[{"secondary_y": True}]])
+
+    fig.add_trace(
+        go.Bar(
+            x=data["timestamp"],
+            y=data["cost_eur_per_hour"],
+            name="Kosten (€/h)",
+            marker_color="#1f77b4",
+            opacity=0.7,
+        ),
+        secondary_y=False,
+    )
+
+    fig.add_trace(
+        go.Scatter(
+            x=data["timestamp"],
+            y=data["co2_kg_per_hour"],
+            name="CO₂ (kg/h)",
+            mode="lines+markers",
+            line=dict(color="#d62728", width=3),
+        ),
+        secondary_y=True,
+    )
+
+    fig.update_layout(
+        height=420,
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0.0),
+        margin=dict(t=40, l=60, r=60, b=40),
+    )
+    fig.update_xaxes(title_text="Zeitpunkt")
+    fig.update_yaxes(title_text="Kosten (€/h)", secondary_y=False)
+    fig.update_yaxes(title_text="CO₂ (kg/h)", secondary_y=True)
+
+    st.plotly_chart(fig, width='stretch')
+
+    tac_col1, tac_col2 = st.columns(2)
+    tac_score = getattr(dashboard_data, "tac_score", None)
+    tac_hours = getattr(dashboard_data, "tac_aligned_hours", None) or 0
+
+    with tac_col1:
+        if tac_score is not None:
+            st.metric("Time Alignment Coverage", f"{tac_score * 100:.0f}%", f"{tac_hours} h aligned")
+        else:
+            st.metric("Time Alignment Coverage", "n/a", "Sammle weitere Daten")
+
+    with tac_col2:
+        cost_mape = getattr(dashboard_data, "cost_mape", None)
+        if cost_mape is not None:
+            st.metric("Cost MAPE", f"{cost_mape * 100:.1f}%")
+        else:
+            st.metric("Cost MAPE", "n/a")

@@ -4,6 +4,7 @@
 - Integriertes Monitoring-System für Cloud-Kosten und CO₂-Emissionen mit Fokus auf deutsche KMU
 - Kombination aus Echtzeit-Stromnetzmetriken, AWS-Laufzeitdaten und FinOps-Kennzahlen
 - Forschungsprojekt im Rahmen eines Design-Science-Ansatzes mit offen dokumentierter Architektur und Evaluation
+- Automatisierte Zeitreihen (48 h) aus AWS Cost Explorer & ElectricityMaps für Time Alignment Coverage (TAC) und interaktive Kosten/CO₂-Trade-offs im Dashboard
 
 ## Forschungsfrage und Teilfragen
 „Wie lässt sich ein integriertes Monitoring-System entwickeln, das Kosten und CO₂-Emissionen von Cloud-Infrastrukturen simultan erfasst, und welche Vorteile bietet dieser Ansatz gegenüber bestehenden getrennten Lösungen?“
@@ -33,6 +34,7 @@ Zur Beantwortung werden folgende Teilfragen adressiert:
 ## Systemarchitektur und Komponenten
 - **Streamlit Frontend (`src/app.py`):** Navigierbares Dashboard mit Executive Summary, Carbon-Ansicht und Infrastrukturübersicht.
 - **Datenorchestrierung (`src/core/processor.py`):** Aggregiert API-Daten, validiert Unsicherheiten und erstellt `DashboardData`-Payloads.
+- **Zeitreihen & TAC:** `DataProcessor` synchronisiert stündliche EC2-Kosten aus dem AWS Cost Explorer mit ElectricityMaps-Intensitäten (`TimeSeriesPoint`) als Grundlage für Time Alignment Coverage und Cost-MAPE.
 - **Laufzeittracking (`src/core/tracker.py`):** Nutzt CloudTrail-Events und CloudWatch-Metriken für präzise Betriebsstunden.
 - **Berechnungen (`src/core/calculator.py` & `src/utils/calculations.py`):** Emissions- und Kostenmodelle auf Basis Boavizta, ElectricityMaps und FinOps-Szenarien.
 - **API-Clients (`src/api/`):** Kapseln Zugriffe auf ElectricityMaps, AWS Cost Explorer, AWS Pricing, CloudWatch und optionale Datenquellen.
@@ -56,7 +58,7 @@ CarbonAware_FinOps_Local/
 
 ## Evaluationskonzept
 - **Zeithorizont:** 30 Tage Beobachtung in einer kontrollierten AWS-Testumgebung.
-- **Metriken:** Datenverfügbarkeit je API, Kostenabweichung vs. AWS Billing, CO₂/kg je Instanz, Aggregationstreue gegenüber ElectricityMaps-Daten, Dashboard-Latenz.
+- **Metriken:** Datenverfügbarkeit je API, TAC (Time Alignment Coverage), Cost-MAPE vs. AWS Billing, CO₂/kg je Instanz, Aggregationstreue gegenüber ElectricityMaps-Daten, Dashboard-Latenz.
 - **Vergleichsbasis:** Manuell gepflegte Kostenreports und separate CO₂-Tracker (Baseline) vs. integrierte Darstellung im Dashboard.
 - **Dokumentation:** Ergebnisse und Unsicherheiten werden in `docs/evaluation/` sowie direkt im Dashboard ausgewiesen.
 

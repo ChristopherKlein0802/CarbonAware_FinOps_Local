@@ -24,25 +24,22 @@ logger = get_performance_logger("electricity_api")
 
 
 def parse_iso_datetime(datetime_str: str) -> datetime:
-    """Parse ISO datetime string, handling 'Z' timezone indicator."""
-    if datetime_str.endswith("Z"):
-        datetime_str = datetime_str[:-1]
+    """Parse ISO datetime string and ensure timezone awareness."""
+    if not datetime_str:
+        return datetime.now(timezone.utc)
 
-    if "+" in datetime_str:
-        datetime_str = datetime_str.split("+")[0]
-    elif datetime_str.count("-") > 2:
-        for i in range(len(datetime_str) - 1, -1, -1):
-            if datetime_str[i] in ["-", "+"] and i > 10:
-                datetime_str = datetime_str[:i]
-                break
+    normalised = datetime_str.strip()
+    if normalised.endswith("Z"):
+        normalised = normalised[:-1] + "+00:00"
 
     try:
-        if "." in datetime_str:
-            return datetime.strptime(datetime_str, "%Y-%m-%dT%H:%M:%S.%f")
-        else:
-            return datetime.strptime(datetime_str, "%Y-%m-%dT%H:%M:%S")
+        dt = datetime.fromisoformat(normalised)
     except ValueError:
-        return datetime.now()
+        return datetime.now(timezone.utc)
+
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
 
 
 class ElectricityMapsAPI:
@@ -52,6 +49,12 @@ class ElectricityMapsAPI:
         """Initialize ElectricityMaps API client"""
         self.api_key = os.getenv("ELECTRICITYMAP_API_KEY")
         self.base_url = "https://api-access.electricitymaps.com/v3"
+        self.enable_hourly_collection = os.getenv(
+            "ENABLE_HOURLY_CARBON_COLLECTION",
+            "false",
+        ).strip().lower() in {"1", "true", "yes", "on"}
+        if self.enable_hourly_collection:
+            logger.info("🟢 Hourly carbon fallback enabled via ENABLE_HOURLY_CARBON_COLLECTION")
 
     def get_current_carbon_intensity(self, region: str = "eu-central-1") -> Optional[CarbonIntensity]:
         """Get current carbon intensity from ElectricityMap with optimized 2-hour caching
@@ -68,10 +71,16 @@ class ElectricityMapsAPI:
                 with open(cache_path, "r") as f:
                     cached_data = json.load(f)
                 logger.debug(f"✅ Using cached carbon data for {region}")
-                fetched_at = datetime.fromtimestamp(os.path.getmtime(cache_path), tz=timezone.utc)
+                fetched_at_raw = cached_data.get("fetched_at_utc") or cached_data.get("fetched_at")
+                if fetched_at_raw:
+                    fetched_at_local = parse_iso_datetime(fetched_at_raw)
+                    fetched_at = fetched_at_local.astimezone(timezone.utc)
+                else:
+                    fetched_at = datetime.fromtimestamp(os.path.getmtime(cache_path), tz=timezone.utc)
+                timestamp_local = parse_iso_datetime(cached_data["timestamp"])
                 return CarbonIntensity(
                     value=cached_data["value"],
-                    timestamp=parse_iso_datetime(cached_data["timestamp"]),
+                    timestamp=timestamp_local.astimezone(timezone.utc),
                     region=cached_data["region"],
                     source=cached_data["source"],
                     fetched_at=fetched_at
@@ -106,22 +115,27 @@ class ElectricityMapsAPI:
                 return None
 
             fetched_at = datetime.now(timezone.utc)
+            timestamp_utc = parse_iso_datetime(data["datetime"])
             carbon_data = CarbonIntensity(
                 value=float(data["carbonIntensity"]),
-                timestamp=parse_iso_datetime(data["datetime"]),
+                timestamp=timestamp_utc,
                 region=region,
                 source="electricitymap",
                 fetched_at=fetched_at
             )
 
-            # Cache the result
+            # Cache the result with local and UTC timestamps
             try:
+                local_timestamp = carbon_data.timestamp.astimezone()
+                local_fetched = carbon_data.fetched_at.astimezone() if carbon_data.fetched_at else None
                 cache_data = {
                     "value": carbon_data.value,
-                    "timestamp": carbon_data.timestamp.isoformat(),
+                    "timestamp": local_timestamp.isoformat(),
+                    "timestamp_utc": carbon_data.timestamp.astimezone(timezone.utc).isoformat(),
                     "region": carbon_data.region,
                     "source": carbon_data.source,
-                    "fetched_at": carbon_data.fetched_at.isoformat() if carbon_data.fetched_at else None
+                    "fetched_at": local_fetched.isoformat() if local_fetched else None,
+                    "fetched_at_utc": carbon_data.fetched_at.astimezone(timezone.utc).isoformat() if carbon_data.fetched_at else None
                 }
                 with open(cache_path, "w") as f:
                     json.dump(cache_data, f)
@@ -158,7 +172,7 @@ class ElectricityMapsAPI:
         Returns: List of hourly data points with timestamp and carbon intensity
         """
         # Use date-based cache key since historical data doesn't change
-        today = datetime.now().strftime("%Y-%m-%d")
+        today = datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d")
         cache_path = get_standard_cache_path("carbon_intensity_24h", f"{region}_{today}")
         ensure_cache_dir(cache_path)
 
@@ -238,10 +252,12 @@ class ElectricityMapsAPI:
                     except (TypeError, ValueError):
                         continue
                     dt = parse_iso_datetime(str(timestamp))
+                    local_dt = dt.astimezone()
                     processed_history.append({
                         "carbonIntensity": intensity_value,
-                        "datetime": dt.isoformat(),
-                        "hour": dt.hour,
+                        "datetime": local_dt.isoformat(),
+                        "datetime_utc": dt.astimezone(timezone.utc).isoformat(),
+                        "hour": local_dt.hour,
                         "source": raw_entry.get("source", "electricitymap_24h_api")
                     })
 
@@ -260,9 +276,11 @@ class ElectricityMapsAPI:
 
             # Cache the result with daily expiration
             try:
+                now_utc = datetime.now(timezone.utc)
                 cache_data = {
                     "history": ordered_history,
-                    "cached_at": datetime.now().isoformat(),
+                    "cached_at": now_utc.astimezone().isoformat(),
+                    "cached_at_utc": now_utc.isoformat(),
                     "data_source": "electricitymap_24h_api",
                     "region": region,
                     "zone": zone
@@ -292,6 +310,18 @@ class ElectricityMapsAPI:
         """
         collection_file = get_standard_cache_path("hourly_collection", region)
 
+        if not self.enable_hourly_collection:
+            if os.path.exists(collection_file):
+                try:
+                    os.remove(collection_file)
+                    logger.debug("🧹 Removed hourly carbon fallback cache: %s", collection_file)
+                except OSError as error:
+                    logger.warning("⚠️ Failed to remove hourly fallback cache %s: %s", collection_file, error)
+            logger.debug("Hourly carbon fallback disabled via configuration")
+            return None
+
+        ensure_cache_dir(collection_file)
+
         # Get current carbon data and store it
         self._store_hourly_carbon_data(region, collection_file)
 
@@ -305,7 +335,7 @@ class ElectricityMapsAPI:
             if not current_data:
                 return
 
-            current_time = datetime.now()
+            current_time = datetime.now(timezone.utc).astimezone()
             current_hour = current_time.replace(minute=0, second=0, microsecond=0)
 
             # Load existing data
@@ -326,20 +356,21 @@ class ElectricityMapsAPI:
                 new_entry = {
                     'hour_key': hour_key,
                     'carbonIntensity': current_data.value,
-                    'datetime': current_hour.isoformat(),  # Use corrected timestamp
+                    'datetime': current_hour.isoformat(),
+                    'datetime_utc': current_hour.astimezone(timezone.utc).isoformat(),
                     'hour': current_hour.hour,
-                    'collected_at': current_hour.isoformat(),  # Use corrected timestamp
+                    'collected_at': current_time.isoformat(),
                     'source': 'electricitymap_hourly_collection',
-                    'full_date': current_hour.strftime('%d.%m.%Y'),  # NEW: Full date for display
-                    'display_time': current_hour.strftime('%d.%m.%Y %H:00')  # NEW: Complete display format
+                    'full_date': current_hour.strftime('%d.%m.%Y'),
+                    'display_time': current_hour.strftime('%d.%m.%Y %H:%M')
                 }
                 collected_data.append(new_entry)
 
                 # Implement sliding 24h window: Keep only last 24 hours + current hour
-                cutoff_time = datetime.now() - timedelta(hours=24)
+                cutoff_time = datetime.now(timezone.utc).astimezone() - timedelta(hours=24)
                 collected_data = [
                     entry for entry in collected_data
-                    if datetime.fromisoformat(entry['hour_key'].replace('Z', '')) > cutoff_time
+                    if parse_iso_datetime(entry['hour_key']).astimezone() > cutoff_time
                 ]
 
                 # If we have more than 24 hours of data, implement sliding window
@@ -406,12 +437,12 @@ class ElectricityMapsAPI:
                 return None
 
             # Filter for last 24 hours
-            now = datetime.now()
+            now = datetime.now(timezone.utc).astimezone()
             cutoff_time = now - timedelta(hours=24)
 
             recent_data = [
                 entry for entry in collected_data
-                if datetime.fromisoformat(entry['hour_key'].replace('Z', '')) > cutoff_time
+                if parse_iso_datetime(entry['hour_key']).astimezone() > cutoff_time
             ]
 
             if len(recent_data) >= 6:  # At least 6 hours of data to show meaningful trend

@@ -3,13 +3,23 @@ Dashboard and application data models
 Complete dashboard data structure and API health monitoring
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 
 # Import from other model modules to avoid circular imports
 from .aws import EC2Instance
 from .business import BusinessCase
+
+
+@dataclass
+class TimeSeriesPoint:
+    """Hourly aligned snapshot for time alignment coverage."""
+
+    timestamp: datetime
+    cost_eur_per_hour: float
+    co2_kg_per_hour: float
+    carbon_intensity: Optional[float] = None
 
 
 @dataclass
@@ -26,6 +36,10 @@ class DashboardData:
     api_health_status: Optional[Dict[str, 'APIHealthStatus']] = None
     validation_factor: Optional[float] = None
     accuracy_status: Optional[str] = None
+    time_series: List[TimeSeriesPoint] = field(default_factory=list)
+    tac_score: Optional[float] = None
+    tac_aligned_hours: Optional[int] = None
+    cost_mape: Optional[float] = None
 
     def __post_init__(self):
         if self.uncertainty_ranges is None:
@@ -43,3 +57,4 @@ class APIHealthStatus:
     last_check: datetime
     error_message: Optional[str] = None
     healthy: bool = False
+    last_api_call: Optional[datetime] = None

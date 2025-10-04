@@ -62,6 +62,7 @@ graph TD
 ## 5. API-Layer und Datenmodelle
 - **UnifiedAPIClient (`src/api/client.py`):** Bündelt ElectricityMaps-, Boavizta- und AWS-Aufrufe und propagiert Fehler im Sinne der No-Fallback-Policy.
 - **AWS-Hilfsklassen (`src/api/aws.py`):** Stellt spezialisierte Clients für Cost Explorer, Pricing und CloudWatch bereit; nutzt gemeinsame Cache-Helfer.
+- **Stündliche Kostenserie:** `AWSAPIClient.get_hourly_costs` liefert EC2-Kosten (USD→EUR) für die letzten 48 h als Basis für TAC.
 - **ElectricityMaps (`src/api/electricity.py`):** Liefert aktuelle Intensitäten sowie 24h-Historien für die deutsche Zone.
 - **Boavizta (`src/api/boavizta.py`):** Berechnet Leistungsprofile für AWS-Instanzen.
 
@@ -71,9 +72,10 @@ graph TD
 | `get_carbon_intensity_24h(zone)` | ElectricityMaps | Trendanalyse auf 24h-Basis | `Optional[List[CarbonPoint]]` |
 | `get_power_profile(instance_type)` | Boavizta | Leistungsmodell (min/avg/max) | `Optional[PowerProfile]` |
 | `get_monthly_costs()` | AWS Cost Explorer | Validierung der Ausgaben | `Optional[AWSCostData]` |
+| `get_hourly_costs(hours)` | AWS Cost Explorer | Stündliche EC2-Kosten (48 h) | `Optional[List[dict]]` |
 | `get_instance_pricing(instance_type, region)` | AWS Pricing | On-Demand-Preis pro Instanz | `Optional[InstancePrice]` |
 
-**Genutzte Dataclasses (`src/models/`):** `CarbonIntensity`, `PowerProfile`, `AWSCostData`, `DashboardData` inkl. `APIHealthStatus` dokumentieren Quellen, Zeitstempel und Unsicherheiten.
+**Genutzte Dataclasses (`src/models/`):** `CarbonIntensity`, `PowerProfile`, `AWSCostData`, `DashboardData` (inkl. `APIHealthStatus` & `TimeSeriesPoint`) dokumentieren Quellen, Zeitstempel und Unsicherheiten.
 
 ## 6. Cache-Mechanismen
 | Datenquelle | Modul | Cache-TTL (`CacheTTL`) | Begründung |
@@ -85,6 +87,7 @@ graph TD
 | AWS Cost Explorer | `src/api/aws.py` | 6 Stunden (`COST_DATA`) | Abrechnungsdaten werden täglich aktualisiert.
 | AWS CloudWatch | `src/api/aws.py` | 3 Stunden (`CPU_UTILIZATION`) | Balance aus Aktualität und API-Kosten.
 | AWS CloudTrail | `src/core/tracker.py` | 24 Stunden (`CLOUDTRAIL_EVENTS`) | Events sind unveränderlich, tägliche Synchronisation genügt.
+| Cost/Carbon Time Series | `src/core/processor.py` | 48 Stunden (lokale JSON-Snapshots) | Grundlage für TAC und Trade-off-Visualisierung.
 
 Die Cache-Funktionen (`src/utils/cache.py`) verwalten Pfade, TTLs und Bereinigung; `clean_old_cache_files` verhindert überalterte Artefakte. Dadurch sinkt das API-Aufkommen um >80 % und die Betriebskosten bleiben im KMU-Rahmen.
 
