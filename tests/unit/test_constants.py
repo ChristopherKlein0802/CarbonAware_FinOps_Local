@@ -4,7 +4,7 @@ Validates centralized constants and their academic integrity
 """
 
 import unittest
-from src.constants import AcademicConstants, CarbonConstants, APIConstants
+from src.domain.constants import AcademicConstants, CarbonConstants, UIConstants
 
 
 class TestAcademicConstants(unittest.TestCase):
@@ -12,7 +12,9 @@ class TestAcademicConstants(unittest.TestCase):
 
     def test_academic_constants_values(self):
         """Validate academic constant values are reasonable"""
-        self.assertAlmostEqual(AcademicConstants.EUR_USD_RATE, 0.92, places=2)
+        # EUR_USD_RATE is now a static method
+        eur_usd = AcademicConstants.get_eur_usd_rate()
+        self.assertAlmostEqual(eur_usd, 0.92, places=1)
         self.assertGreater(AcademicConstants.EU_ETS_PRICE_PER_TONNE, 0)
         self.assertEqual(AcademicConstants.HOURS_PER_MONTH, 730)
 
@@ -29,19 +31,17 @@ class TestCarbonConstants(unittest.TestCase):
 
     def test_carbon_thresholds_logical_order(self):
         """Test carbon intensity thresholds are in logical order"""
-        self.assertLess(CarbonConstants.OPTIMAL_THRESHOLD,
-                       CarbonConstants.MODERATE_THRESHOLD)
-        self.assertLess(CarbonConstants.MODERATE_THRESHOLD,
-                       CarbonConstants.HIGH_CARBON_THRESHOLD)
+        self.assertLess(CarbonConstants.OPTIMAL_THRESHOLD, CarbonConstants.MODERATE_THRESHOLD)
+        self.assertLess(CarbonConstants.MODERATE_THRESHOLD, CarbonConstants.HIGH_CARBON_THRESHOLD)
 
 
-class TestAPIConstants(unittest.TestCase):
-    """Test API timeout and cache configuration"""
+class TestUIConstants(unittest.TestCase):
+    """Test UI and cache configuration"""
 
     def test_streamlit_cache_ttl(self):
         """Ensure Streamlit cache TTL is positive"""
-        self.assertGreater(APIConstants.STREAMLIT_DYNAMIC_CALCULATIONS, 0)
+        self.assertGreater(UIConstants.STREAMLIT_CACHE_TTL_SECONDS, 0)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

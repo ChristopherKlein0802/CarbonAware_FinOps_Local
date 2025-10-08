@@ -1,122 +1,120 @@
-# Carbon-Aware FinOps Tool – Bachelorarbeit
+# Carbon-Aware FinOps Tool – Bachelor Thesis
 
-## Projektüberblick
-- Integriertes Monitoring-System für Cloud-Kosten und CO₂-Emissionen mit Fokus auf deutsche KMU
-- Kombination aus Echtzeit-Stromnetzmetriken, AWS-Laufzeitdaten und FinOps-Kennzahlen
-- Forschungsprojekt im Rahmen eines Design-Science-Ansatzes mit offen dokumentierter Architektur und Evaluation
-- Automatisierte Zeitreihen (48 h) aus AWS Cost Explorer & ElectricityMaps für Time Alignment Coverage (TAC) und interaktive Kosten/CO₂-Trade-offs im Dashboard
+[![Tests](https://img.shields.io/badge/tests-79%2F79%20passing-brightgreen)]()
+[![Architecture](https://img.shields.io/badge/architecture-Clean%20Architecture-blue)]()
+[![Python](https://img.shields.io/badge/python-3.11%2B-blue)]()
 
-## Forschungsfrage und Teilfragen
-„Wie lässt sich ein integriertes Monitoring-System entwickeln, das Kosten und CO₂-Emissionen von Cloud-Infrastrukturen simultan erfasst, und welche Vorteile bietet dieser Ansatz gegenüber bestehenden getrennten Lösungen?“
+## Project Overview
 
-Zur Beantwortung werden folgende Teilfragen adressiert:
-1. Welche Defizite weisen existierende Tools bei der Integration von Kosten- und Emissionsmetriken auf?
-2. Wie lassen sich heterogene Datenquellen trotz unterschiedlicher Charakteristika robust integrieren?
-3. Welche messbaren Vorteile bietet die Integration gegenüber getrennten Ansätzen?
-4. Inwieweit lässt sich der entwickelte Ansatz auf verschiedene Unternehmensgrößen, Cloud-Anbieter und geografische Kontexte adaptieren?
+Integrated monitoring system for cloud costs and CO₂ emissions, focused on German SMEs. Combines real-time power grid metrics, AWS runtime data, and FinOps principles using a Design Science Research approach.
 
-## Motivation und Kontext
-84 % der Unternehmen sehen Kostenkontrolle als größte Cloud-Herausforderung, während die CSRD ab 2024 detaillierte Emissionsreports inklusive Scope-3-Daten fordert. Deutsche KMU geraten damit doppelt unter Druck: Sie müssen Kosten senken und belastbare Emissionsdaten liefern, obwohl verfügbare Tools beide Dimensionen voneinander trennen. Der Prototyp schließt diese Lücke, indem er Kostentransparenz und Carbon Accounting gemeinsam adressiert und so eine belastbare Grundlage für Compliance-Reporting und FinOps-Entscheidungen schafft.
+**Key Features:**
+- 🌍 **Real-time Carbon Tracking**: ElectricityMaps integration for German power grid
+- 💰 **Cost & Carbon Integration**: Combined tracking instead of separate tools
+- 📊 **Business Case Calculator**: Savings estimation based on McKinsey/MIT research
+- 🏛️ **CSRD-Ready**: Scope 2/3 reporting for German compliance
+- ⚡ **CloudTrail Precision**: Minute-level runtime tracking for accurate calculations
 
-## Ziele und Beitrag
-- Systematische Analyse bestehender Kosten- und Emissionslösungen samt Bewertungsframework
-- Entwicklung eines integrierten Dashboards, das Echtzeitdaten, historische Laufzeiten und modellbasierte Emissionsberechnungen verknüpft
-- Quantitative Evaluation über 30 Tage hinsichtlich Datenverfügbarkeit, Genauigkeit und Handlungsempfehlungen
-- Dokumentation übertragbarer Integrationsmuster für KMU und Erweiterbarkeit auf weitere Regionen sowie Cloud-Anbieter
+## Research Question
 
-## Methodischer Ansatz (Design Science Research)
-- **Problemidentifikation:** Literatur-Review und Marktanalyse definieren Integrationsdefizite getrennter Tools.
-- **Anforderungsanalyse:** Ableitung funktionaler Anforderungen (z. B. No-Fallback-Policy, Unsicherheitsangaben, EU-spezifische Berichte).
-- **Artefaktentwicklung:** Iterative Implementierung des Dashboards, inkl. API-Orchestrierung, Laufzeittracking und Business-Case-Modellen.
-- **Evaluation:** Vergleich mit Baseline-Tools anhand verifizierter Metriken (CO₂/kg pro Instanz, Kostenabweichung, Datenlatenz).
-- **Kommunikation:** Open-Source-Repository, reproduzierbare Makefile-Workflows und begleitende Dokumente in `docs/`.
+"How can an integrated monitoring system be developed that simultaneously tracks costs and CO₂ emissions of cloud infrastructures, and what advantages does this approach offer compared to existing separate solutions?"
 
-## Systemarchitektur und Komponenten
-- **Streamlit Frontend (`src/app.py`):** Navigierbares Dashboard mit Executive Summary, Carbon-Ansicht und Infrastrukturübersicht.
-- **Datenorchestrierung (`src/core/processor.py`):** Aggregiert API-Daten, validiert Unsicherheiten und erstellt `DashboardData`-Payloads.
-- **Domain-Services (`src/services/`):** `runtime.py` (CloudTrail & CloudWatch), `carbon.py` (ElectricityMaps & Time-Series), `business.py` (Validierung & Business Case).
-- **Zeitreihen & TAC:** Die Services synchronisieren stündliche EC2-Kosten aus dem AWS Cost Explorer mit ElectricityMaps-Intensitäten (`TimeSeriesPoint`) und berechnen Time Alignment Coverage sowie Cost-MAPE.
-- **Berechnungen (`src/core/calculator.py` & `src/utils/calculations.py`):** Emissions- und Kostenmodelle auf Basis Boavizta, ElectricityMaps und FinOps-Szenarien.
-- **Infrastructure-Layer (`src/infrastructure/`):** `clients/` kapselt ElectricityMaps, Boavizta und AWS SDKs; `cache.py` und `time_series.py` liefern wiederverwendbare Persistenz-Utilities.
-- **UI-Komponenten (`src/views/components/`):** Modulare, wiederverwendbare View-Komponenten (Grid Status, Metrics, Business Case, Validation, Time Series).
-- **Infrastruktur (`terraform/`):** Referenzumgebung zur Reproduktion der Experimente mit AWS-Workloads im KMU-Skalierungsbereich.
+## Motivation
 
-- **Validierungsmetriken (`src/utils/validation.py`, `src/views/components/validation.py`):** Erfassen Laufzeit-, Preis- und Emissionsabdeckung je Instanz und stellen den Data-Precision-Score im Dashboard bereit.
+84% of companies see cost control as the biggest cloud challenge, while CSRD (from 2024) requires detailed emission reports. German SMEs need to reduce costs and provide reliable emission data, but available tools separate these two dimensions.
 
-```
-CarbonAware_FinOps_Local/
-├── src/
-│   ├── infrastructure/   # Infrastruktur-Adapter (APIs, Cache, Zeitreihen)
-│   │   ├── clients/      # ElectricityMaps, Boavizta, AWS-Adapter
-│   │   ├── cache.py      # Zentrale Cache-Repository
-│   │   └── time_series.py # Zeitreihen-Persistierung
-│   ├── config/           # Pydantic-basierte Settings (`settings.py`)
-│   ├── core/             # DataProcessor, Kalkulatoren, Tracker
-│   ├── services/         # Runtime-, Carbon- und Business-Domain-Services
-│   ├── models/           # Dataclasses für Dashboard-, Business- und AWS-Objekte
-│   ├── utils/            # Validierungs-, Berechnungs- und UI-Hilfen
-│   ├── views/            # Streamlit-Seiten (overview, carbon, infrastructure)
-│   │   └── components/   # Wiederverwendbare UI-Komponenten
-│   └── vendor/           # Externe Stub-Implementierungen (httpx)
-├── docs/                 # Literaturarbeit, Methodik, Evaluationsprotokolle
-├── tests/                # Unit-Tests für Kernlogik und Integrationspunkte
-├── terraform/            # Infrastruktur-Templates für Evaluationsszenarien
-├── Makefile              # Wiederholbare Befehle (Setup, Tests, Dashboard)
-└── requirements.txt      # Abhängigkeiten (streamlit, boto3, pandas, plotly, etc.)
-```
+## System Architecture
 
-## Evaluationskonzept
-- **Zeithorizont:** 30 Tage Beobachtung in einer kontrollierten AWS-Testumgebung.
-- **Metriken:** Datenverfügbarkeit je API, TAC (Time Alignment Coverage), Cost-MAPE vs. AWS Billing, CO₂/kg je Instanz, Aggregationstreue gegenüber ElectricityMaps-Daten, Dashboard-Latenz sowie Data-Precision-Score.
-- **Vergleichsbasis:** Manuell gepflegte Kostenreports und separate CO₂-Tracker (Baseline) vs. integrierte Darstellung im Dashboard.
-- **Dokumentation:** Ergebnisse und Unsicherheiten werden in `docs/validation-results.md` sowie direkt im Dashboard ausgewiesen.
-- **Aktueller Fokus:** Szenario-Integrationstests (z. B. geplante Start/Stop-Sequenzen), wiederholte CloudTrail-Analysen und der Aufbau eines belastbaren Messdatensatzes (siehe `docs/thesis-documentation.md`).
+The system follows Clean Architecture principles with clear layer separation:
 
-## Schnellstart
+**Domain Layer** (`src/domain/`)
+- Business logic and calculations (CO₂ emissions, power consumption)
+- Domain services (runtime, carbon data)
+- Protocols for external dependencies
+
+**Application Layer** (`src/application/`)
+- Orchestrator for dashboard data
+- Business case calculator
+- Use cases for specific workflows
+
+**Infrastructure Layer** (`src/infrastructure/`)
+- API gateways (AWS, ElectricityMaps, Boavizta)
+- Cache repository
+
+**Presentation Layer** (`src/presentation/`)
+- Streamlit dashboard with three pages
+- Reusable UI components
+
+## Quick Start
+
 ```bash
-# Repository klonen
+# Clone and setup
 git clone <your-repo-url>
 cd CarbonAware_FinOps_Local
-
-# Virtuelle Umgebung einrichten
 make setup
 
-# (Optional) Tests vorbereiten – pytest installieren, falls nicht Bestandteil der Umgebung
-# python3 -m pip install pytest
-
-# Dashboard starten
+# Start dashboard
 make dashboard
+# Browser: http://localhost:8501
 
-# Browser öffnen (Standardport)
-# http://localhost:8501
-
-# Tests ausführen (optional, nach Installation von pytest)
-# python3 -m pytest
+# Run tests
+make test
 ```
 
-## Aktueller Status & Offene Arbeiten
-- Wiederholte CloudTrail-/Cost-Explorer-Abgleiche zur Reduktion des Validierungsfaktors sind geplant.
-- Szenario-Integrationstests (Start/Stop, Carbon-aware Scheduling) werden vorbereitet, um Literaturannahmen empirisch zu belegen.
-- Aufbau eines Messdatensatzes und Dokumentation der 48 h-Zeitreihen für die schriftliche Arbeit laufen (`docs/thesis-documentation.md`).
+## AWS Integration (Optional)
 
-## Optionale AWS-Integration
 ```bash
-# AWS SSO Profil vorbereiten
+# Configure AWS SSO
 aws configure sso --profile your-profile-name
 aws sso login --profile your-profile-name
 
-# Beispielkonfiguration kopieren
+# Create .env file
 cp .env.example .env
-# ELECTRICITYMAP_API_KEY im neuen .env hinterlegen
-
-# Testinfrastruktur bereitstellen (optional)
-make deploy
+# Add ELECTRICITYMAP_API_KEY to .env
 ```
 
-## Dokumentation und Quellen
-- Methodische Details, Marktanalyse und Evaluationspläne: `docs/thesis-documentation.md`
-- Literatur- und Quellenverwaltung: `docs/references.md`
-- Modularisierung und Integrationsmuster: `docs/literature-integration.md`
+## Test Coverage
+**79/79 Tests passing (100% success rate)**
+- 27 Domain Calculations Tests (Power, CO₂, Barroso & Hölzle validation)
+- 29 Business Case Calculator Tests (McKinsey/MIT scenarios)
+- 12 Core Calculator Tests (CloudTrail accuracy, validation factors)
+- 7 Orchestrator Tests (Use case delegation, error handling)
+- 4 Constants Tests (Academic values validation)
 
-## Lizenz
-Das Projekt entstand im Rahmen einer Bachelorarbeit. Die Nutzung richtet sich nach den Vorgaben der Hochschule; ergänzende Hinweise stehen in `LICENSE`.
+**Test Quality:**
+- ✅ Academic literature references in test docstrings
+- ✅ Edge case coverage (None, zero, negative values)
+- ✅ Integration tests for full data pipeline
+- ✅ Execution time: <3 seconds (fast feedback loop)
+
+Details: [docs/quality/test-coverage-report.md](docs/quality/test-coverage-report.md)
+
+## Documentation
+
+**Main documentation:** [docs/README.md](docs/README.md)
+
+### For thesis reviewers:
+- [Thesis Documentation](docs/research/thesis-documentation.md) - Research question, methodology, results
+- [Quick Reference](docs/thesis/quick-reference.md) - Defense preparation
+- [Test Coverage Report](docs/quality/test-coverage-report.md) - 79 tests, 100% pass rate
+
+### For developers:
+- [System Architecture](docs/architecture/system-architecture.md) - Clean Architecture overview
+- [Calculation Methodology](docs/methodology/calculations.md) - CO₂ and cost formulas
+- [Developer Handbook](docs/user/developer-handbook.md) - Setup and extension guide
+
+## Technology Stack
+
+- Python 3.11+
+- Streamlit (Dashboard)
+- AWS SDK (boto3)
+- Pytest (Testing)
+- Terraform (Infrastructure)
+
+## Contact & License
+
+**Author:** Christopher Klein
+**University:** TH Köln- Technische Informatik
+**Supervisor:** Andreas Behrend, Ferenc Domröse
+
+Bachelor Thesis Project 2025. All rights reserved.

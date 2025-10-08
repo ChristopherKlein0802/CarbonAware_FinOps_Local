@@ -42,7 +42,9 @@ class _ResponseWrapper:
 
 
 class AsyncClient:
-    def __init__(self, base_url: str = "", headers: Optional[Dict[str, str]] = None, timeout: Optional[Timeout] = None) -> None:
+    def __init__(
+        self, base_url: str = "", headers: Optional[Dict[str, str]] = None, timeout: Optional[Timeout] = None
+    ) -> None:
         self.base_url = base_url
         self.headers = headers or {}
         self.timeout = timeout.timeout if isinstance(timeout, Timeout) else timeout
@@ -56,7 +58,9 @@ class AsyncClient:
     async def get(self, endpoint: str, params: Optional[Dict[str, Any]] = None) -> _ResponseWrapper:
         return await self._request("GET", endpoint, params=params)
 
-    async def post(self, endpoint: str, json: Optional[Dict[str, Any]] = None, headers: Optional[Dict[str, str]] = None) -> _ResponseWrapper:
+    async def post(
+        self, endpoint: str, json: Optional[Dict[str, Any]] = None, headers: Optional[Dict[str, str]] = None
+    ) -> _ResponseWrapper:
         return await self._request("POST", endpoint, json=json, headers=headers)
 
     async def _request(

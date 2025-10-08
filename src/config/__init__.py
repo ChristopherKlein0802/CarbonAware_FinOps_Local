@@ -1,5 +1,13 @@
-"""Application configuration access point."""
+"""
+Configuration Package
 
-from .settings import settings
+This package manages all application configuration including environment-specific settings.
 
-__all__ = ["settings"]
+Modules:
+    settings: Main Pydantic settings (environment variables, API keys)
+"""
+
+# Re-export for convenient access
+from .settings import settings, Settings
+
+__all__ = ["settings", "Settings"]

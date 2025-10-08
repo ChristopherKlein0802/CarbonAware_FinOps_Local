@@ -1,14 +1,24 @@
-"""Filesystem-based cache utilities for the infrastructure layer."""
+"""
+Infrastructure Cache - Filesystem-based caching and time-series persistence
+
+This module consolidates all caching functionality:
+- FileCacheRepository: JSON file caching with TTL validation (implements CacheRepository protocol)
+- JsonTimeSeriesStore: Time-series data persistence
+- CacheTTL: Standardized cache TTL values
+
+Clean Architecture:
+FileCacheRepository implements the src.domain.protocols.CacheRepository protocol,
+allowing domain services to depend on abstractions rather than concrete implementations.
+"""
 
 from __future__ import annotations
 
 import json
 import logging
-import os
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, Iterable, List, Dict
 
 logger = logging.getLogger(__name__)
 
@@ -17,17 +27,26 @@ logger = logging.getLogger(__name__)
 class CacheTTL:
     """Standard cache TTL values used across the application (minutes)."""
 
-    CARBON_DATA: int = 60         # ElectricityMaps updates roughly every hour
-    CARBON_24H: int = 120         # Historical data can be cached longer
-    POWER_DATA: int = 10080       # Hardware specs rarely change
-    PRICING_DATA: int = 10080     # AWS pricing is stable
-    COST_DATA: int = 360          # Cost Explorer updates several times per day
-    CPU_UTILIZATION: int = 180    # Performance metrics refresh every few hours
-    CLOUDTRAIL_EVENTS: int = 1440 # CloudTrail events immutable
+    CARBON_DATA: int = 60  # ElectricityMaps updates hourly
+    CARBON_24H: int = 120  # Historical data cached longer
+    POWER_DATA: int = 10080  # Hardware specs rarely change (7 days)
+    PRICING_DATA: int = 10080  # AWS pricing stable (7 days)
+    COST_DATA: int = 1440  # Cost Explorer updates daily (24 hours)
+    CPU_UTILIZATION: int = 60  # CloudWatch metrics aligned with grid data (1 hour)
+    CLOUDTRAIL_EVENTS: int = 360  # Runtime events cached for 6 hours
+    INSTANCE_METADATA: int = 525600  # Launch time immutable (365 days)
 
 
 class FileCacheRepository:
-    """Filesystem-backed cache repository with JSON convenience helpers."""
+    """
+    Filesystem-backed cache repository with JSON convenience helpers.
+
+    Implements: src.domain.protocols.CacheRepository
+
+    This concrete implementation satisfies the CacheRepository protocol through
+    structural subtyping (duck typing). Domain services depend on the protocol,
+    not this concrete class.
+    """
 
     def __init__(self, root: Path) -> None:
         self._root = root
@@ -122,4 +141,32 @@ class FileCacheRepository:
         return deleted
 
 
-__all__ = ["FileCacheRepository", "CacheTTL"]
+class JsonTimeSeriesStore:
+    """Lightweight JSON time-series storage backed by ``FileCacheRepository``."""
+
+    def __init__(self, repository: FileCacheRepository, cache_key: str) -> None:
+        self._repository = repository
+        self._path = repository.path(*cache_key.split("/"))
+
+    @property
+    def path(self) -> Path:
+        return self._path
+
+    def load(self) -> List[Dict[str, Any]]:
+        payload = self._repository.read_json(self._path)
+        if isinstance(payload, list):
+            return payload
+        if payload is not None:
+            logger.debug("Unexpected payload while loading time series: %s", type(payload))
+        return []
+
+    def save(self, rows: Iterable[Dict[str, Any]]) -> None:
+        serialised = list(rows)
+        self._repository.write_json(self._path, serialised)
+
+
+__all__ = [
+    "CacheTTL",
+    "FileCacheRepository",
+    "JsonTimeSeriesStore",
+]

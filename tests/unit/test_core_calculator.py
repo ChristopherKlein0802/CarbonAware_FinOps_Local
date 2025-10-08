@@ -6,8 +6,8 @@ Testing BusinessCaseCalculator functionality
 import unittest
 from unittest.mock import Mock
 
-from src.core.calculator import BusinessCaseCalculator
-from src.models.business import BusinessCase
+from src.application.calculator import BusinessCaseCalculator
+from src.domain.models import BusinessCase
 
 
 class TestBusinessCaseCalculator(unittest.TestCase):
@@ -84,11 +84,7 @@ class TestBusinessCaseCalculator(unittest.TestCase):
     def test_calculate_cloudtrail_enhanced_accuracy_normal(self):
         """Test normal accuracy calculation"""
         # Mock instances
-        instances = [
-            Mock(state="running"),
-            Mock(state="running"),
-            Mock(state="stopped")
-        ]
+        instances = [Mock(state="running"), Mock(state="running"), Mock(state="stopped")]
 
         # Mock cost data
         cost_data = Mock()
@@ -166,5 +162,5 @@ class TestBusinessCaseCalculator(unittest.TestCase):
         self.assertAlmostEqual(result.office_hours_co2_reduction_kg, 1.086, places=3)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

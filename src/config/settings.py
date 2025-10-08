@@ -15,6 +15,7 @@ load_dotenv()
 
 try:
     from pydantic import Field  # type: ignore
+
     try:
         from pydantic import AliasChoices  # type: ignore
     except ImportError:  # pragma: no cover - AliasChoices introduced in pydantic v2
@@ -28,6 +29,7 @@ try:
             HttpUrl = str  # type: ignore[misc,assignment]
     try:
         from pydantic_settings import BaseSettings  # type: ignore
+
         try:
             from pydantic_settings import SettingsConfigDict  # type: ignore
         except ImportError:  # pragma: no cover - pydantic-settings v1 style
@@ -70,13 +72,14 @@ except (ModuleNotFoundError, ImportError):  # pragma: no cover - lightweight fal
 
     settings = Settings()
 else:
+
     def _env_alias(name: str) -> dict[str, Any]:
         if AliasChoices:
             return {"validation_alias": AliasChoices(name)}
         return {"env": name}
 
     class Settings(BaseSettings):
-        if 'SettingsConfigDict' in globals() and SettingsConfigDict is not None:
+        if "SettingsConfigDict" in globals() and SettingsConfigDict is not None:
             model_config = SettingsConfigDict(
                 env_file=".env",
                 env_file_encoding="utf-8",
@@ -130,6 +133,7 @@ else:
         )
 
         if SettingsConfigDict is None:
+
             class Config:  # type: ignore[override]
                 env_file = ".env"
                 env_file_encoding = "utf-8"
