@@ -202,7 +202,7 @@ def _render_instance_detail_table(dashboard_data: Any) -> None:
         df = pd.DataFrame(table_data)
 
         # Display table with help text
-        st.dataframe(df, width="stretch", hide_index=True, use_container_width=True)
+        st.dataframe(df, width="stretch", hide_index=True)
 
         # Power & CO₂ Calculation Methodology
         _render_calculation_methodology_expander()
