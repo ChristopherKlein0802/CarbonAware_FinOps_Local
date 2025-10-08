@@ -164,18 +164,28 @@ def _render_summary_metrics(dashboard_data: Any) -> None:
     col1, col2, col3 = st.columns(3)
 
     with col1:
-        st.metric("Total Monthly Cost", f"€{total_cost:.2f}", "Sum of all instances")
+        st.metric(
+            "Total Monthly Cost",
+            f"€{total_cost:.2f}",
+            "Sum of all instances",
+            help="Total monthly costs across all monitored instances. Calculated from CloudTrail runtime hours × AWS Pricing API rates. Excludes reserved instance discounts and data transfer costs."
+        )
 
     with col2:
-        st.metric("Total Monthly CO₂", f"{total_co2:.2f} kg", "All instances combined")
+        st.metric(
+            "Total Monthly CO₂",
+            f"{total_co2:.2f} kg",
+            "All instances combined",
+            help="Total monthly carbon emissions from all instances. Based on Boavizta power models, CPU utilization from CloudWatch, and ElectricityMaps German grid intensity. Formula: CO₂(kg) = Power(kW) × Intensity(g/kWh) × Runtime(h) ÷ 1000"
+        )
 
     with col3:
-        st.metric("Total Power Draw", f"{total_power:.0f} W", "Current consumption")
-
-    st.info(
-        "💡 **CO₂ Formula**: Effective_Power(W) = Base_Power × (0.3 + 0.7 × CPU/100) → "
-        "CO₂(kg) = Effective_Power(kW) × Grid_Intensity(g/kWh) × Runtime(h) ÷ 1000"
-    )
+        st.metric(
+            "Total Power Draw",
+            f"{total_power:.0f} W",
+            "Current consumption",
+            help="Sum of current power consumption across all running instances. Based on Boavizta hardware models with CPU-based scaling: Power = Base × (30% idle + 70% × CPU utilization). Stopped instances show 0W."
+        )
 
 
 def _render_instance_detail_table(dashboard_data: Any) -> None:

@@ -34,19 +34,28 @@ def render_overview_page(dashboard_data: Optional[DashboardData]) -> None:
     """
     st.header("🏆 Dashboard Overview - Carbon-Aware FinOps")
 
-    # Academic Disclaimer - prominent at top
-    st.info("""
-    ℹ️ **Academic Prototype - Research Dashboard**
+    # Academic Disclaimer - compact expander
+    with st.expander("🎓 About this Dashboard - Academic Prototype", expanded=False):
+        st.markdown("""
+        **Carbon-Aware FinOps Dashboard** - Integrated cloud cost and CO₂ emissions monitoring
 
-    This tool is a research prototype developed for bachelor thesis purposes. Key considerations:
+        This dashboard demonstrates how carbon-aware scheduling can reduce both environmental
+        impact and operating costs for AWS infrastructure.
 
-    - **Optimization calculations** require empirical validation in production environments
-    - **Conservative estimates** with ±15% uncertainty range (literature-based: McKinsey [7], MIT [20])
-    - **Theoretical scenarios** demonstrate methodology feasibility for SME use cases
-    - **Development-scale adjustments** applied for small infrastructures (<€1/month)
+        **Purpose**: Research prototype developed for bachelor thesis to prove the feasibility of
+        integrated FinOps + carbon tracking for German SMEs.
 
-    For detailed methodology, see [Documentation](https://github.com/your-repo/docs).
-    """, icon="🎓")
+        **Key Features**:
+        - Real-time German grid carbon intensity tracking (ElectricityMaps)
+        - CloudTrail-based precision runtime tracking (±5% accuracy target)
+        - Business case modeling with McKinsey/MIT research-backed scenarios
+        - CSRD Scope 2/3 compliance reporting
+
+        **Limitations**:
+        - Optimization calculations require empirical validation in production
+        - Conservative estimates with ±15% uncertainty range (literature-based)
+        - Development-scale adjustments for small infrastructures (<€1/month)
+        """)
 
     if not dashboard_data or not dashboard_data.instances:
         st.warning("⚠️ No infrastructure data available. Check API connections.")
