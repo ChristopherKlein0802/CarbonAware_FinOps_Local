@@ -113,6 +113,7 @@ class FetchInfrastructureDataUseCase:
             enriched = self.enrich_use_case.execute(
                 instance,
                 carbon_intensity=carbon_intensity.value,
+                carbon_history=carbon_history,  # NEW: Pass carbon history for hourly calculation
                 force_refresh=force_refresh,
             )
             if enriched:
@@ -124,14 +125,40 @@ class FetchInfrastructureDataUseCase:
         # Step 7: Track API call timestamps from cache metadata
         self._track_api_timestamps(processed_instances)
 
-        # Step 8: Calculate totals
+        # Step 8: Calculate totals with dual comparison
+        # Separate instances by calculation method
+        hourly_precise_instances = [i for i in processed_instances if i.co2_calculation_method == "hourly_24h_precise"]
+        fallback_instances = [i for i in processed_instances if i.co2_calculation_method == "monthly_average"]
+
+        # Total costs: Use 30d actual (existing field) for backward compatibility
         total_cost_eur = sum(inst.monthly_cost_eur for inst in processed_instances if inst.monthly_cost_eur is not None)
         total_co2_kg = sum(inst.monthly_co2_kg for inst in processed_instances if inst.monthly_co2_kg is not None)
 
+        # NEW: Separate totals for comparison
+        # 24h projected totals (only from hourly-precise instances)
+        total_cost_projected_eur = sum(
+            inst.monthly_cost_projected_eur for inst in hourly_precise_instances
+            if inst.monthly_cost_projected_eur is not None
+        )
+        total_co2_projected_kg = sum(
+            inst.monthly_co2_kg_projected for inst in hourly_precise_instances
+            if inst.monthly_co2_kg_projected is not None
+        )
+
+        # 30d actual totals (from all instances)
+        total_cost_30d_eur = sum(inst.monthly_cost_eur for inst in processed_instances if inst.monthly_cost_eur is not None)
+        total_co2_30d_kg = sum(inst.monthly_co2_kg_30d for inst in processed_instances if inst.monthly_co2_kg_30d is not None)
+
+        logger.info(
+            f"📊 Aggregation: {len(hourly_precise_instances)} hourly-precise, {len(fallback_instances)} fallback | "
+            f"CO2: {total_co2_projected_kg:.3f} kg (24h×30) vs {total_co2_30d_kg:.3f} kg (30d actual)"
+        )
+
         # Step 9: Enhanced validation - compare calculated costs with actual AWS spending
+        # NOTE: Use 30d actual costs for validation (not 24h projected) for factual comparison
         validation_factor = self.calculator.calculate_cloudtrail_enhanced_accuracy(
             processed_instances,
-            total_cost_eur,
+            total_cost_eur,  # 30d actual (same as total_cost_30d_eur)
             cost_data,
             original_instances=None,
         )
@@ -167,6 +194,13 @@ class FetchInfrastructureDataUseCase:
             cloudtrail_tracked_instances=cloudtrail_tracked,
             carbon_history=carbon_history or [],
             self_collected_carbon_history=self_collected_history or [],
+            # NEW: Dual comparison aggregates
+            total_cost_projected_eur=total_cost_projected_eur,
+            total_co2_projected_kg=total_co2_projected_kg,
+            total_cost_30d_eur=total_cost_30d_eur,
+            total_co2_30d_kg=total_co2_30d_kg,
+            hourly_precise_count=len(hourly_precise_instances),
+            fallback_count=len(fallback_instances),
         )
 
         logger.info(

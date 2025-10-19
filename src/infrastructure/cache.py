@@ -28,12 +28,12 @@ class CacheTTL:
     """Standard cache TTL values used across the application (minutes)."""
 
     CARBON_DATA: int = 60  # ElectricityMaps updates hourly
-    CARBON_24H: int = 120  # Historical data cached longer
+    CARBON_24H: int = 60  # Historical data synchronized with hourly updates (changed from 120)
     POWER_DATA: int = 10080  # Hardware specs rarely change (7 days)
     PRICING_DATA: int = 10080  # AWS pricing stable (7 days)
     COST_DATA: int = 1440  # Cost Explorer updates daily (24 hours)
     CPU_UTILIZATION: int = 60  # CloudWatch metrics aligned with grid data (1 hour)
-    CLOUDTRAIL_EVENTS: int = 360  # Runtime events cached for 6 hours
+    CLOUDTRAIL_EVENTS: int = 180  # Runtime events cache (3 hours, balanced refresh rate)
     INSTANCE_METADATA: int = 525600  # Launch time immutable (365 days)
 
 

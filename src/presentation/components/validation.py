@@ -90,7 +90,7 @@ def _render_system_status(dashboard_data: DashboardData) -> None:
             "AWS Pricing": "Instance pricing (7 day cache)",
             "AWS Cost Explorer": "Aggregated cost comparison (24 h cache)",
             "AWS CloudWatch": "CPU utilisation (1 h cache)",
-            "AWS CloudTrail": "Instance-specific runtime (6 h cache)",
+            "AWS CloudTrail": "Instance-specific runtime (3 h cache)",
         }
 
         # Normalize service names to standard format
@@ -356,6 +356,39 @@ def _render_precision_insights(dashboard_data: DashboardData) -> None:
             st.warning(
                 "⚠️ **Building Runtime History**: AWS CloudTrail precision improves over time. Current validation factor indicates developing accuracy."
             )
+
+    # NEW: Document calculation assumptions
+    with st.expander("📝 Calculation Assumptions & Constants", expanded=False):
+        from src.domain.constants import AcademicConstants
+
+        eur_usd_rate = AcademicConstants.get_eur_usd_rate()
+
+        st.markdown(f"""
+        **Currency Conversion:**
+        - **EUR/USD Rate**: {eur_usd_rate:.4f} (1 USD = {eur_usd_rate:.4f} EUR)
+        - **Source**: European Central Bank (ECB) official rates
+        - **Configurable**: Set via `EUR_USD_RATE` environment variable in `.env`
+        - **Usage**: All costs calculated in USD (AWS Pricing API) are converted to EUR for display
+        - **Formula**: `cost_eur = cost_usd × {eur_usd_rate:.4f}`
+
+        **Calculation Methods:**
+        - **24h Projected**: Uses last 24h data × 30 for monthly projection
+        - **30d Actual**: Uses total runtime from last 30 days for monthly calculation
+        - **Validation**: Cost Explorer comparison uses 30d actual (not projected) for factual validation
+
+        **Power Consumption Model:**
+        - **Idle Power**: 30% of peak power (constant baseline)
+        - **Variable Power**: 70% of peak power (scales linearly with CPU utilization)
+        - **Source**: Barroso & Hölzle (2007) - "The Case for Energy-Proportional Computing"
+
+        **Academic Constants:**
+        - **EU ETS Price**: €{AcademicConstants.EU_ETS_PRICE_PER_TONNE:.2f}/tonne CO₂ (European Energy Exchange market data)
+        - **Hours per Month**: {AcademicConstants.HOURS_PER_MONTH} hours (365.25 × 24 ÷ 12)
+
+        **Note**: These assumptions are documented for thesis transparency and can be adjusted as needed.
+        """)
+
+        st.caption("💡 For methodology details, see docs/methodology/ in the repository.")
 
         st.info(
             "💡 **Academic outlook**: With sufficient runtime history, AWS CloudTrail can reach ±5% accuracy; currently only indicative estimates (≈±40%) are available."

@@ -5,7 +5,8 @@ Scientific calculation functions for the Carbon-Aware FinOps dashboard.
 """
 
 import logging
-from typing import Optional
+from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -78,8 +79,149 @@ def calculate_co2_emissions(power_watts: float, carbon_intensity_g_per_kwh: floa
     return safe_round(co2_kg, 3)
 
 
+def calculate_co2_hourly_precise(
+    base_power_watts: float,
+    cpu_values_hourly: List[float],
+    carbon_intensity_hourly: List[float],
+    runtime_hours_per_slot: List[float],
+    timestamps: List[datetime],
+) -> Dict[str, Any]:
+    """
+    Calculate CO2 emissions with hourly precision for 24h window.
+
+    This function calculates CO2 emissions with hourly granularity by using:
+    - Hourly CPU utilization data from CloudWatch
+    - Hourly carbon intensity data from ElectricityMaps
+    - Hourly runtime fractions from CloudTrail events
+
+    Formula for each hour h:
+        Power_h = Base × (0.3 + 0.7 × CPU_h/100)
+        CO2_h = (Power_h / 1000) × Carbon_h × Runtime_h
+
+    Total: Sum over all hours
+
+    Args:
+        base_power_watts: Base power consumption from Boavizta (constant)
+        cpu_values_hourly: List of CPU % values (one per hour, up to 24)
+        carbon_intensity_hourly: List of carbon intensity g/kWh (one per hour)
+        runtime_hours_per_slot: List of runtime fractions (0.0-1.0) per hour
+        timestamps: List of datetime objects for each hour
+
+    Returns:
+        Dictionary containing:
+        - total_co2_kg: Total CO2 emissions in kg (sum of all hours)
+        - hourly_emissions: List of detailed hourly breakdowns
+        - data_quality: 'high' (≥20h), 'medium' (≥12h), or 'low' (<12h)
+        - coverage_hours: Number of hours with valid data
+        - method: Always 'hourly_24h_precise'
+
+    Example:
+        Hour 0 (23h ago): CPU=35%, Carbon=280g/kWh, Runtime=1.0h
+            Power = 15W × (0.3 + 0.7×0.35) = 8.175W
+            CO2 = 0.008175kW × 280g × 1.0h = 2.289g
+
+        Hour 1 (22h ago): CPU=45%, Carbon=320g/kWh, Runtime=1.0h
+            Power = 15W × (0.3 + 0.7×0.45) = 9.225W
+            CO2 = 0.009225kW × 320g × 1.0h = 2.952g
+
+        Total: Sum of all 24 hours
+    """
+    hourly_emissions = []
+    total_co2_g = 0.0
+    hours_with_data = 0
+
+    # Ensure all lists have compatible lengths
+    num_hours = min(
+        len(cpu_values_hourly),
+        len(carbon_intensity_hourly),
+        len(runtime_hours_per_slot),
+        len(timestamps),
+    )
+
+    if num_hours == 0:
+        logger.warning("No hourly data available for CO2 calculation")
+        return {
+            "total_co2_kg": 0.0,
+            "hourly_emissions": [],
+            "data_quality": "low",
+            "coverage_hours": 0,
+            "method": "hourly_24h_precise",
+        }
+
+    logger.info(f"Calculating hourly CO2 for {num_hours} hours")
+
+    for i in range(num_hours):
+        cpu = cpu_values_hourly[i]
+        carbon = carbon_intensity_hourly[i]
+        runtime = runtime_hours_per_slot[i]
+        timestamp = timestamps[i]
+
+        # Skip if instance wasn't running this hour
+        if runtime == 0.0:
+            hourly_emissions.append(
+                {
+                    "timestamp": timestamp.isoformat() if isinstance(timestamp, datetime) else timestamp,
+                    "co2_g": 0.0,
+                    "running": False,
+                }
+            )
+            continue
+
+        # Calculate effective power for this hour
+        power_watts = calculate_simple_power_consumption(base_power_watts, cpu)
+
+        # Calculate CO2 for this hour
+        # Formula: CO2(g) = Power(kW) × Carbon(g/kWh) × Runtime(h)
+        power_kw = power_watts / 1000.0
+        co2_g = power_kw * carbon * runtime
+
+        total_co2_g += co2_g
+        hours_with_data += 1
+
+        hourly_emissions.append(
+            {
+                "timestamp": timestamp.isoformat() if isinstance(timestamp, datetime) else timestamp,
+                "co2_g": round(co2_g, 3),
+                "power_watts": round(power_watts, 2),
+                "cpu_percent": round(cpu, 1),
+                "carbon_intensity": round(carbon, 1),
+                "runtime_fraction": round(runtime, 2),
+                "running": True,
+            }
+        )
+
+        logger.debug(
+            f"Hour {i}: {power_kw:.4f}kW × {carbon:.0f}g/kWh × {runtime:.2f}h = {co2_g:.3f}g "
+            f"(CPU={cpu:.1f}%, Power={power_watts:.1f}W)"
+        )
+
+    # Calculate data quality based on coverage
+    if hours_with_data >= 20:
+        data_quality = "high"
+    elif hours_with_data >= 12:
+        data_quality = "medium"
+    else:
+        data_quality = "low"
+
+    total_co2_kg = total_co2_g / 1000.0
+
+    logger.info(
+        f"✅ Hourly CO2 calculation complete: {total_co2_kg:.6f} kg "
+        f"({hours_with_data}/{num_hours} hours, quality={data_quality})"
+    )
+
+    return {
+        "total_co2_kg": round(total_co2_kg, 6),
+        "hourly_emissions": hourly_emissions,
+        "data_quality": data_quality,
+        "coverage_hours": hours_with_data,
+        "method": "hourly_24h_precise",
+    }
+
+
 __all__ = [
     "safe_round",
     "calculate_simple_power_consumption",
     "calculate_co2_emissions",
+    "calculate_co2_hourly_precise",
 ]
