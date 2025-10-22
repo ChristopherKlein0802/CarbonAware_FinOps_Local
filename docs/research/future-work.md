@@ -1,4 +1,10 @@
-# Future Work
+# Future Work & Research Extensions
+
+This document outlines potential extensions and improvements for the Carbon-Aware FinOps Dashboard, structured as future research directions for the Bachelor thesis.
+
+## Overview
+
+The current implementation provides a functional prototype with 24-hour precise CO2 calculations and dual-method comparison. This document describes enhancements that would further improve accuracy, usability, and research value.
 
 ## 1. Long-Term CO2 Calculation (30-Day Exact)
 
@@ -87,10 +93,10 @@ def calculate_exact_monthly_co2(instance_id: str) -> float:
 
 #### Benefits
 
-- ✅ **100% accuracy** for monthly calculations (after 30-day build-up)
-- ✅ **Historical trend analysis** (track CO2 over months)
-- ✅ **Workload pattern detection** (identify variations)
-- ✅ **No projection assumptions** needed
+- 100% accuracy for monthly calculations (after 30-day build-up)
+- Historical trend analysis (track CO2 over months)
+- Workload pattern detection (identify variations)
+- No projection assumptions needed
 
 ---
 
@@ -164,9 +170,9 @@ def calculate_multifactor_power(
 
 #### Benefits
 
-- ✅ **~95% accuracy** (vs. ~85% current)
-- ✅ **Workload-specific models** (web server vs. database vs. compute)
-- ✅ **Better I/O-bound workload accuracy**
+- ~95% accuracy (vs. ~85% current)
+- Workload-specific models (web server vs. database vs. compute)
+- Better I/O-bound workload accuracy
 
 ---
 
@@ -236,10 +242,10 @@ def calculate_multifactor_power(
 
 #### Benefits
 
-- ✅ **Actionable insights** (not just reporting)
-- ✅ **CO2 reduction** without infrastructure changes
-- ✅ **Cost savings** (off-peak hours often cheaper)
-- ✅ **Competitive advantage** (ESG reporting)
+- Actionable insights (not just reporting)
+- CO2 reduction without infrastructure changes
+- Cost savings (off-peak hours often cheaper)
+- Competitive advantage (ESG reporting)
 
 ---
 
@@ -291,10 +297,10 @@ ENABLE_HOURLY_CARBON_COLLECTION=true
 
 #### Benefits
 
-- ✅ **Independent from API limits**
-- ✅ **30-90 day history** available
-- ✅ **Enables exact monthly CO2 calculation**
-- ✅ **Pattern analysis** over longer periods
+- Independent from API limits
+- 30-90 day history available
+- Enables exact monthly CO2 calculation
+- Pattern analysis over longer periods
 
 ---
 
@@ -347,9 +353,9 @@ ENABLE_HOURLY_CARBON_COLLECTION=true
 
 #### Benefits
 
-- ✅ **Global infrastructure visibility**
-- ✅ **Regional CO2 comparison**
-- ✅ **Migration planning** (move workloads to low-carbon regions)
+- Global infrastructure visibility
+- Regional CO2 comparison
+- Migration planning (move workloads to low-carbon regions)
 
 ---
 
@@ -365,7 +371,7 @@ ENABLE_HOURLY_CARBON_COLLECTION=true
 
 1. **High Carbon Alert**
    ```
-   🚨 High Carbon Intensity Alert
+   High Carbon Intensity Alert
 
    Current: 520 g/kWh (↑ 40% above baseline)
    Running instances: 12
@@ -376,7 +382,7 @@ ENABLE_HOURLY_CARBON_COLLECTION=true
 
 2. **Low Carbon Opportunity**
    ```
-   💚 Low Carbon Window Detected
+   Low Carbon Window Detected
 
    Current: 180 g/kWh (↓ 50% below average)
    Duration: Expected 2-4 hours
@@ -386,7 +392,7 @@ ENABLE_HOURLY_CARBON_COLLECTION=true
 
 3. **Budget Alert**
    ```
-   💰 CO2 Budget Alert
+   CO2 Budget Alert
 
    Monthly CO2: 45.2 kg (90% of 50 kg budget)
    Days remaining: 5
@@ -412,26 +418,35 @@ ENABLE_HOURLY_CARBON_COLLECTION=true
 
 #### Benefits
 
-- ✅ **Proactive carbon management**
-- ✅ **Prevent budget overruns**
-- ✅ **Opportunity detection** (low-carbon windows)
+- Proactive carbon management
+- Prevent budget overruns
+- Opportunity detection (low-carbon windows)
 
 ---
 
 ## Priority Ranking
 
-For **Bachelor Thesis Timeline:**
+For **Bachelor Thesis Context:**
 
-| Priority | Enhancement | Effort | Impact | When |
-|----------|-------------|--------|--------|------|
-| 🥇 **1** | Long-Term CO2 Calc (30d) | 3-4h | High | **Now (ready to implement)** |
-| 🥈 **2** | Historical Carbon Storage | 2-3h | High | **Now (90% done)** |
-| 🥉 **3** | Multi-Region Support | 5-8h | Medium | After thesis |
+| Priority | Enhancement | Effort | Impact | Timeline |
+|----------|-------------|--------|--------|----------|
+| **1** | Long-Term CO2 Calculation (30d exact) | 3-4h | High | Ready to implement |
+| **2** | Historical Carbon Storage | 2-3h | High | 90% complete |
+| **3** | Multi-Region Support | 5-8h | Medium | Post-thesis |
 | 4 | Predictive Scheduling | 18-27h | High | Future research |
 | 5 | Improved Power Models | 20-30h | Medium | Future research |
-| 6 | Real-Time Alerting | 8-12h | Medium | Future product feature |
+| 6 | Real-Time Alerting | 8-12h | Medium | Product feature |
 
 **Recommendation for Thesis:**
-- ✅ **Document #1 and #2** as "readily implementable"
-- ✅ **Describe #3-#6** as "future research directions"
-- ✅ Focus thesis on the **24h precise calculation** (already implemented)
+- Document #1 and #2 as "readily implementable"
+- Describe #3-#6 as "future research directions"
+- Focus thesis on the **24h precise calculation** (already implemented)
+
+---
+
+## Related Documentation
+
+- [24h Precise Calculation](../methodology/co2_calculation_24h_precise.md) - Current implementation
+- [Thesis Documentation](thesis-documentation.md) - Research context
+- [Validation Results](validation-results.md) - Current accuracy metrics
+- [Known Issues](../quality/known-issues.md) - Current limitations

@@ -25,6 +25,7 @@ Forschungsdokumentation für die Bachelor-Thesis:
 - [literature-integration.md](research/literature-integration.md) - Literaturintegration und akademische Quellen
 - [validation-results.md](research/validation-results.md) - Evaluationsergebnisse und Validierung
 - [references.md](research/references.md) - Vollständiges Literaturverzeichnis
+- [future-work.md](research/future-work.md) - Forschungserweiterungen und Verbesserungen
 
 **Zielgruppe:** Thesis-Komitee, akademische Reviewer
 
@@ -45,6 +46,7 @@ Thesis-spezifische Materialien für Verteidigung und Einreichung:
 ## Quality
 Qualitätsmetriken und Test-Dokumentation:
 - [test-coverage-report.md](quality/test-coverage-report.md) - Test Coverage Analysis (79 passing tests)
+- [known-issues.md](quality/known-issues.md) - Bekannte Limitierungen und Workarounds
 
 **Zielgruppe:** QA Engineers, technische Reviewer
 
@@ -60,6 +62,8 @@ Qualitätsmetriken und Test-Dokumentation:
 | Dashboard-Nutzung | [user/user-guide.md](user/user-guide.md) | Benutzerhandbuch |
 | Entwickler | [user/developer-handbook.md](user/developer-handbook.md) | Entwickler-Handbuch |
 | QA/Testing | [quality/test-coverage-report.md](quality/test-coverage-report.md) | Test Coverage Report |
+| Future Research | [research/future-work.md](research/future-work.md) | Forschungserweiterungen |
+| Known Issues | [quality/known-issues.md](quality/known-issues.md) | Limitierungen & Workarounds |
 
 ## Dokumentations-Standards
 

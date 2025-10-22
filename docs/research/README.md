@@ -9,6 +9,7 @@ Academic research, literature, and validation results for the bachelor thesis.
 - [**market-analysis.md**](market-analysis.md) - Analysis of existing tools
 - [**validation-results.md**](validation-results.md) - Validation setup and limitations
 - [**references.md**](references.md) - Bibliography
+- [**future-work.md**](future-work.md) - Research extensions and potential improvements
 
 ## Research Areas
 

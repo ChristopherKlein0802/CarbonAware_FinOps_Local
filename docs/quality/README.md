@@ -5,6 +5,7 @@ This directory contains quality metrics and testing documentation for the Carbon
 ## 📁 Contents
 
 - [**test-coverage-report.md**](test-coverage-report.md) - Comprehensive test coverage analysis
+- [**known-issues.md**](known-issues.md) - Known limitations and workarounds
 
 ## 🎯 Purpose
 
