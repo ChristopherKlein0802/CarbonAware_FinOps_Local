@@ -68,19 +68,14 @@ aws sso login --profile <profilname>
 Optional kann über `make deploy` eine Terraform-Testumgebung mit vier Instanzen provisioniert werden (`make status`, `make destroy` für Verwaltung).
 
 ## 5. Dashboard-Navigation
-Das Streamlit-Dashboard bietet drei Hauptseiten (Auswahl über die Sidebar).
+Das Streamlit-Dashboard bietet zwei Hauptseiten (Auswahl über die Sidebar).
 
 ### 5.1 Executive Summary
 - Verdichtete Kennzahlen zu Kosten, CO₂ und Datenqualität
 - Business-Case-Indikatoren mit Validierungsfaktor
 - Einsatz in der Thesis: zeigt den Mehrwert der integrierten Lösung und verweist auf Unsicherheiten
 
-### 5.2 Carbon Optimization
-- 24h-Profil der deutschen Netzintensität
-- Empfehlungen zur Lastverschiebung
-- Einsatz in der Thesis: belegt Vorteile gegenüber getrennten Tools (Teilfrage 3)
-
-### 5.3 Infrastructure
+### 5.2 Infrastructure
 - Instanztabellen mit Laufzeit (CloudTrail), CPU (CloudWatch), Kosten und Emissionen
 - API-Statusanzeigen nach No-Fallback-Policy
 - Einsatz in der Thesis: liefert Rohdaten zur Integration heterogener Quellen (Teilfrage 2)
@@ -100,7 +95,7 @@ Das Streamlit-Dashboard bietet drei Hauptseiten (Auswahl über die Sidebar).
 
 ## 8. Typische Einsatzszenarien
 - **Management-Update:** Executive Summary exportieren, Aussagen mit `docs/market-analysis.md` ergänzen.
-- **ESG-/CSRD-Reporting:** Carbon Optimization heranziehen, Literaturbandbreite ergänzen (vgl. `docs/calculations.md`).
+- **ESG-/CSRD-Reporting:** Infrastructure Details für Carbon-Daten heranziehen, Literaturbandbreite ergänzen (vgl. `docs/calculations.md`).
 - **FinOps-Review:** Infrastructure-Ansicht für Right-Sizing- und Shutdown-Entscheidungen nutzen.
 
 ## 9. Fehlersuche

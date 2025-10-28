@@ -34,7 +34,6 @@ flowchart TB
 
     subgraph Presentation["🎨 Presentation Layer"]
         Overview["Overview Page<br/>Executive Summary"]
-        CarbonAnalysis["Carbon Analysis Page<br/>Optimization Insights"]
         InfraDetails["Infrastructure Details<br/>Instance-Level View"]
     end
 
@@ -81,7 +80,6 @@ flowchart TB
 
     %% Data Flow: Application → Presentation
     Orchestrator -->|"Complete Dashboard Data"| Overview
-    Orchestrator -->|"Complete Dashboard Data"| CarbonAnalysis
     Orchestrator -->|"Complete Dashboard Data"| InfraDetails
 
     %% Styling
@@ -95,7 +93,7 @@ flowchart TB
     class AWSGateway,ElectricityGateway,BoavizaGateway,Cache infrastructure
     class RuntimeService,CarbonService,Calculations domain
     class FetchUseCase,EnrichUseCase,Calculator,Orchestrator application
-    class Overview,CarbonAnalysis,InfraDetails presentation
+    class Overview,InfraDetails presentation
 ```
 
 ## 📊 Data Transformation Pipeline

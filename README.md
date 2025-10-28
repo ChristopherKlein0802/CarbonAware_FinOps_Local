@@ -42,7 +42,7 @@ The system follows Clean Architecture principles with clear layer separation:
 - Cache repository
 
 **Presentation Layer** (`src/presentation/`)
-- Streamlit dashboard with three pages
+- Streamlit dashboard with two pages
 - Reusable UI components
 
 ## Quick Start

@@ -37,7 +37,7 @@ for _logger_name in _NOISY_AWS_LOGGERS:
 from src.domain.constants import UIConstants
 from src.application.orchestrator import DashboardDataOrchestrator
 from src.domain.models import DashboardData
-from src.presentation import render_overview_page, render_infrastructure_page, render_carbon_page
+from src.presentation import render_overview_page, render_infrastructure_page
 
 
 # Initialize data orchestrator (lazy loading)
@@ -217,7 +217,7 @@ def main() -> None:
 
     # Simplified navigation menu - core features only
     page = st.sidebar.radio(
-        "Navigation", ["🏆 Executive Summary", "🇩🇪 Carbon Optimization", "🏗️ Infrastructure"], index=0
+        "Navigation", ["Dashboard Overview", "Infrastructure Details"], index=0
     )
 
     # Load data once for all pages
@@ -272,11 +272,9 @@ def main() -> None:
 
     # Render selected page with specific error handling
     try:
-        if page == "🏆 Executive Summary":
+        if page == "Dashboard Overview":
             render_overview_page(dashboard_data)
-        elif page == "🇩🇪 Carbon Optimization":
-            render_carbon_page(dashboard_data)
-        elif page == "🏗️ Infrastructure":
+        elif page == "Infrastructure Details":
             render_infrastructure_page(dashboard_data)
 
     except (AttributeError, KeyError) as e:

@@ -7,7 +7,7 @@ This diagram shows the Clean Architecture implementation with strict dependency 
 ```mermaid
 graph TB
     subgraph Presentation["🎨 Presentation Layer (UI)"]
-        Pages["Streamlit Pages<br/>overview.py<br/>carbon_analysis.py<br/>infrastructure_details.py"]
+        Pages["Streamlit Pages<br/>overview.py<br/>infrastructure_details.py"]
         Components["UI Components<br/>metrics, business_case<br/>time_series, validation"]
     end
 

@@ -47,7 +47,7 @@ CarbonAware_FinOps_Local/
 
 ## 3. Schichtenmodell (Clean Architecture)
 - **Präsentation (`src/presentation/`)**
-  - Streamlit-basierte Oberfläche mit Executive Summary, Carbon-Analyse und Infrastrukturdetail.
+  - Streamlit-basierte Oberfläche mit Executive Summary und Infrastrukturdetail.
   - Modulare UI-Komponenten in `src/presentation/components/` (Grid Status, Metrics, Business Case, Validation, Time Series).
   - Einheitliche CSS-Assets in `src/assets/`.
 - **Application (`src/application/`)**
