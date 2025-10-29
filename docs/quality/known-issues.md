@@ -142,7 +142,7 @@ Then restart dashboard.
 
 These limitations are acceptable for the thesis scope:
 
-- **Small-scale validation:** Tested with 4 AWS instances (t3.micro to t3.large)
+- **Small-scale validation:** Tested with 4 AWS m6a.large instances (non-burstable, realistic SME scenarios)
 - **Single-region focus:** eu-central-1 only, German grid carbon intensity
 - **Single cloud provider:** AWS only (Azure, GCP not supported)
 - **No production hardening:** No high-availability, no failover, no scaling

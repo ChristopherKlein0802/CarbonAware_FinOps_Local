@@ -54,7 +54,7 @@ CO2_monthly = (Power / 1000) × Current_Intensity × Total_Runtime
 
 ## Example Calculation
 
-**Instance:** t3.medium
+**Instance:** m6a.large (test environment standard)
 **Base Power:** 15W (from Boavizta)
 **Calculation Period:** Last 24 hours (2025-10-18 00:00 - 2025-10-19 00:00)
 

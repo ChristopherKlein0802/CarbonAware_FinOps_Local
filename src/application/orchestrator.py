@@ -107,7 +107,7 @@ class DashboardDataOrchestrator:
 
         logger.info("Dashboard Data Orchestrator initialized")
 
-    def get_infrastructure_data(self, *, force_refresh: bool = False) -> Optional[DashboardData]:
+    def get_infrastructure_data(self, *, force_refresh: bool = False, period_days: int = 30) -> Optional[DashboardData]:
         """
         Get infrastructure data - delegates to use cases.
 
@@ -115,6 +115,7 @@ class DashboardDataOrchestrator:
 
         Args:
             force_refresh: Bypass cache and fetch fresh data
+            period_days: Analysis period in days (1, 7, or 30)
 
         Returns:
             DashboardData with infrastructure metrics or error response
@@ -123,7 +124,7 @@ class DashboardDataOrchestrator:
 
         try:
             # Happy path: delegate to fetch use case
-            dashboard_data = self.fetch_use_case.execute(force_refresh=force_refresh)
+            dashboard_data = self.fetch_use_case.execute(force_refresh=force_refresh, period_days=period_days)
 
             # Enrich with API health status
             api_health_status = self.health_use_case.execute(

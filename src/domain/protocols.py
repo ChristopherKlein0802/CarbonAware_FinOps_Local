@@ -177,18 +177,20 @@ class AWSGateway(Protocol):
         """
         ...
 
-    def get_monthly_costs(
+    def get_costs(
         self,
         region: str,
+        period_days: int = 30,
     ) -> Optional[Any]:
         """
-        Get monthly cost data from Cost Explorer.
+        Get cost data from Cost Explorer for specified period.
 
         Args:
             region: AWS region
+            period_days: Analysis period in days (1, 7, or 30)
 
         Returns:
-            Cost data object, or None if unavailable
+            Cost data object for the specified period, or None if unavailable
         """
         ...
 
@@ -325,8 +327,8 @@ class InfrastructureGateway(Protocol):
         """Get instance pricing."""
         ...
 
-    def get_monthly_costs(self, region: str) -> Optional[Any]:
-        """Get monthly costs."""
+    def get_costs(self, region: str, period_days: int = 30) -> Optional[Any]:
+        """Get costs for specified period."""
         ...
 
     def get_hourly_costs(self, hours: int, region: str) -> List[Any]:

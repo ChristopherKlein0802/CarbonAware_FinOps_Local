@@ -95,7 +95,7 @@ ec2_client.describe_instances(
   "Reservations": [{
     "Instances": [{
       "InstanceId": "i-abc123",
-      "InstanceType": "t3.medium",
+      "InstanceType": "m6a.large",
       "State": {"Name": "running"},
       "LaunchTime": "2025-01-01T00:00:00Z",
       "Tags": [{"Key": "Name", "Value": "WebServer"}]
@@ -270,7 +270,7 @@ pricing_client.get_products(
     ServiceCode="AmazonEC2",
     Filters=[
         {"Type": "TERM_MATCH", "Field": "location", "Value": "EU (Frankfurt)"},
-        {"Type": "TERM_MATCH", "Field": "instanceType", "Value": "t3.medium"},
+        {"Type": "TERM_MATCH", "Field": "instanceType", "Value": "m6a.large"},
         {"Type": "TERM_MATCH", "Field": "tenancy", "Value": "Shared"},
         {"Type": "TERM_MATCH", "Field": "operatingSystem", "Value": "Linux"}
     ]

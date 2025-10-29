@@ -19,11 +19,16 @@ def render_core_metrics(dashboard_data: Optional[DashboardData]) -> None:
         st.warning("⚠️ No data available")
         return
 
-    st.markdown("### 📊 Core Metrics")
-    st.caption("Monthly costs and carbon emissions for monitored infrastructure")
+    # Get analysis period
+    period_days = getattr(dashboard_data, "analysis_period_days", 30)
+    period_label = f"{period_days}-day" if period_days < 30 else "monthly"
 
-    total_cost = dashboard_data.total_cost_eur
-    total_co2 = dashboard_data.total_co2_kg
+    st.markdown("### 📊 Core Metrics")
+    st.caption(f"{period_label.title()} costs and carbon emissions for monitored infrastructure")
+
+    # Use new field names with fallback for backward compatibility
+    total_cost = getattr(dashboard_data, "total_cost_average", dashboard_data.total_cost_eur)
+    total_co2 = getattr(dashboard_data, "total_co2_average", dashboard_data.total_co2_kg)
 
     # Data quality assessment
     num_instances = len(dashboard_data.instances) if dashboard_data.instances else 0
@@ -40,10 +45,10 @@ def render_core_metrics(dashboard_data: Optional[DashboardData]) -> None:
     with col1:
         instance_label = f"{num_instances} instance{'s' if num_instances != 1 else ''}"
         st.metric(
-            "💰 Monthly Costs",
+            f"💰 {period_label.title()} Costs",
             f"€{total_cost:.2f}",
             f"{instance_label}",
-            help="Instance-specific costs calculated from CloudTrail runtime data × AWS Pricing API on-demand rates. "
+            help=f"Instance-specific costs calculated from CloudTrail runtime data over {period_days} days × AWS Pricing API on-demand rates. "
                  "Covers only monitored EC2 instances. Excludes reserved instances discounts, data transfer, and EBS costs. "
                  "For full AWS billing, see Cost Explorer metric."
         )
@@ -52,10 +57,10 @@ def render_core_metrics(dashboard_data: Optional[DashboardData]) -> None:
 
     with col2:
         st.metric(
-            "🌍 Monthly Carbon",
+            f"🌍 {period_label.title()} Carbon",
             f"{total_co2:.2f} kg CO₂",
             f"{co2_quality}",
-            help="Carbon emissions calculated using: Power consumption (Boavizta hardware models) × Runtime (CloudTrail) × "
+            help=f"Carbon emissions calculated over {period_days} days using: Power consumption (Boavizta hardware models) × Runtime (CloudTrail) × "
                  "Grid intensity (ElectricityMaps German grid). Updated hourly. Formula: CO₂(kg) = Power(kW) × Intensity(g/kWh) × Runtime(h) ÷ 1000"
         )
         if not has_carbon_data:

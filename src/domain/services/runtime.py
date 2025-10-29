@@ -33,7 +33,8 @@ class RuntimeServiceConfig:
 
     region: str = settings.aws_region
     aws_profile: str = settings.aws_profile
-    lookback_days: int = 30
+    period_days: int = 30
+    """Analysis period in days (1, 7, or 30). Used for CloudTrail lookback and calculations."""
 
 
 class RuntimeService:
@@ -162,6 +163,7 @@ class RuntimeService:
         carbon_intensity: float,
         carbon_history: Optional[List[Dict]] = None,
         force_refresh: bool = False,
+        period_days: int = 30,
     ) -> Optional[EC2Instance]:
         """
         Return an enriched `EC2Instance` with runtime, power, cost, and CO2 metadata.
@@ -171,10 +173,11 @@ class RuntimeService:
             carbon_intensity: Current carbon intensity (fallback value)
             carbon_history: Optional 24h carbon history for hourly calculation
             force_refresh: Force refresh all cached data
+            period_days: Analysis period in days (1, 7, or 30)
 
         Returns:
-            Enriched EC2Instance with hourly-precise CO2 calculation if data available,
-            otherwise falls back to monthly average calculation.
+            Enriched EC2Instance with period-based calculations using both
+            Hourly-Precise and Average-Based methods.
         """
         # Fetch basic data (unchanged)
         runtime_hours = self._get_precise_runtime_hours(instance, force_refresh=force_refresh)
@@ -193,22 +196,29 @@ class RuntimeService:
         if power_data is None and runtime_hours is None and hourly_price is None:
             logger.warning("Insufficient data to enrich instance %s", instance["instance_id"])
 
-        # Initialize variables
+        # Initialize period-based variables
         effective_power_watts = None
         hourly_co2_g = None
-        monthly_co2_kg = None
         daily_co2_kg = None
-        monthly_cost_usd = None
-        monthly_cost_eur = None
-        co2_method = "none"
+        co2_method = "average"
         hourly_breakdown = None
-        # NEW: Dual comparison variables
-        monthly_co2_kg_projected = None
-        monthly_co2_kg_30d = None
-        monthly_cost_projected_eur = None
         daily_runtime_hours = None
         data_completeness_24h = None
         instance_age_days = None
+
+        # Period-based calculations (new naming)
+        co2_kg_hourly = None  # Hourly-Precise method
+        co2_kg_average = None  # Average-Based method
+        cost_eur_hourly = None  # Hourly-Precise method
+        cost_eur_average = None  # Average-Based method
+
+        # Deprecated variables (backward compatibility)
+        monthly_co2_kg = None
+        monthly_cost_usd = None
+        monthly_cost_eur = None
+        monthly_co2_kg_projected = None
+        monthly_co2_kg_30d = None
+        monthly_cost_projected_eur = None
 
         # NEW: Try hourly-precise CO2 calculation
         if power_data and cpu_hourly_data and carbon_history:
@@ -219,9 +229,9 @@ class RuntimeService:
                     f"Carbon history: {len(carbon_history)} entries)"
                 )
 
-                # Get CloudTrail events for runtime calculation
+                # Get CloudTrail events for runtime calculation (period-based)
                 end_time = datetime.now(timezone.utc)
-                lookback_start = end_time - timedelta(days=self.config.lookback_days)
+                lookback_start = end_time - timedelta(days=period_days)
                 events = self._gateway.lookup_instance_events(
                     instance_id=instance["instance_id"],
                     region=instance.get("region", self.config.region),
@@ -245,17 +255,25 @@ class RuntimeService:
                     carbon_intensity_hourly=carbon_hourly,
                     runtime_hours_per_slot=runtime_per_hour,
                     timestamps=hour_timestamps,
+                    hourly_price_usd=hourly_price,
+                    eur_usd_rate=AcademicConstants.get_eur_usd_rate(),
                 )
 
                 daily_co2_kg = co2_result["total_co2_kg"]
-                monthly_co2_kg_projected = daily_co2_kg * 30  # NEW: 24h projected
-                monthly_co2_kg = monthly_co2_kg_projected  # Keep existing field for backward compatibility
-                co2_method = "hourly_24h_precise"
+                # Hourly-Precise: Scale 24h data to period
+                co2_kg_hourly = daily_co2_kg * period_days
+                co2_method = "hourly"
                 hourly_breakdown = co2_result["hourly_emissions"]
                 data_completeness_24h = co2_result["coverage_hours"]
 
                 # Calculate 24h runtime sum for projection
                 daily_runtime_hours = sum(runtime_per_hour)
+
+                # Hourly-Precise cost: Scale 24h to period
+                cost_eur_hourly = None
+                if hourly_price and daily_runtime_hours:
+                    daily_cost = hourly_price * daily_runtime_hours
+                    cost_eur_hourly = daily_cost * period_days * AcademicConstants.get_eur_usd_rate()
 
                 # Calculate average power from hourly data
                 power_values = [e["power_watts"] for e in hourly_breakdown if e.get("power_watts")]
@@ -267,45 +285,44 @@ class RuntimeService:
                     hourly_co2_g = (effective_power_watts / 1000.0) * carbon_intensity
 
                 logger.info(
-                    f"✅ Hourly CO2 calculation successful: {daily_co2_kg:.6f} kg/day, "
-                    f"{co2_result['coverage_hours']}/24 hours, quality={co2_result['data_quality']}"
+                    f"✅ Hourly-Precise calculation: {daily_co2_kg:.6f} kg/day × {period_days} = {co2_kg_hourly:.3f} kg, "
+                    f"{co2_result['coverage_hours']}/24 hours"
                 )
 
             except Exception as e:
-                logger.warning(f"⚠️ Hourly CO2 calculation failed for {instance['instance_id']}: {e}", exc_info=True)
-                # Fall through to legacy calculation
+                logger.warning(f"⚠️ Hourly-Precise calculation failed for {instance['instance_id']}: {e}", exc_info=True)
+                # Fall through to Average-Based calculation
 
-        # Calculate 30d actual CO2 (always, for comparison)
-        monthly_co2_kg_30d = None
+        # Average-Based calculation (always, for comparison)
+        co2_kg_average = None
+        cost_eur_average = None
         if power_data and cpu_utilisation is not None and runtime_hours is not None:
-            power_30d = calculate_simple_power_consumption(power_data.avg_power_watts, cpu_utilisation)
-            if power_30d is not None:
-                monthly_co2_kg_30d = calculate_co2_emissions(power_30d, carbon_intensity, runtime_hours)
+            avg_power = calculate_simple_power_consumption(power_data.avg_power_watts, cpu_utilisation)
+            if avg_power is not None:
+                co2_kg_average = calculate_co2_emissions(avg_power, carbon_intensity, runtime_hours)
+                if hourly_price:
+                    cost_usd = hourly_price * runtime_hours
+                    cost_eur_average = cost_usd * AcademicConstants.get_eur_usd_rate()
 
-        # FALLBACK: Use 30d actual if hourly-precise failed or data missing
-        if monthly_co2_kg is None and monthly_co2_kg_30d is not None:
-            monthly_co2_kg = monthly_co2_kg_30d
-            monthly_co2_kg_projected = monthly_co2_kg_30d  # No projection, use actual
+        # FALLBACK: If Hourly-Precise failed, use only Average-Based
+        if co2_kg_hourly is None and co2_kg_average is not None:
+            # Only average available - set effective power for display
             if power_data and cpu_utilisation is not None:
                 effective_power_watts = calculate_simple_power_consumption(power_data.avg_power_watts, cpu_utilisation)
                 hourly_co2_g = (effective_power_watts / 1000.0) * carbon_intensity
-            co2_method = "monthly_average"
             logger.info(
-                f"Using legacy average CO2 calculation for {instance['instance_id']}: "
-                f"{monthly_co2_kg:.3f} kg/month"
+                f"Using Average-Based calculation for {instance['instance_id']}: "
+                f"{co2_kg_average:.3f} kg (period: {period_days} days)"
             )
 
-        # Cost calculations
-        monthly_cost_projected_eur = None
-        if hourly_price is not None and runtime_hours is not None:
-            # 30d actual cost (unchanged)
-            monthly_cost_usd = hourly_price * runtime_hours
-            monthly_cost_eur = monthly_cost_usd * AcademicConstants.get_eur_usd_rate()
-
-            # NEW: 24h projected cost
-            if daily_runtime_hours is not None:
-                monthly_cost_projected_usd = hourly_price * (daily_runtime_hours * 30)
-                monthly_cost_projected_eur = monthly_cost_projected_usd * AcademicConstants.get_eur_usd_rate()
+        # Map to deprecated fields for backward compatibility
+        monthly_co2_kg = co2_kg_average or co2_kg_hourly
+        monthly_cost_eur = cost_eur_average
+        monthly_co2_kg_projected = co2_kg_hourly
+        monthly_co2_kg_30d = co2_kg_average
+        monthly_cost_projected_eur = cost_eur_hourly
+        if cost_eur_average:
+            monthly_cost_usd = cost_eur_average / AcademicConstants.get_eur_usd_rate()
 
         # Calculate instance age for validation
         instance_age_days = None
@@ -339,12 +356,6 @@ class RuntimeService:
             instance_name=instance.get("instance_name", "Unnamed"),
             power_watts=self._safe_round(effective_power_watts, 1),
             hourly_co2_g=self._safe_round(hourly_co2_g, 2),
-            monthly_co2_kg=self._safe_round(monthly_co2_kg, 3),
-            daily_co2_kg=self._safe_round(daily_co2_kg, 6),
-            co2_calculation_method=co2_method,
-            hourly_co2_breakdown=hourly_breakdown,
-            monthly_cost_usd=self._safe_round(monthly_cost_usd, 2),
-            monthly_cost_eur=self._safe_round(monthly_cost_eur, 2),
             runtime_hours=self._safe_round(runtime_hours, 1),
             hourly_price_usd=self._safe_round(hourly_price, 4),
             cpu_utilization=self._safe_round(cpu_utilisation, 1),
@@ -352,13 +363,26 @@ class RuntimeService:
             confidence_level=confidence_level,
             data_sources=data_sources,
             last_updated=datetime.now(timezone.utc),
-            # NEW: Dual comparison fields
+            # Period-based calculations (NEW)
+            period_days=period_days,
+            co2_kg_hourly=self._safe_round(co2_kg_hourly, 3),
+            co2_kg_average=self._safe_round(co2_kg_average, 3),
+            cost_eur_hourly=self._safe_round(cost_eur_hourly, 2),
+            cost_eur_average=self._safe_round(cost_eur_average, 2),
+            # Hourly-Precise metadata
+            daily_co2_kg=self._safe_round(daily_co2_kg, 6),
             daily_runtime_hours=self._safe_round(daily_runtime_hours, 2),
+            co2_calculation_method=co2_method,
+            hourly_co2_breakdown=hourly_breakdown,
+            instance_age_days=instance_age_days,
+            data_completeness_24h=data_completeness_24h,
+            # DEPRECATED fields (backward compatibility)
+            monthly_co2_kg=self._safe_round(monthly_co2_kg, 3),
+            monthly_cost_usd=self._safe_round(monthly_cost_usd, 2),
+            monthly_cost_eur=self._safe_round(monthly_cost_eur, 2),
             monthly_co2_kg_projected=self._safe_round(monthly_co2_kg_projected, 3),
             monthly_co2_kg_30d=self._safe_round(monthly_co2_kg_30d, 3),
             monthly_cost_projected_eur=self._safe_round(monthly_cost_projected_eur, 2),
-            instance_age_days=instance_age_days,
-            data_completeness_24h=data_completeness_24h,
         )
 
     # ------------------------------------------------------------------
@@ -393,7 +417,7 @@ class RuntimeService:
                 if launch_time:
                     logger.debug(f"✅ Using cached launch time for {instance_id}: {launch_time}")
 
-            lookback_start = end_time - timedelta(days=self.config.lookback_days)
+            lookback_start = end_time - timedelta(days=self.config.period_days)
             if launch_time:
                 lookback_start = min(lookback_start, launch_time - timedelta(hours=1))
 

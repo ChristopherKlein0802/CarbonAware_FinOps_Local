@@ -85,18 +85,22 @@ def calculate_co2_hourly_precise(
     carbon_intensity_hourly: List[float],
     runtime_hours_per_slot: List[float],
     timestamps: List[datetime],
+    hourly_price_usd: Optional[float] = None,
+    eur_usd_rate: float = 0.92,
 ) -> Dict[str, Any]:
     """
-    Calculate CO2 emissions with hourly precision for 24h window.
+    Calculate CO2 emissions and costs with hourly precision for 24h window.
 
-    This function calculates CO2 emissions with hourly granularity by using:
+    This function calculates CO2 emissions and costs with hourly granularity by using:
     - Hourly CPU utilization data from CloudWatch
     - Hourly carbon intensity data from ElectricityMaps
     - Hourly runtime fractions from CloudTrail events
+    - Hourly pricing from AWS Pricing API
 
     Formula for each hour h:
         Power_h = Base × (0.3 + 0.7 × CPU_h/100)
         CO2_h = (Power_h / 1000) × Carbon_h × Runtime_h
+        Cost_h = HourlyPrice_USD × Runtime_h × EUR_USD_Rate
 
     Total: Sum over all hours
 
@@ -106,28 +110,34 @@ def calculate_co2_hourly_precise(
         carbon_intensity_hourly: List of carbon intensity g/kWh (one per hour)
         runtime_hours_per_slot: List of runtime fractions (0.0-1.0) per hour
         timestamps: List of datetime objects for each hour
+        hourly_price_usd: Optional hourly price in USD (for cost calculation)
+        eur_usd_rate: EUR/USD exchange rate (default: 0.92)
 
     Returns:
         Dictionary containing:
         - total_co2_kg: Total CO2 emissions in kg (sum of all hours)
-        - hourly_emissions: List of detailed hourly breakdowns
+        - total_cost_eur: Total cost in EUR (sum of all hours, if price provided)
+        - hourly_emissions: List of detailed hourly breakdowns (includes cost_eur if price provided)
         - data_quality: 'high' (≥20h), 'medium' (≥12h), or 'low' (<12h)
         - coverage_hours: Number of hours with valid data
         - method: Always 'hourly_24h_precise'
 
     Example:
-        Hour 0 (23h ago): CPU=35%, Carbon=280g/kWh, Runtime=1.0h
+        Hour 0 (23h ago): CPU=35%, Carbon=280g/kWh, Runtime=1.0h, Price=$0.042/h
             Power = 15W × (0.3 + 0.7×0.35) = 8.175W
             CO2 = 0.008175kW × 280g × 1.0h = 2.289g
+            Cost = $0.042 × 1.0h × 0.92 = €0.0386
 
         Hour 1 (22h ago): CPU=45%, Carbon=320g/kWh, Runtime=1.0h
             Power = 15W × (0.3 + 0.7×0.45) = 9.225W
             CO2 = 0.009225kW × 320g × 1.0h = 2.952g
+            Cost = $0.042 × 1.0h × 0.92 = €0.0386
 
         Total: Sum of all 24 hours
     """
     hourly_emissions = []
     total_co2_g = 0.0
+    total_cost_eur = 0.0
     hours_with_data = 0
 
     # Ensure all lists have compatible lengths
@@ -142,10 +152,11 @@ def calculate_co2_hourly_precise(
         logger.warning("No hourly data available for CO2 calculation")
         return {
             "total_co2_kg": 0.0,
+            "total_cost_eur": 0.0,
             "hourly_emissions": [],
             "data_quality": "low",
             "coverage_hours": 0,
-            "method": "hourly_24h_precise",
+            "method": "hourly",
         }
 
     logger.info(f"Calculating hourly CO2 for {num_hours} hours")
@@ -158,13 +169,15 @@ def calculate_co2_hourly_precise(
 
         # Skip if instance wasn't running this hour
         if runtime == 0.0:
-            hourly_emissions.append(
-                {
-                    "timestamp": timestamp.isoformat() if isinstance(timestamp, datetime) else timestamp,
-                    "co2_g": 0.0,
-                    "running": False,
-                }
-            )
+            emission_data = {
+                "timestamp": timestamp.isoformat() if isinstance(timestamp, datetime) else timestamp,
+                "co2_g": 0.0,
+                "running": False,
+            }
+            # Add cost if pricing available
+            if hourly_price_usd is not None:
+                emission_data["cost_eur"] = 0.0
+            hourly_emissions.append(emission_data)
             continue
 
         # Calculate effective power for this hour
@@ -175,20 +188,31 @@ def calculate_co2_hourly_precise(
         power_kw = power_watts / 1000.0
         co2_g = power_kw * carbon * runtime
 
+        # Calculate cost for this hour (if pricing available)
+        # Formula: Cost(EUR) = HourlyPrice(USD) × Runtime(h) × EUR_USD_Rate
+        cost_eur = 0.0
+        if hourly_price_usd is not None:
+            cost_eur = hourly_price_usd * runtime * eur_usd_rate
+            total_cost_eur += cost_eur
+
         total_co2_g += co2_g
         hours_with_data += 1
 
-        hourly_emissions.append(
-            {
-                "timestamp": timestamp.isoformat() if isinstance(timestamp, datetime) else timestamp,
-                "co2_g": round(co2_g, 3),
-                "power_watts": round(power_watts, 2),
-                "cpu_percent": round(cpu, 1),
-                "carbon_intensity": round(carbon, 1),
-                "runtime_fraction": round(runtime, 2),
-                "running": True,
-            }
-        )
+        emission_data = {
+            "timestamp": timestamp.isoformat() if isinstance(timestamp, datetime) else timestamp,
+            "co2_g": round(co2_g, 3),
+            "power_watts": round(power_watts, 2),
+            "cpu_percent": round(cpu, 1),
+            "carbon_intensity": round(carbon, 1),
+            "runtime_fraction": round(runtime, 2),
+            "running": True,
+        }
+
+        # Add cost if pricing available
+        if hourly_price_usd is not None:
+            emission_data["cost_eur"] = round(cost_eur, 4)
+
+        hourly_emissions.append(emission_data)
 
         logger.debug(
             f"Hour {i}: {power_kw:.4f}kW × {carbon:.0f}g/kWh × {runtime:.2f}h = {co2_g:.3f}g "
@@ -205,17 +229,24 @@ def calculate_co2_hourly_precise(
 
     total_co2_kg = total_co2_g / 1000.0
 
-    logger.info(
-        f"✅ Hourly CO2 calculation complete: {total_co2_kg:.6f} kg "
-        f"({hours_with_data}/{num_hours} hours, quality={data_quality})"
-    )
+    if hourly_price_usd is not None:
+        logger.info(
+            f"✅ Hourly CO2 & Cost calculation complete: {total_co2_kg:.6f} kg, €{total_cost_eur:.4f} "
+            f"({hours_with_data}/{num_hours} hours, quality={data_quality})"
+        )
+    else:
+        logger.info(
+            f"✅ Hourly CO2 calculation complete: {total_co2_kg:.6f} kg "
+            f"({hours_with_data}/{num_hours} hours, quality={data_quality})"
+        )
 
     return {
         "total_co2_kg": round(total_co2_kg, 6),
+        "total_cost_eur": round(total_cost_eur, 4),
         "hourly_emissions": hourly_emissions,
         "data_quality": data_quality,
         "coverage_hours": hours_with_data,
-        "method": "hourly_24h_precise",
+        "method": "hourly",
     }
 
 

@@ -29,9 +29,6 @@ class EC2Instance:
     instance_name: Optional[str] = None
     power_watts: Optional[float] = None
     hourly_co2_g: Optional[float] = None
-    monthly_co2_kg: Optional[float] = None
-    monthly_cost_usd: Optional[float] = None
-    monthly_cost_eur: Optional[float] = None
     runtime_hours: Optional[float] = None
     hourly_price_usd: Optional[float] = None
     cpu_utilization: Optional[float] = None
@@ -40,42 +37,79 @@ class EC2Instance:
     data_sources: Optional[List[str]] = None
     last_updated: Optional[datetime] = None
 
-    # NEW: Hourly-precise CO2 calculation fields
+    # ========================================================================
+    # PERIOD-BASED CALCULATIONS (New flexible time window approach)
+    # ========================================================================
+
+    period_days: int = 30
+    """Analysis window in days (1, 7, or 30). Determines timeframe for all calculations."""
+
+    # Hourly-Precise Method (24h real-time data scaled to period)
+    co2_kg_hourly: Optional[float] = None
+    """CO2 emissions using Hourly-Precise method: daily_co2_kg × period_days"""
+
+    cost_eur_hourly: Optional[float] = None
+    """Cost using Hourly-Precise method: daily_cost × period_days"""
+
+    # Average-Based Method (full period runtime)
+    co2_kg_average: Optional[float] = None
+    """CO2 emissions using Average-Based method: power × carbon × runtime_period"""
+
+    cost_eur_average: Optional[float] = None
+    """Cost using Average-Based method: price × runtime_period"""
+
+    # ========================================================================
+    # HOURLY-PRECISE CALCULATION METADATA
+    # ========================================================================
+
     daily_co2_kg: Optional[float] = None
     """Daily CO2 emissions calculated with hourly precision (24h window)"""
 
-    co2_calculation_method: str = "monthly_average"
+    daily_runtime_hours: Optional[float] = None
+    """Runtime hours from last 24h window (sum of hourly fractions)"""
+
+    co2_calculation_method: str = "average"
     """
     Method used for CO2 calculation:
-    - 'hourly_24h_precise': Hourly calculation with 24h data
-    - 'monthly_average': Legacy average calculation
+    - 'hourly': Hourly-Precise calculation with 24h data
+    - 'average': Average-Based calculation (fallback)
     - 'none': No CO2 data available
     """
 
     hourly_co2_breakdown: Optional[List[Dict]] = None
     """
-    Hourly breakdown of CO2 emissions (only available for hourly_24h_precise method).
+    Hourly breakdown of CO2 emissions (only available for hourly method).
     Format: List of dicts with keys: timestamp, co2_g, power_watts, cpu_percent, carbon_intensity, runtime_fraction, running
     """
-
-    # NEW: Dual comparison fields (24h projected vs 30d actual)
-    daily_runtime_hours: Optional[float] = None
-    """Runtime hours from last 24h window (sum of hourly fractions)"""
-
-    monthly_co2_kg_projected: Optional[float] = None
-    """Monthly CO2 projected from 24h data: daily_co2_kg × 30"""
-
-    monthly_co2_kg_30d: Optional[float] = None
-    """Monthly CO2 calculated from 30d actual runtime (fallback/average method)"""
-
-    monthly_cost_projected_eur: Optional[float] = None
-    """Monthly cost projected from 24h runtime: (daily_runtime_hours × 30) × hourly_price × EUR/USD"""
 
     instance_age_days: Optional[int] = None
     """Days since instance launch (for data completeness validation)"""
 
     data_completeness_24h: Optional[int] = None
     """Number of hours with valid data in 24h window (0-24)"""
+
+    # ========================================================================
+    # DEPRECATED FIELDS (Kept for backward compatibility, will be removed in v2.0.0)
+    # Migration Guide: docs/migration/field-deprecation.md
+    # ========================================================================
+
+    monthly_co2_kg: Optional[float] = None
+    """DEPRECATED: Use co2_kg_average instead. Maps to period-based calculation."""
+
+    monthly_cost_usd: Optional[float] = None
+    """DEPRECATED: Use cost_eur_hourly or cost_eur_average instead."""
+
+    monthly_cost_eur: Optional[float] = None
+    """DEPRECATED: Use cost_eur_average instead. Maps to period-based calculation."""
+
+    monthly_co2_kg_projected: Optional[float] = None
+    """DEPRECATED: Use co2_kg_hourly instead. Was: daily_co2_kg × 30"""
+
+    monthly_co2_kg_30d: Optional[float] = None
+    """DEPRECATED: Use co2_kg_average instead. Was: 30d actual runtime calculation."""
+
+    monthly_cost_projected_eur: Optional[float] = None
+    """DEPRECATED: Use cost_eur_hourly instead. Was: 24h projected to 30d"""
 
     def __post_init__(self):
         if self.data_sources is None:
@@ -141,6 +175,8 @@ class BusinessCase:
     methodology: str = "Theoretical framework"
     validation_status: str = "Requires validation"
     source_notes: Optional[str] = None
+    analysis_period_days: int = 30
+    """Analysis period for which savings are calculated (1, 7, or 30 days)"""
 
 
 # ============================================================================
@@ -174,52 +210,108 @@ class APIHealthStatus:
 @dataclass
 class DashboardData:
     """
-    Complete dashboard data structure.
+    Complete dashboard data structure with period-based analysis.
 
-    Attributes:
+    Key Attributes:
         instances: List of EC2 instances with enriched data
+        analysis_period_days: Analysis time window (1, 7, or 30 days)
+        total_co2_hourly: Total CO2 using Hourly-Precise method
+        total_co2_average: Total CO2 using Average-Based method
+        total_cost_hourly: Total costs using Hourly-Precise method
+        total_cost_average: Total costs using Average-Based method
         carbon_intensity: Current carbon intensity from ElectricityMaps
-        total_cost_eur: Total monthly costs in EUR (30d actual, backward compatible)
-        total_co2_kg: Total monthly CO₂ emissions in kg (backward compatible)
-        business_case: Business case calculations and scenarios
-        data_freshness: Timestamp of last data update
-        academic_disclaimers: List of academic integrity notes
-        api_health_status: Health status of all API integrations
+        business_case: Business case calculations for selected period
         validation_factor: Cost validation factor (calculated vs. AWS)
-        accuracy_status: Human-readable accuracy status
-        cloudtrail_coverage: Percentage of instances with CloudTrail runtime data (0.0-1.0)
-        cloudtrail_tracked_instances: Number of instances with runtime data
-        carbon_history: Historical carbon intensity data from ElectricityMaps
-        self_collected_carbon_history: Self-collected carbon intensity snapshots
-        total_cost_projected_eur: Total monthly costs projected from 24h data (NEW)
-        total_co2_projected_kg: Total monthly CO2 projected from 24h data (NEW)
-        total_cost_30d_eur: Total monthly costs from 30d actual runtime (NEW)
-        total_co2_30d_kg: Total monthly CO2 from 30d actual runtime (NEW)
-        hourly_precise_count: Number of instances using hourly-precise calculation (NEW)
-        fallback_count: Number of instances using fallback calculation (NEW)
+        cloudtrail_coverage: Percentage of instances with CloudTrail data
+        hourly_precise_count: Instances using Hourly-Precise method
+        fallback_count: Instances using Average-Based method
     """
 
     instances: List[EC2Instance]
+
+    # ========================================================================
+    # PERIOD-BASED ANALYSIS CONFIGURATION
+    # ========================================================================
+
+    analysis_period_days: int = 30
+    """Current analysis time window in days (1, 7, or 30)"""
+
+    # ========================================================================
+    # PERIOD TOTALS - HOURLY-PRECISE METHOD
+    # ========================================================================
+
+    total_co2_hourly: float = 0.0
+    """Total CO2 emissions using Hourly-Precise method (24h scaled to period)"""
+
+    total_cost_hourly: float = 0.0
+    """Total costs using Hourly-Precise method (24h scaled to period)"""
+
+    # ========================================================================
+    # PERIOD TOTALS - AVERAGE-BASED METHOD
+    # ========================================================================
+
+    total_co2_average: float = 0.0
+    """Total CO2 emissions using Average-Based method (full period runtime)"""
+
+    total_cost_average: float = 0.0
+    """Total costs using Average-Based method (full period runtime)"""
+
+    # ========================================================================
+    # METHOD STATISTICS
+    # ========================================================================
+
+    hourly_precise_count: int = 0
+    """Number of instances successfully using Hourly-Precise calculation"""
+
+    fallback_count: int = 0
+    """Number of instances falling back to Average-Based calculation"""
+
+    # ========================================================================
+    # CARBON & VALIDATION DATA
+    # ========================================================================
+
     carbon_intensity: Optional[CarbonIntensity] = None
-    total_cost_eur: float = 0.0
-    total_co2_kg: float = 0.0
+    carbon_history: List[Dict[str, Any]] = field(default_factory=list)
+    self_collected_carbon_history: List[Dict[str, Any]] = field(default_factory=list)
+
+    validation_factor: Optional[float] = None
+    """Cost validation: Cost Explorer ÷ Calculated (aligned period windows)"""
+
+    accuracy_status: Optional[str] = None
+    cloudtrail_coverage: Optional[float] = None
+    cloudtrail_tracked_instances: Optional[int] = None
+
+    # ========================================================================
+    # DASHBOARD METADATA
+    # ========================================================================
+
     business_case: Optional[BusinessCase] = None
     data_freshness: Optional[datetime] = None
     academic_disclaimers: List[str] = field(default_factory=list)
     api_health_status: Optional[Dict[str, APIHealthStatus]] = None
-    validation_factor: Optional[float] = None
-    accuracy_status: Optional[str] = None
-    cloudtrail_coverage: Optional[float] = None
-    cloudtrail_tracked_instances: Optional[int] = None
-    carbon_history: List[Dict[str, Any]] = field(default_factory=list)
-    self_collected_carbon_history: List[Dict[str, Any]] = field(default_factory=list)
-    # NEW: Dual comparison aggregates
+
+    # ========================================================================
+    # DEPRECATED FIELDS (Backward compatibility, will be removed in v2.0.0)
+    # Migration Guide: docs/migration/field-deprecation.md
+    # ========================================================================
+
+    total_cost_eur: float = 0.0
+    """DEPRECATED: Use total_cost_average instead. Mapped for backward compatibility."""
+
+    total_co2_kg: float = 0.0
+    """DEPRECATED: Use total_co2_average instead. Mapped for backward compatibility."""
+
     total_cost_projected_eur: float = 0.0
+    """DEPRECATED: Use total_cost_hourly instead. Was: 24h projected to 30d"""
+
     total_co2_projected_kg: float = 0.0
+    """DEPRECATED: Use total_co2_hourly instead. Was: 24h projected to 30d"""
+
     total_cost_30d_eur: float = 0.0
+    """DEPRECATED: Use total_cost_average instead. Was: 30d actual costs"""
+
     total_co2_30d_kg: float = 0.0
-    hourly_precise_count: int = 0
-    fallback_count: int = 0
+    """DEPRECATED: Use total_co2_average instead. Was: 30d actual CO2"""
 
 
 # ============================================================================

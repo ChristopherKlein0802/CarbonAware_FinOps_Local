@@ -129,31 +129,31 @@ lint: ## Basic code quality check
 
 validate-aws: ## Validate AWS SSO session
 	@echo "$(YELLOW)🔍 Validating AWS SSO session...$(NC)"
-	$(call get_aws_account)
+	@$(call get_aws_account)
 	@echo "$(GREEN)✅ AWS SSO session active$(NC)"
 
 plan: ## Show deployment plan
 	@echo "$(YELLOW)📋 Generating Terraform plan...$(NC)"
 	@test -d terraform || (echo "$(RED)❌ Terraform directory not found$(NC)" && exit 1)
-	$(call get_aws_account) && \
+	@$(call get_aws_account) && \
 	cd terraform && terraform init && terraform plan -var="aws_account_id=$$AWS_ACCOUNT_ID"
 
 deploy: ## Deploy AWS infrastructure
 	@echo "$(YELLOW)☁️  Deploying AWS infrastructure...$(NC)"
 	@test -d terraform || (echo "$(RED)❌ Terraform directory not found$(NC)" && exit 1)
-	$(call get_aws_account) && \
+	@$(call get_aws_account) && \
 	cd terraform && terraform init && terraform apply -var="aws_account_id=$$AWS_ACCOUNT_ID"
 	@echo "$(GREEN)✅ Infrastructure deployed$(NC)"
 
 status: ## Show infrastructure status
 	@echo "$(YELLOW)📊 Infrastructure status...$(NC)"
 	@test -d terraform || (echo "$(RED)❌ Terraform directory not found$(NC)" && exit 1)
-	$(call get_aws_account) && cd terraform && terraform show
+	@$(call get_aws_account) && cd terraform && terraform show
 
 refresh: ## Refresh infrastructure state
 	@echo "$(YELLOW)🔄 Refreshing Terraform state...$(NC)"
 	@test -d terraform || (echo "$(RED)❌ Terraform directory not found$(NC)" && exit 1)
-	$(call get_aws_account) && \
+	@$(call get_aws_account) && \
 	cd terraform && terraform init && terraform refresh -var="aws_account_id=$$AWS_ACCOUNT_ID"
 	@echo "$(GREEN)✅ State refreshed$(NC)"
 
@@ -162,7 +162,7 @@ destroy: ## Destroy AWS infrastructure
 	@read -p "Type 'yes' to confirm: " confirm; \
 	if [ "$$confirm" = "yes" ]; then \
 		$(call get_aws_account) && \
-		cd terraform && terraform destroy -var="aws_account_id=$$AWS_ACCOUNT_ID"; \
+		cd terraform && terraform destroy -var="aws_account_id=$$AWS_ACCOUNT_ID" && \
 		echo "$(GREEN)✅ Infrastructure destroyed$(NC)"; \
 	else \
 		echo "$(BLUE)❌ Cancelled$(NC)"; \
@@ -170,8 +170,20 @@ destroy: ## Destroy AWS infrastructure
 
 clean: ## Clean temporary files
 	@echo "$(YELLOW)🧹 Cleaning...$(NC)"
-	find . -name "*.pyc" -delete
-	find . -name "__pycache__" -delete
-	find . -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
-	find . -name ".pytest_cache" -exec rm -rf {} + 2>/dev/null || true
+	@echo "$(BLUE)Removing Python cache files...$(NC)"
+	@find . -type f -name "*.pyc" -delete 2>/dev/null || true
+	@find . -type f -name "*.pyo" -delete 2>/dev/null || true
+	@find . -type f -name "*.pyd" -delete 2>/dev/null || true
+	@echo "$(BLUE)Removing cache directories...$(NC)"
+	@find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+	@find . -type d -name ".pytest_cache" -exec rm -rf {} + 2>/dev/null || true
+	@find . -type d -name ".mypy_cache" -exec rm -rf {} + 2>/dev/null || true
+	@find . -type d -name ".ruff_cache" -exec rm -rf {} + 2>/dev/null || true
+	@find . -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
+	@echo "$(BLUE)Removing build and test artifacts...$(NC)"
+	@rm -rf artifacts 2>/dev/null || true
+	@rm -rf htmlcov 2>/dev/null || true
+	@rm -rf .coverage 2>/dev/null || true
+	@rm -rf dist 2>/dev/null || true
+	@rm -rf build 2>/dev/null || true
 	@echo "$(GREEN)✅ Cleaned$(NC)"

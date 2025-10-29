@@ -14,6 +14,46 @@ Integrated monitoring system for cloud costs and CO₂ emissions, focused on Ger
 - 📊 **Business Case Calculator**: Savings estimation based on McKinsey/MIT research
 - 🏛️ **CSRD-Ready**: Scope 2/3 reporting for German compliance
 - ⚡ **CloudTrail Precision**: Minute-level runtime tracking for accurate calculations
+- 📅 **Flexible Time Windows**: Analyze 1-day, 7-day, or 30-day periods (NEW in v2.0.0)
+- 🔄 **Dual Calculation Methods**: Compare Hourly-Precise vs. Average-Based CO₂ calculations (NEW in v2.0.0)
+
+## What's New in v2.0.0 - Flexible Time Windows
+
+The latest release introduces **flexible time window analysis**, allowing you to analyze your infrastructure over different periods:
+
+### 🎯 Key Improvements
+
+**Period Selection**
+- Choose from 1-day, 7-day, or 30-day analysis periods
+- Dynamic labels throughout UI adapt to selected period
+- Period-specific caching prevents data contamination
+
+**Dual Calculation Methods**
+- **Hourly-Precise**: Scales 24h ElectricityMaps data to selected period
+- **Average-Based**: Uses full period CloudTrail runtime
+- Side-by-side comparison reveals workload patterns
+
+**Enhanced UI**
+- Period selector in sidebar
+- Dynamic metric labels ("7-day Costs" vs "Monthly Costs")
+- Comparison section shows method differences
+- All charts and tables adapt to selected period
+
+### 📖 Documentation
+
+- [Migration Guide](docs/migration/field-deprecation.md) - Update existing code
+- [Naming Conventions](docs/architecture/naming-conventions.md) - New field names
+- [CHANGELOG](CHANGELOG.md) - Full release notes
+
+### ⚠️ Breaking Changes (with Backward Compatibility)
+
+Deprecated fields remain functional but will be removed in v3.0.0:
+- `monthly_co2_kg` → `co2_kg_average`
+- `monthly_cost_eur` → `cost_eur_average`
+
+See [Migration Guide](docs/migration/field-deprecation.md) for details.
+
+---
 
 ## Research Question
 
@@ -102,6 +142,8 @@ Details: [docs/quality/test-coverage-report.md](docs/quality/test-coverage-repor
 - [System Architecture](docs/architecture/system-architecture.md) - Clean Architecture overview
 - [Calculation Methodology](docs/methodology/calculations.md) - CO₂ and cost formulas
 - [Developer Handbook](docs/user/developer-handbook.md) - Setup and extension guide
+- [Naming Conventions](docs/architecture/naming-conventions.md) - Period-based field naming (v2.0.0)
+- [Migration Guide](docs/migration/field-deprecation.md) - Upgrade from v1.x to v2.0.0
 
 ## Technology Stack
 

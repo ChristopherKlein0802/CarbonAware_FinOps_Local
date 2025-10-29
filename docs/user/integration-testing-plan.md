@@ -8,7 +8,7 @@
 ## Testszenarien
 | Szenario | Beschreibung | Primäre Datenquellen | Erwartete Evidenz |
 |----------|--------------|----------------------|-------------------|
-| Baseline Monitoring | Referenz-Snapshot mit vier EC2-Instanzen (t3.micro–t3.large) | ElectricityMaps, Boavizta, AWS Pricing/CloudTrail/CloudWatch | JSON-Artefakte inkl. Zusammenfassung |
+| Baseline Monitoring | Referenz-Snapshot mit vier EC2-Instanzen (m6a.large, non-burstable, varied schedules) | ElectricityMaps, Boavizta, AWS Pricing/CloudTrail/CloudWatch | JSON-Artefakte inkl. Zusammenfassung |
 | Carbon-aware Scheduling | Gezielte Start/Stop-Aktionen mit Vorher/Nachher-Vergleich | CloudTrail, CloudWatch, ElectricityMaps | Ereignistimeline, Laufzeitdeltas, Carbon-Vergleich |
 | Kostenvalidierung | Abgleich der berechneten Monatskosten mit Cost Explorer | AWS Cost Explorer, Pricing API | Bericht zur Validierungsabweichung |
 | Fehlerhandling | Simulationslauf mit API-Verfügbarkeitsproblem | ElectricityMaps oder CloudTrail | Logauszug + Hinweis im Dashboard |

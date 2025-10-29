@@ -36,6 +36,7 @@ class EnrichInstanceUseCase:
         *,
         carbon_history: Optional[List[Dict]] = None,
         force_refresh: bool = False,
+        period_days: int = 30,
     ) -> Optional[EC2Instance]:
         """
         Enrich EC2 instance with runtime, pricing, power, and emissions.
@@ -45,6 +46,7 @@ class EnrichInstanceUseCase:
             carbon_intensity: Current carbon intensity (gCO2/kWh) - used as fallback
             carbon_history: Optional 24h carbon history for hourly-precise calculation
             force_refresh: Bypass cache
+            period_days: Analysis period in days (1, 7, or 30)
 
         Returns:
             Enriched EC2Instance or None if failed
@@ -55,6 +57,7 @@ class EnrichInstanceUseCase:
                 carbon_intensity=carbon_intensity,
                 carbon_history=carbon_history,
                 force_refresh=force_refresh,
+                period_days=period_days,
             )
 
             if enriched:

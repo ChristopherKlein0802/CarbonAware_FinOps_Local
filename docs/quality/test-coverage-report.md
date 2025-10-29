@@ -45,7 +45,7 @@
    - ✅ Idle state (0% CPU = 30% power)
    - ✅ Peak state (100% CPU = 100% power)
    - ✅ Mid utilization (50% CPU = 65% power)
-   - ✅ Realistic scenarios (t3.medium, m5.large)
+   - ✅ Realistic scenarios (m6a.large, various CPU loads)
    - ✅ Input validation (negative power, CPU >100%)
    - ✅ Precision testing
    - ✅ Logging verification

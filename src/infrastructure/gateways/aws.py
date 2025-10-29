@@ -334,9 +334,21 @@ class AWSClient:
         self._repository.write_json(cache_path, series)
         return series
 
-    def get_monthly_costs(self, region: str) -> Optional[AWSCostData]:
-        cache_key = f"monthly_{region.replace('-', '_')}"
+    def get_costs(self, region: str, period_days: int = 30) -> Optional[AWSCostData]:
+        """
+        Get cost data from AWS Cost Explorer for specified period.
+
+        Args:
+            region: AWS region (e.g., "eu-central-1")
+            period_days: Analysis period in days (1, 7, or 30)
+
+        Returns:
+            AWSCostData for the specified period, or None if error
+        """
+        # Period-specific cache key
+        cache_key = f"costs_{period_days}d_{region.replace('-', '_')}"
         cache_path = self._cache_path("cost_data", cache_key)
+
         if self._repository.is_valid(cache_path, CacheTTL.COST_DATA):
             cached = self._repository.read_json(cache_path)
             if cached:
@@ -347,27 +359,37 @@ class AWSClient:
                         monthly_cost_usd=float(cached["monthly_cost_usd"]),
                         service_costs=cached.get("service_costs", {}),
                         region=cached.get("region", region),
-                        source=cached.get("source", "AWS_Cost_Explorer_Validation"),
+                        source=cached.get("source", "AWS_Cost_Explorer"),
                         fetched_at=fetched_at_dt,
                     )
                 except (KeyError, ValueError, TypeError) as error:
-                    logger.debug("Invalid cached monthly cost data: %s", error)
+                    logger.debug("Invalid cached cost data: %s", error)
 
         cost_client = self._cost_client()
+
+        # Dynamic date range based on period_days
         end_date = datetime.now().date()
-        start_date = (datetime.now() - timedelta(days=30)).date()
-        region_label = self._pricing_mappings.get(region)
+        start_date = end_date - timedelta(days=period_days)
+
+        # Auto-select granularity based on period length
+        # AWS Cost Explorer limits: HOURLY max 14 days, DAILY unlimited
+        granularity = "HOURLY" if period_days <= 14 else "DAILY"
 
         request_kwargs: Dict[str, Any] = {
-            "TimePeriod": {"Start": start_date.strftime("%Y-%m-%d"), "End": end_date.strftime("%Y-%m-%d")},
-            "Granularity": "DAILY",
+            "TimePeriod": {
+                "Start": start_date.strftime("%Y-%m-%d"),
+                "End": end_date.strftime("%Y-%m-%d")
+            },
+            "Granularity": granularity,
             "Metrics": ["UnblendedCost"],
             "GroupBy": [{"Type": "DIMENSION", "Key": "SERVICE"}],
             # Region filter: Use AWS region code format (e.g., "eu-central-1")
-            # Debug via: scripts/debug_cost_explorer.py
             "Filter": {
                 "And": [
-                    {"Dimensions": {"Key": "SERVICE", "Values": ["Amazon Elastic Compute Cloud - Compute", "EC2 - Other"]}},
+                    {"Dimensions": {"Key": "SERVICE", "Values": [
+                        "Amazon Elastic Compute Cloud - Compute",
+                        "EC2 - Other"
+                    ]}},
                     {"Dimensions": {"Key": "REGION", "Values": [region]}},
                 ]
             },
@@ -382,6 +404,7 @@ class AWSClient:
         service_costs: Dict[str, float] = {}
         total_cost = 0.0
         ec2_cost = 0.0
+
         for result in response.get("ResultsByTime", []):
             for group in result.get("Groups", []):
                 keys = group.get("Keys") or []
@@ -400,19 +423,32 @@ class AWSClient:
                 if "EC2" in service_name or "Amazon Elastic Compute Cloud" in service_name:
                     ec2_cost += cost_amount
                     logger.debug(f"💰 Found EC2 service in {region}: '{service_name}' with ${cost_amount:.4f}")
+
         if ec2_cost == 0.0 and total_cost > 0.0:
             ec2_cost = total_cost
 
-        logger.info(f"✅ Cost Explorer: ${ec2_cost:.2f} EC2 costs in {region} over 30 days")
+        # Dynamic period label for logging
+        if period_days == 1:
+            period_label = "24 hours"
+        elif period_days == 7:
+            period_label = "7 days"
+        else:
+            period_label = f"{period_days} days"
+
+        logger.info(
+            f"✅ Cost Explorer: ${ec2_cost:.2f} EC2 costs in {region} over {period_label} "
+            f"({granularity} granularity)"
+        )
 
         fetched_at = datetime.now(timezone.utc)
         cost_data = AWSCostData(
             monthly_cost_usd=ec2_cost,
             service_costs=service_costs,
             region=self._session_helper.session().region_name or region,
-            source="AWS_Cost_Explorer_Validation",
+            source=f"AWS_Cost_Explorer_{period_days}d",
             fetched_at=fetched_at,
         )
+
         self._repository.write_json(
             cache_path,
             {

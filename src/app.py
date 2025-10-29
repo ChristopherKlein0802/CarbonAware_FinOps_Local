@@ -117,12 +117,13 @@ def _cache_dashboard_data(data: Optional[DashboardData]) -> None:
     st.session_state[_CACHE_TIMESTAMP_KEY] = datetime.now()
 
 
-def load_infrastructure_data(force_refresh: bool = False) -> Optional[DashboardData]:
+def load_infrastructure_data(force_refresh: bool = False, period_days: int = 30) -> Optional[DashboardData]:
     """
     Load infrastructure data with manual TTL caching and specific error handling.
 
     Args:
         force_refresh: If True, bypass cache and fetch fresh data
+        period_days: Analysis period in days (1, 7, or 30)
 
     Returns:
         DashboardData object with instances, metrics, and API status, or None on error
@@ -134,11 +135,13 @@ def load_infrastructure_data(force_refresh: bool = False) -> Optional[DashboardD
     if not force_refresh and cached_data is not None and cached_at is not None:
         age_seconds = (datetime.now() - cached_at).total_seconds()
         if age_seconds < _CACHE_TTL_SECONDS:
-            return cached_data
+            # Check if cached data has same period
+            if getattr(cached_data, "analysis_period_days", 30) == period_days:
+                return cached_data
 
     try:
         with st.spinner("Loading infrastructure data..."):
-            dashboard_data = data_processor.get_infrastructure_data(force_refresh=force_refresh)
+            dashboard_data = data_processor.get_infrastructure_data(force_refresh=force_refresh, period_days=period_days)
         _cache_dashboard_data(dashboard_data)
         return dashboard_data
     except (ConnectionError, TimeoutError) as e:
@@ -181,6 +184,31 @@ def main() -> None:
     st.sidebar.title("🌱 Carbon-Aware FinOps")
     st.sidebar.markdown("*Bachelor Thesis Dashboard*")
 
+    # Analysis Period Selection
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### 📅 Analysis Period")
+
+    period_options = {
+        "Last 24 hours": 1,
+        "Last 7 days": 7,
+        "Last 30 days": 30,
+    }
+
+    selected_period_label = st.sidebar.selectbox(
+        "Time Window",
+        options=list(period_options.keys()),
+        index=2,  # Default to "Last 30 days"
+        help="Select the time window for cost and carbon analysis. Carbon data is always based on 24h ElectricityMaps data, scaled to the selected period."
+    )
+
+    period_days = period_options[selected_period_label]
+
+    # Store in session state for cross-component access
+    if "analysis_period_days" not in st.session_state or st.session_state["analysis_period_days"] != period_days:
+        st.session_state["analysis_period_days"] = period_days
+        # Clear cache when period changes
+        _clear_dashboard_cache()
+
     if "force_refresh" not in st.session_state:
         st.session_state["force_refresh"] = False
 
@@ -222,7 +250,7 @@ def main() -> None:
 
     # Load data once for all pages
     force_refresh_flag = st.session_state.get("force_refresh", False)
-    dashboard_data = load_infrastructure_data(force_refresh_flag)
+    dashboard_data = load_infrastructure_data(force_refresh_flag, period_days=period_days)
     if force_refresh_flag:
         st.session_state["force_refresh"] = False
 

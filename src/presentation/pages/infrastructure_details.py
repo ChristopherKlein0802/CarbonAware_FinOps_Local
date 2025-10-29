@@ -42,8 +42,15 @@ def _render_infrastructure_overview(dashboard_data: Any) -> None:
     running_instances = len([i for i in dashboard_data.instances if i.state == "running"])
     total_instances = len(dashboard_data.instances)
     total_power = sum(i.power_watts for i in dashboard_data.instances if i.power_watts is not None)
+
+    # Get analysis period (with fallback for backward compatibility)
+    period_days = getattr(dashboard_data, "analysis_period_days", 30)
+    period_label = f"{period_days}d" if period_days < 30 else "monthly"
+
+    # Use average-based totals for overview metrics
+    total_cost = getattr(dashboard_data, "total_cost_average", dashboard_data.total_cost_eur)
     avg_cost_per_instance = (
-        dashboard_data.total_cost_eur / len(dashboard_data.instances) if dashboard_data.instances else 0
+        total_cost / len(dashboard_data.instances) if dashboard_data.instances else 0
     )
 
     # Essential metrics only
@@ -71,8 +78,8 @@ def _render_infrastructure_overview(dashboard_data: Any) -> None:
         st.metric(
             "💰 Avg Cost/Instance",
             f"€{avg_cost_per_instance:.2f}",
-            "Per month",
-            help="Average monthly cost per instance (total cost ÷ instance count). Useful for comparing instance efficiency. "
+            f"Per {period_label}",
+            help=f"Average cost per instance over {period_days} days (total cost ÷ instance count). Useful for comparing instance efficiency. "
                  "Calculated from CloudTrail runtime × AWS Pricing API on-demand rates."
         )
 
@@ -86,13 +93,14 @@ def _render_infrastructure_overview(dashboard_data: Any) -> None:
         )
 
 
-def _prepare_instance_row_data(instance: Any, grid_intensity: Optional[float]) -> dict[str, str]:
+def _prepare_instance_row_data(instance: Any, grid_intensity: Optional[float], period_days: int = 30) -> dict[str, str]:
     """
     Prepare table row data for a single instance.
 
     Args:
         instance: EC2Instance object
         grid_intensity: Current grid carbon intensity (g CO₂/kWh)
+        period_days: Analysis period in days
 
     Returns:
         Dictionary with formatted instance data for table display
@@ -114,43 +122,56 @@ def _prepare_instance_row_data(instance: Any, grid_intensity: Optional[float]) -
         "partial": "🟡 Partial",
     }.get(data_quality, "🔴 Limited")
 
-    # Formatted values
+    # Period label for column headers
+    period_label = f"{period_days}d" if period_days < 30 else "monthly"
+
+    # Formatted values - use new field names with fallback
     power_kw = f"{instance.power_watts / 1000:.3f}" if instance.power_watts is not None else "N/A"
     grid_intensity_display = f"{grid_intensity:.0f}" if grid_intensity else "N/A"
-    co2_display = f"{instance.monthly_co2_kg:.3f}" if instance.monthly_co2_kg is not None else "⚠️ Not available"
-    cost_display = f"{instance.monthly_cost_eur:.2f}" if instance.monthly_cost_eur is not None else "⚠️ Not available"
+
+    # Use new field names (with fallback for backward compatibility)
+    co2_avg = getattr(instance, "co2_kg_average", instance.monthly_co2_kg if hasattr(instance, "monthly_co2_kg") else None)
+    cost_avg = getattr(instance, "cost_eur_average", instance.monthly_cost_eur if hasattr(instance, "monthly_cost_eur") else None)
+
+    co2_display = f"{co2_avg:.3f}" if co2_avg is not None else "⚠️ Not available"
+    cost_display = f"€{cost_avg:.2f}" if cost_avg is not None else "⚠️ Not available"
 
     return {
         "Instance Name": instance.instance_name or "Unnamed",
         "Type": instance.instance_type,
         "State": instance.state.title(),
-        "Monthly Runtime (30d)": runtime_hours,
+        f"Runtime ({period_label})": runtime_hours,
         "CPU Avg (%)": cpu_util,
         "Power (kW)": power_kw,
         "Grid Intensity (g/kWh)": grid_intensity_display,
-        "CO₂/Month (30d avg)": co2_display,
-        "Cost/Month (30d)": cost_display,
+        f"CO₂ ({period_label} avg)": co2_display,
+        f"Cost ({period_label})": cost_display,
         "Data Quality": quality_badge,
     }
 
 
 def _render_dual_comparison_section(dashboard_data: Any) -> None:
     """
-    Render side-by-side comparison of 24h projected vs 30d actual calculations.
+    Render side-by-side comparison of Hourly-Precise vs Average-Based calculations.
 
     Shows methodology validation and pattern analysis for Bachelor thesis.
     """
     st.markdown("---")
     st.subheader("📊 Calculation Method Comparison")
-    st.caption("24-Hour Precise vs. 30-Day Actual - Methodology Validation")
 
-    # Get aggregated values
+    # Get analysis period
+    period_days = getattr(dashboard_data, "analysis_period_days", 30)
+    period_label = f"{period_days}d" if period_days < 30 else "30d"
+
+    st.caption(f"Hourly-Precise (24h scaled) vs. Average-Based ({period_label} actual) - Methodology Validation")
+
+    # Get aggregated values with new field names
     hourly_precise_count = getattr(dashboard_data, "hourly_precise_count", 0)
     fallback_count = getattr(dashboard_data, "fallback_count", 0)
-    total_co2_projected = getattr(dashboard_data, "total_co2_projected_kg", 0.0)
-    total_co2_30d = getattr(dashboard_data, "total_co2_30d_kg", 0.0)
-    total_cost_projected = getattr(dashboard_data, "total_cost_projected_eur", 0.0)
-    total_cost_30d = getattr(dashboard_data, "total_cost_30d_eur", 0.0)
+    total_co2_hourly = getattr(dashboard_data, "total_co2_hourly", 0.0)
+    total_co2_average = getattr(dashboard_data, "total_co2_average", 0.0)
+    total_cost_hourly = getattr(dashboard_data, "total_cost_hourly", 0.0)
+    total_cost_average = getattr(dashboard_data, "total_cost_average", 0.0)
 
     # Show instance counts
     col1, col2 = st.columns(2)
@@ -172,26 +193,26 @@ def _render_dual_comparison_section(dashboard_data: Any) -> None:
     col1, col2, col3 = st.columns(3)
 
     with col1:
-        st.markdown("#### 24h Projected")
-        st.markdown(f"**{total_co2_projected:.3f} kg**")
-        st.caption(f"Daily × 30 projection")
+        st.markdown("#### Hourly-Precise")
+        st.markdown(f"**{total_co2_hourly:.3f} kg**")
+        st.caption(f"24h data × {period_days}")
         st.caption(f"({hourly_precise_count} instances)")
 
     with col2:
-        st.markdown("#### 30d Actual")
-        st.markdown(f"**{total_co2_30d:.3f} kg**")
-        st.caption(f"Actual runtime basis")
+        st.markdown(f"#### Average-Based")
+        st.markdown(f"**{total_co2_average:.3f} kg**")
+        st.caption(f"{period_label} runtime basis")
         st.caption(f"({len(dashboard_data.instances)} instances)")
 
     with col3:
         # Calculate difference and pattern
-        if total_co2_30d > 0:
-            diff_pct = ((total_co2_projected - total_co2_30d) / total_co2_30d) * 100
-            pattern = "Stable" if abs(diff_pct) < 5 else ("Increasing" if diff_pct > 0 else "Decreasing")
+        if total_co2_average > 0:
+            diff_pct = ((total_co2_hourly - total_co2_average) / total_co2_average) * 100
+            pattern = "Stable" if abs(diff_pct) < 5 else ("Higher" if diff_pct > 0 else "Lower")
             st.markdown("#### Difference")
             st.markdown(f"**{diff_pct:+.1f}%**")
             st.caption(f"Pattern: {pattern}")
-            st.caption(f"Δ {total_co2_projected - total_co2_30d:+.3f} kg")
+            st.caption(f"Δ {total_co2_hourly - total_co2_average:+.3f} kg")
         else:
             st.markdown("#### Difference")
             st.caption("N/A")
@@ -201,47 +222,47 @@ def _render_dual_comparison_section(dashboard_data: Any) -> None:
     col1, col2, col3 = st.columns(3)
 
     with col1:
-        st.markdown("#### 24h Projected")
-        st.markdown(f"**€{total_cost_projected:.2f}**")
-        st.caption(f"Daily × 30 projection")
+        st.markdown("#### Hourly-Precise")
+        st.markdown(f"**€{total_cost_hourly:.2f}**")
+        st.caption(f"24h data × {period_days}")
         st.caption(f"({hourly_precise_count} instances)")
 
     with col2:
-        st.markdown("#### 30d Actual")
-        st.markdown(f"**€{total_cost_30d:.2f}**")
-        st.caption(f"Actual runtime basis")
+        st.markdown(f"#### Average-Based")
+        st.markdown(f"**€{total_cost_average:.2f}**")
+        st.caption(f"{period_label} runtime basis")
         st.caption(f"({len(dashboard_data.instances)} instances)")
 
     with col3:
-        if total_cost_30d > 0:
-            diff_pct = ((total_cost_projected - total_cost_30d) / total_cost_30d) * 100
-            pattern = "Stable" if abs(diff_pct) < 5 else ("Increasing" if diff_pct > 0 else "Decreasing")
+        if total_cost_average > 0:
+            diff_pct = ((total_cost_hourly - total_cost_average) / total_cost_average) * 100
+            pattern = "Stable" if abs(diff_pct) < 5 else ("Higher" if diff_pct > 0 else "Lower")
             st.markdown("#### Difference")
             st.markdown(f"**{diff_pct:+.1f}%**")
             st.caption(f"Pattern: {pattern}")
-            st.caption(f"Δ €{total_cost_projected - total_cost_30d:+.2f}")
+            st.caption(f"Δ €{total_cost_hourly - total_cost_average:+.2f}")
         else:
             st.markdown("#### Difference")
             st.caption("N/A")
 
     # Methodology explanation
     with st.expander("📖 Understanding the Comparison", expanded=False):
-        st.markdown("""
-        **24h Projected (Hourly-Precise Method):**
+        st.markdown(f"""
+        **Hourly-Precise Method:**
         - Calculates CO₂ for each of the last 24 hours individually
         - Uses hourly CPU data, carbon intensity, and runtime fractions
-        - Projects to monthly: `daily_co2 × 30`
+        - Scales to {period_days} days: `daily_co2 × {period_days}`
         - **Best for:** Variable workloads, carbon intensity tracking
 
-        **30d Actual (Monthly Average Method):**
-        - Uses total runtime from last 30 days
+        **Average-Based Method:**
+        - Uses total runtime from last {period_days} days
         - Uses average CPU and current carbon intensity
         - **Best for:** Stable workloads, cost validation
 
         **Pattern Analysis:**
         - **Stable (<5% difference):** Consistent workload, both methods agree
-        - **Increasing (>5% higher):** 24h period had higher activity than 30d average
-        - **Decreasing (>5% lower):** 24h period had lower activity than 30d average
+        - **Higher (>5%):** 24h period had higher activity than {period_days}-day average
+        - **Lower (>5%):** 24h period had lower activity than {period_days}-day average
 
         **Thesis Relevance:**
         This comparison validates the hourly-precise method by showing how it differs from
@@ -290,26 +311,37 @@ def _render_calculation_methodology_expander() -> None:
 
 def _render_summary_metrics(dashboard_data: Any) -> None:
     """Render summary metrics and CO₂ formula info."""
-    total_cost = sum(i.monthly_cost_eur for i in dashboard_data.instances if i.monthly_cost_eur is not None)
-    total_co2 = sum(i.monthly_co2_kg for i in dashboard_data.instances if i.monthly_co2_kg is not None)
+    # Get analysis period
+    period_days = getattr(dashboard_data, "analysis_period_days", 30)
+    period_label = f"{period_days}d" if period_days < 30 else "monthly"
+
+    # Use new field names with fallback
+    total_cost = sum(
+        getattr(i, "cost_eur_average", i.monthly_cost_eur if hasattr(i, "monthly_cost_eur") else None) or 0
+        for i in dashboard_data.instances
+    )
+    total_co2 = sum(
+        getattr(i, "co2_kg_average", i.monthly_co2_kg if hasattr(i, "monthly_co2_kg") else None) or 0
+        for i in dashboard_data.instances
+    )
     total_power = sum(i.power_watts for i in dashboard_data.instances if i.power_watts is not None)
 
     col1, col2, col3 = st.columns(3)
 
     with col1:
         st.metric(
-            "Total Monthly Cost",
+            f"Total {period_label.title()} Cost",
             f"€{total_cost:.2f}",
             "Sum of all instances",
-            help="Total monthly costs across all monitored instances. Calculated from CloudTrail runtime hours × AWS Pricing API rates. Excludes reserved instance discounts and data transfer costs."
+            help=f"Total costs across all monitored instances over {period_days} days. Calculated from CloudTrail runtime hours × AWS Pricing API rates. Excludes reserved instance discounts and data transfer costs."
         )
 
     with col2:
         st.metric(
-            "Total Monthly CO₂",
+            f"Total {period_label.title()} CO₂",
             f"{total_co2:.2f} kg",
             "All instances combined",
-            help="Total monthly carbon emissions from all instances. Based on Boavizta power models, CPU utilization from CloudWatch, and ElectricityMaps German grid intensity. Formula: CO₂(kg) = Power(kW) × Intensity(g/kWh) × Runtime(h) ÷ 1000"
+            help=f"Total carbon emissions from all instances over {period_days} days. Based on Boavizta power models, CPU utilization from CloudWatch, and ElectricityMaps German grid intensity. Formula: CO₂(kg) = Power(kW) × Intensity(g/kWh) × Runtime(h) ÷ 1000"
         )
 
     with col3:
@@ -323,8 +355,12 @@ def _render_summary_metrics(dashboard_data: Any) -> None:
 
 def _render_instance_detail_table(dashboard_data: Any) -> None:
     """Render detailed instance table with CO₂ formula components"""
-    st.markdown("### 📊 Instance Analysis - 30-Day Actual Data")
-    st.caption("Per-instance metrics calculated using 30-day actual runtime and average CPU utilization")
+    # Get analysis period
+    period_days = getattr(dashboard_data, "analysis_period_days", 30)
+    period_label = f"{period_days}d" if period_days < 30 else "30-Day"
+
+    st.markdown(f"### 📊 Instance Analysis - {period_label} Average-Based Data")
+    st.caption(f"Per-instance metrics calculated using {period_days}-day actual runtime and average CPU utilization")
 
     if not dashboard_data or not dashboard_data.instances:
         st.warning("No instance data available")
@@ -337,7 +373,7 @@ def _render_instance_detail_table(dashboard_data: Any) -> None:
     table_data = []
 
     for instance in dashboard_data.instances:
-        table_data.append(_prepare_instance_row_data(instance, grid_intensity))
+        table_data.append(_prepare_instance_row_data(instance, grid_intensity, period_days))
 
     if table_data:
         # Create DataFrame
@@ -362,12 +398,12 @@ def _render_hourly_co2_analysis_section(dashboard_data: Any) -> None:
     """
     Render hourly CO2 analysis section for instances with hourly breakdown data.
 
-    Only displays for instances that have hourly_24h_precise calculation method.
+    Only displays for instances that have hourly calculation method.
     """
     # Filter instances with hourly data
     instances_with_hourly = [
         inst for inst in dashboard_data.instances
-        if inst.co2_calculation_method == "hourly_24h_precise" and inst.hourly_co2_breakdown
+        if inst.co2_calculation_method == "hourly" and inst.hourly_co2_breakdown
     ]
 
     if not instances_with_hourly:
@@ -446,14 +482,23 @@ def _render_instance_hourly_analysis(instance: Any) -> None:
         timestamps.append(dt.astimezone())
 
     co2_values = [e.get("co2_g", 0) for e in breakdown]
+    cost_values = [e.get("cost_eur", 0) for e in breakdown]  # NEW: Extract hourly costs
     cpu_values = [e.get("cpu_percent") for e in breakdown if e.get("running", False)]
     carbon_values = [e.get("carbon_intensity") for e in breakdown if e.get("running", False)]
     power_values = [e.get("power_watts") for e in breakdown if e.get("running", False)]
     runtime_fractions = [e.get("runtime_fraction", 0) for e in breakdown]
 
+    # Check if cost data is available
+    has_cost_data = any(cost_values) and any(e.get("cost_eur") is not None for e in breakdown)
+
     # Summary statistics
     st.markdown("#### Summary Statistics (24h)")
-    col1, col2, col3, col4 = st.columns(4)
+
+    # Dynamically adjust columns based on cost data availability
+    if has_cost_data:
+        col1, col2, col3, col4, col5 = st.columns(5)
+    else:
+        col1, col2, col3, col4 = st.columns(4)
 
     with col1:
         st.metric(
@@ -463,34 +508,181 @@ def _render_instance_hourly_analysis(instance: Any) -> None:
         )
 
     with col2:
-        avg_cpu = sum(cpu_values) / len(cpu_values) if cpu_values else 0
-        st.metric(
-            "Avg CPU",
-            f"{avg_cpu:.1f}%",
-            help="Average CPU utilization over the last 24 hours"
-        )
+        if has_cost_data:
+            daily_cost_eur = sum(cost_values)
+            st.metric(
+                "Total Cost (24h)",
+                f"€{daily_cost_eur:.4f}",
+                help="Total cost over the last 24 hours (hourly-precise calculation)"
+            )
+        else:
+            avg_cpu = sum(cpu_values) / len(cpu_values) if cpu_values else 0
+            st.metric(
+                "Avg CPU",
+                f"{avg_cpu:.1f}%",
+                help="Average CPU utilization over the last 24 hours"
+            )
 
     with col3:
-        avg_carbon = sum(carbon_values) / len(carbon_values) if carbon_values else 0
-        st.metric(
-            "Avg Carbon",
-            f"{avg_carbon:.0f} g/kWh",
-            help="Average grid carbon intensity over the last 24 hours"
-        )
+        if has_cost_data:
+            avg_cpu = sum(cpu_values) / len(cpu_values) if cpu_values else 0
+            st.metric(
+                "Avg CPU",
+                f"{avg_cpu:.1f}%",
+                help="Average CPU utilization over the last 24 hours"
+            )
+        else:
+            avg_carbon = sum(carbon_values) / len(carbon_values) if carbon_values else 0
+            st.metric(
+                "Avg Carbon",
+                f"{avg_carbon:.0f} g/kWh",
+                help="Average grid carbon intensity over the last 24 hours"
+            )
 
     with col4:
-        monthly_projection = instance.daily_co2_kg * 30 if instance.daily_co2_kg else 0
-        delta = monthly_projection - (instance.monthly_co2_kg or 0)
-        st.metric(
-            "Monthly (projected)",
-            f"{monthly_projection:.2f} kg",
-            delta=f"{delta:+.2f} kg" if instance.monthly_co2_kg else None,
-            help="Monthly projection: daily × 30 days"
-        )
+        if has_cost_data:
+            avg_carbon = sum(carbon_values) / len(carbon_values) if carbon_values else 0
+            st.metric(
+                "Avg Carbon",
+                f"{avg_carbon:.0f} g/kWh",
+                help="Average grid carbon intensity over the last 24 hours"
+            )
+        else:
+            # Get period-based projection
+            period_days = getattr(instance, "period_days", 30)
+            period_projection = instance.daily_co2_kg * period_days if instance.daily_co2_kg else 0
+            # Use new field name with fallback
+            co2_average = getattr(instance, "co2_kg_average", instance.monthly_co2_kg if hasattr(instance, "monthly_co2_kg") else None)
+            delta = period_projection - (co2_average or 0)
+            st.metric(
+                f"Period Projection ({period_days}d)",
+                f"{period_projection:.2f} kg",
+                delta=f"{delta:+.2f} kg" if co2_average else None,
+                help=f"Period projection: daily × {period_days} days"
+            )
+
+    if has_cost_data:
+        with col5:
+            period_days = getattr(instance, "period_days", 30)
+            period_cost_projection = sum(cost_values) * period_days
+            # Use new field name with fallback
+            cost_average = getattr(instance, "cost_eur_average", instance.monthly_cost_eur if hasattr(instance, "monthly_cost_eur") else None)
+            delta_cost = period_cost_projection - (cost_average or 0)
+            st.metric(
+                f"Period Cost Projection ({period_days}d)",
+                f"€{period_cost_projection:.2f}",
+                delta=f"€{delta_cost:+.2f}" if cost_average else None,
+                help=f"Period cost projection: daily × {period_days} days"
+            )
 
     # Create detailed hourly chart
     from plotly.subplots import make_subplots
     import plotly.graph_objects as go
+
+    # NEW: Synchronized Cost & CO2 Chart (for Thesis validation)
+    if has_cost_data:
+        st.markdown("---")
+        st.markdown("#### 💰 Synchronized Cost & CO2 Timeline (24h)")
+        st.caption(
+            "This chart demonstrates synchronized cost and carbon data on a common timeline, "
+            "enabling simultaneous analysis of both dimensions (Thesis requirement F1)"
+        )
+
+        # Create dual-axis chart: Cost (left) + CO2 (right)
+        fig_cost_co2 = make_subplots(
+            specs=[[{"secondary_y": True}]],
+            subplot_titles=["Hourly Cost & CO2 Emissions - Synchronized Timeline"]
+        )
+
+        # Primary Y-axis (left): Hourly Costs (Bar Chart)
+        fig_cost_co2.add_trace(
+            go.Bar(
+                x=timestamps,
+                y=cost_values,
+                name='Cost (EUR)',
+                marker_color='rgba(54, 162, 235, 0.7)',  # Blue
+                yaxis='y',
+                hovertemplate='<b>%{x}</b><br>Cost: €%{y:.4f}<extra></extra>'
+            ),
+            secondary_y=False
+        )
+
+        # Secondary Y-axis (right): Hourly CO2 (Line Chart)
+        fig_cost_co2.add_trace(
+            go.Scatter(
+                x=timestamps,
+                y=co2_values,
+                name='CO2 (g)',
+                line=dict(color='rgba(75, 192, 192, 1)', width=3),  # Green
+                mode='lines+markers',
+                yaxis='y2',
+                hovertemplate='<b>%{x}</b><br>CO2: %{y:.2f} g<extra></extra>'
+            ),
+            secondary_y=True
+        )
+
+        # Get local timezone name for display
+        import time
+        local_tz_name = time.strftime('%Z')
+
+        # Update layout
+        fig_cost_co2.update_xaxes(title_text="Time", showgrid=True)
+        fig_cost_co2.update_yaxes(
+            title=dict(text="<b>Cost (EUR)</b>", font=dict(color='rgba(54, 162, 235, 1)')),
+            secondary_y=False,
+            showgrid=True
+        )
+        fig_cost_co2.update_yaxes(
+            title=dict(text="<b>CO2 Emissions (g/h)</b>", font=dict(color='rgba(75, 192, 192, 1)')),
+            secondary_y=True,
+            showgrid=False
+        )
+
+        fig_cost_co2.update_layout(
+            height=450,
+            showlegend=True,
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="right",
+                x=1
+            ),
+            hovermode='x unified',
+            title_text=f"<b>Synchronized Cost & CO2 Analysis</b><br><sub>Last 24 hours (times in {local_tz_name}) - Common timeline for simultaneous analysis</sub>",
+            title_font_size=16
+        )
+
+        st.plotly_chart(fig_cost_co2, use_container_width=True)
+
+        # Thesis validation note
+        with st.expander("📚 Thesis Validation - Synchronized Timeline", expanded=False):
+            st.markdown("""
+            **This visualization validates Thesis Requirement F1:**
+
+            > "Das System stellt Kosten- und Emissionsdaten auf einer gemeinsamen Zeitachse dar,
+            > sodass Entscheidungsträger beide Dimensionen simultan analysieren können."
+
+            **Key Features:**
+            - ✅ **Synchronized Timeline**: Both metrics share the same 24-hour X-axis
+            - ✅ **Hourly Precision**: Individual data points for each hour (24 data points)
+            - ✅ **Dual-Axis Design**: Enables direct comparison of Cost (EUR) and CO2 (g)
+            - ✅ **Common Hover**: Hovering shows both values simultaneously
+
+            **Insights from Synchronized View:**
+            - Identify cost peaks and their correlation with carbon intensity
+            - Analyze if high-cost hours align with high-carbon hours
+            - Support carbon-aware scheduling decisions with cost impact visibility
+            - Validate economic vs. environmental trade-offs
+
+            **Data Coverage:** {coverage_hours}/24 hours ({coverage_pct:.0f}% coverage)
+            """.format(
+                coverage_hours=sum(1 for rf in runtime_fractions if rf > 0),
+                coverage_pct=(sum(1 for rf in runtime_fractions if rf > 0) / 24) * 100
+            ))
+
+        st.markdown("---")
+        st.markdown("#### 📊 Detailed Analysis Charts")
 
     fig = make_subplots(
         rows=2, cols=1,
@@ -591,14 +783,14 @@ def _render_instance_hourly_analysis(instance: Any) -> None:
 
 def _render_co2_method_badge(method: str) -> None:
     """Render badge indicating CO2 calculation method."""
-    if method == "hourly_24h_precise":
-        st.success("🟢 Calculation Method: Hourly Precise (24h)")
+    if method == "hourly":
+        st.success("🟢 Calculation Method: Hourly-Precise")
         st.caption(
             "This instance uses hourly-precise calculation with individual CPU, "
             "carbon intensity, and runtime values for each of the last 24 hours."
         )
-    elif method == "monthly_average":
-        st.info("🔵 Calculation Method: Monthly Average")
+    elif method == "average":
+        st.info("🔵 Calculation Method: Average-Based")
         st.caption(
             "This instance uses average calculation (24h CPU average × current carbon intensity × total runtime)."
         )

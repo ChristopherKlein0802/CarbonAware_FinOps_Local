@@ -106,7 +106,7 @@ flowchart TB
 # AWS Gateway
 {
     "instance_id": "i-abc123",
-    "instance_type": "t3.medium",
+    "instance_type": "m6a.large",
     "state": "running",
     "launch_time": "2025-01-01T00:00:00Z"
 }

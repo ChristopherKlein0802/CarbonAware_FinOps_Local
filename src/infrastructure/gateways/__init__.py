@@ -54,8 +54,8 @@ class InfrastructureGateway:
     def get_instance_pricing(self, instance_type: str, region: str) -> Optional[float]:
         return self._aws.get_instance_pricing(instance_type, region)
 
-    def get_monthly_costs(self, region: str):
-        return self._aws.get_monthly_costs(region)
+    def get_costs(self, region: str, period_days: int = 30):
+        return self._aws.get_costs(region, period_days)
 
     def get_hourly_costs(self, hours: int, region: str):
         return self._aws.get_hourly_costs(hours, region)

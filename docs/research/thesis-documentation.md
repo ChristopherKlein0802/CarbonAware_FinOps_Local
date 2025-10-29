@@ -49,7 +49,11 @@ CloudTrail is primarily used for compliance [13]. This work examines its applica
 
 ## 6. Validation Status
 
-- **Test Environment:** Four AWS instances (t3.micro to t3.large)
+- **Test Environment:** Four AWS m6a.large instances (non-burstable) representing realistic SME scenarios:
+  - `baseline-24x7`: Always-on database (24/7, 40% CPU)
+  - `office-hours`: Business application (Mo-Fr 8-18h, 60% CPU)
+  - `night-batch`: Batch processing (daily 22-6h, 80% CPU)
+  - `variable-load`: Dev/test environment (daily 6-22h, 30-70% CPU)
 - **Costs & Emissions:** Currently literature-based savings potentials; empirical confirmation requires production CloudTrail and Cost Explorer data
 - **Accuracy:** Without complete CloudTrail data, the validation factor remains theory-based
 

@@ -60,21 +60,24 @@ class FetchInfrastructureDataUseCase:
         # Track last API call timestamps for dashboard transparency
         self.api_last_calls: dict[str, Optional[datetime]] = {}
 
-    def execute(self, *, force_refresh: bool = False) -> DashboardData:
+    def execute(self, *, force_refresh: bool = False, period_days: int = 30) -> DashboardData:
         """
         Execute infrastructure data fetching workflow.
 
         Args:
             force_refresh: Bypass cache and fetch fresh data
+            period_days: Analysis period in days (1, 7, or 30)
 
         Returns:
-            DashboardData with enriched instances and metrics
+            DashboardData with enriched instances and period-based metrics
 
         Raises:
             AWSAuthenticationError, ClientError, ValueError, TypeError
         """
         # Reset API call log for this processing cycle
         self.api_last_calls = {}
+
+        logger.info(f"📊 Starting infrastructure analysis with {period_days}-day period")
 
         # Step 1: Get carbon intensity (1h cache)
         carbon_intensity = self.carbon_service.get_current_intensity(region="eu-central-1")
@@ -95,8 +98,8 @@ class FetchInfrastructureDataUseCase:
         if not instances:
             raise ValueError("No EC2 instances found")
 
-        # Step 4: Get cost data once for proportional allocation (region-specific)
-        cost_data = self.gateway.get_monthly_costs("eu-central-1")
+        # Step 4: Get cost data for specified period (region-specific)
+        cost_data = self.gateway.get_costs("eu-central-1", period_days)
         fetched_at = getattr(cost_data, "fetched_at", None) if cost_data else None
         if isinstance(fetched_at, datetime):
             if fetched_at.tzinfo is None:
@@ -115,6 +118,7 @@ class FetchInfrastructureDataUseCase:
                 carbon_intensity=carbon_intensity.value,
                 carbon_history=carbon_history,  # NEW: Pass carbon history for hourly calculation
                 force_refresh=force_refresh,
+                period_days=period_days,  # Pass analysis period to enrichment
             )
             if enriched:
                 processed_instances.append(enriched)
@@ -127,38 +131,45 @@ class FetchInfrastructureDataUseCase:
 
         # Step 8: Calculate totals with dual comparison
         # Separate instances by calculation method
-        hourly_precise_instances = [i for i in processed_instances if i.co2_calculation_method == "hourly_24h_precise"]
-        fallback_instances = [i for i in processed_instances if i.co2_calculation_method == "monthly_average"]
+        hourly_precise_instances = [i for i in processed_instances if i.co2_calculation_method == "hourly"]
+        fallback_instances = [i for i in processed_instances if i.co2_calculation_method == "average"]
 
-        # Total costs: Use 30d actual (existing field) for backward compatibility
-        total_cost_eur = sum(inst.monthly_cost_eur for inst in processed_instances if inst.monthly_cost_eur is not None)
-        total_co2_kg = sum(inst.monthly_co2_kg for inst in processed_instances if inst.monthly_co2_kg is not None)
-
-        # NEW: Separate totals for comparison
-        # 24h projected totals (only from hourly-precise instances)
-        total_cost_projected_eur = sum(
-            inst.monthly_cost_projected_eur for inst in hourly_precise_instances
-            if inst.monthly_cost_projected_eur is not None
+        # Aggregate totals for both calculation methods
+        # Hourly-Precise totals (from instances with 24h carbon data)
+        total_cost_hourly = sum(
+            inst.cost_eur_hourly for inst in hourly_precise_instances
+            if inst.cost_eur_hourly is not None
         )
-        total_co2_projected_kg = sum(
-            inst.monthly_co2_kg_projected for inst in hourly_precise_instances
-            if inst.monthly_co2_kg_projected is not None
+        total_co2_hourly = sum(
+            inst.co2_kg_hourly for inst in hourly_precise_instances
+            if inst.co2_kg_hourly is not None
         )
 
-        # 30d actual totals (from all instances)
-        total_cost_30d_eur = sum(inst.monthly_cost_eur for inst in processed_instances if inst.monthly_cost_eur is not None)
-        total_co2_30d_kg = sum(inst.monthly_co2_kg_30d for inst in processed_instances if inst.monthly_co2_kg_30d is not None)
+        # Average-Based totals (from all instances)
+        total_cost_average = sum(
+            inst.cost_eur_average for inst in processed_instances
+            if inst.cost_eur_average is not None
+        )
+        total_co2_average = sum(
+            inst.co2_kg_average for inst in processed_instances
+            if inst.co2_kg_average is not None
+        )
+
+        # DEPRECATED: Backward compatibility fields (use average-based totals)
+        total_cost_eur = total_cost_average
+        total_co2_kg = total_co2_average
 
         logger.info(
-            f"📊 Aggregation: {len(hourly_precise_instances)} hourly-precise, {len(fallback_instances)} fallback | "
-            f"CO2: {total_co2_projected_kg:.3f} kg (24h×30) vs {total_co2_30d_kg:.3f} kg (30d actual)"
+            f"📊 Aggregation: {len(hourly_precise_instances)} hourly-precise, {len(fallback_instances)} average-based | "
+            f"CO2: {total_co2_hourly:.3f} kg (hourly) vs {total_co2_average:.3f} kg (average) | "
+            f"Cost: €{total_cost_hourly:.2f} (hourly) vs €{total_cost_average:.2f} (average)"
         )
 
         # Step 9: Enhanced validation - compare calculated costs with actual AWS spending
-        # NOTE: Use 30d actual costs for validation (not 24h projected) for factual comparison
+        # NOTE: Use average-based costs for validation (factual runtime-based comparison)
         validation_factor = self.calculator.calculate_cloudtrail_enhanced_accuracy(
             processed_instances,
-            total_cost_eur,  # 30d actual (same as total_cost_30d_eur)
+            total_cost_average,  # Average-based total for validation
             cost_data,
             original_instances=None,
         )
@@ -168,9 +179,10 @@ class FetchInfrastructureDataUseCase:
         cloudtrail_coverage, cloudtrail_tracked = self._calculate_cloudtrail_coverage(processed_instances)
 
         # Step 12: Calculate business case with validation factor awareness
+        # NOTE: Using average-based totals as baseline (most conservative estimate)
         business_case = self.calculator.calculate_business_case(
-            baseline_cost=total_cost_eur,
-            baseline_co2=total_co2_kg,
+            baseline_cost=total_cost_average,
+            baseline_co2=total_co2_average,
             validation_factor=validation_factor,
         )
 
@@ -178,6 +190,15 @@ class FetchInfrastructureDataUseCase:
         dashboard_data = DashboardData(
             instances=processed_instances,
             carbon_intensity=carbon_intensity,
+            analysis_period_days=period_days,
+            # New field names (primary)
+            total_cost_hourly=total_cost_hourly,
+            total_co2_hourly=total_co2_hourly,
+            total_cost_average=total_cost_average,
+            total_co2_average=total_co2_average,
+            hourly_precise_count=len(hourly_precise_instances),
+            fallback_count=len(fallback_instances),
+            # DEPRECATED: Backward compatibility fields
             total_cost_eur=total_cost_eur,
             total_co2_kg=total_co2_kg,
             business_case=business_case,
@@ -194,17 +215,11 @@ class FetchInfrastructureDataUseCase:
             cloudtrail_tracked_instances=cloudtrail_tracked,
             carbon_history=carbon_history or [],
             self_collected_carbon_history=self_collected_history or [],
-            # NEW: Dual comparison aggregates
-            total_cost_projected_eur=total_cost_projected_eur,
-            total_co2_projected_kg=total_co2_projected_kg,
-            total_cost_30d_eur=total_cost_30d_eur,
-            total_co2_30d_kg=total_co2_30d_kg,
-            hourly_precise_count=len(hourly_precise_instances),
-            fallback_count=len(fallback_instances),
         )
 
         logger.info(
-            f"✅ Infrastructure analysis complete: {len(processed_instances)} instances, €{total_cost_eur:.2f} monthly"
+            f"✅ Infrastructure analysis complete: {len(processed_instances)} instances, "
+            f"€{total_cost_average:.2f} ({period_days}d period)"
         )
         return dashboard_data
 

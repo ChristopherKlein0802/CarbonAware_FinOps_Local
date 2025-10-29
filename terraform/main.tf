@@ -66,44 +66,49 @@ data "aws_ami" "amazon_linux" {
   }
 }
 
-# Optimized test instances for Bachelor thesis validation
-# 4 instances covering key scenarios with academic rigor and cost efficiency
+# Test instances for Bachelor thesis - realistic SME scenarios
+# 4 m6a instances (non-burstable) representing typical German SME workloads
+# These instances validate the integrated Cost+CO2 monitoring approach
 resource "aws_instance" "test_instances" {
   for_each = var.test_instance_count > 0 ? {
-    # Small instance - SME baseline scenario
-    "sme-small" = {
-      schedule      = "Current: Always Running (SME Analysis)"
-      purpose       = "SME workload optimization analysis (baseline)"
-      description   = "Small instance - SME office hours optimization potential"
-      instance_type = "t3.small"
-      scenario      = "SME Office Hours (60-72% savings potential)"
+    # Scenario 1: Always-On Database (Baseline)
+    # Represents critical infrastructure that cannot be stopped
+    # Purpose: Baseline for comparison, validates 24/7 cost and carbon tracking
+    "baseline-24x7" = {
+      instance_type = "m6a.large"
+      cpu_target    = "40%"
+      schedule      = "24/7"
+      purpose       = "Always-on baseline (critical database)"
     }
 
-    # Medium instance - Core business scenario  
-    "business-medium" = {
-      schedule      = "Current: Always Running (Business Analysis)"
-      purpose       = "Core business workload carbon-aware optimization"
-      description   = "Medium instance - primary carbon scheduling analysis"
-      instance_type = "t3.medium"
-      scenario      = "Carbon-Aware Scheduling (15-35% CO2 reduction)"
+    # Scenario 2: Office-Hours Application
+    # Represents business applications used only during work hours (Mo-Fr 8-18h)
+    # Purpose: Demonstrates office-hours optimization potential (15-25% cost savings)
+    "office-hours" = {
+      instance_type = "m6a.large"
+      cpu_target    = "60%"
+      schedule      = "Mo-Fr 8-18h"
+      purpose       = "Office-hours app (business hours only)"
     }
 
-    # Large instance - Enterprise scenario
-    "enterprise-large" = {
-      schedule      = "Current: Always Running (Enterprise Analysis)"
-      purpose       = "Enterprise workload comprehensive optimization"
-      description   = "Large instance - multi-strategy optimization analysis"
-      instance_type = "t3.large"
-      scenario      = "Hybrid Strategy (Cost + Carbon optimization)"
+    # Scenario 3: Night Batch Processing
+    # Represents batch jobs scheduled during low-carbon grid times (22-6h)
+    # Purpose: Validates carbon-aware scheduling (15-35% CO2 reduction)
+    "night-batch" = {
+      instance_type = "m6a.large"
+      cpu_target    = "80%"
+      schedule      = "Daily 22-6h"
+      purpose       = "Night batch job (carbon-aware candidate)"
     }
 
-    # Micro instance - Edge/Cost-sensitive scenario
-    "edge-micro" = {
-      schedule      = "Current: Always Running (Edge Analysis)"
-      purpose       = "Edge computing and cost-sensitive analysis"
-      description   = "Micro instance - edge computing optimization validation"
-      instance_type = "t3.micro"
-      scenario      = "Weekend-Only (25-30% savings potential)"
+    # Scenario 4: Variable Workload
+    # Represents dev/test environments with fluctuating load patterns
+    # Purpose: Validates power consumption model with variable CPU utilization
+    "variable-load" = {
+      instance_type = "m6a.large"
+      cpu_target    = "30-70% alternating"
+      schedule      = "Daily 6-22h"
+      purpose       = "Variable workload (dev/test environment)"
     }
   } : {}
 
@@ -113,19 +118,13 @@ resource "aws_instance" "test_instances" {
   user_data     = file("${path.module}/user-data/${each.key}.sh")
 
   tags = merge(local.common_tags, {
-    Name             = "${local.project_name}-${each.key}"
-    ScheduleType     = each.key
-    Purpose          = each.value.purpose
-    Schedule         = each.value.schedule
-    Description      = each.value.description
-    Scenario         = each.value.scenario
-    AnalysisTarget   = "true"
-    ThesisValidation = "Bachelor-2025"
-    # Enhanced analytics tags
-    BusinessSize     = each.key == "sme-small" ? "SME" : each.key == "business-medium" ? "Business" : each.key == "enterprise-large" ? "Enterprise" : "Edge"
-    OptimizationType = each.key == "sme-small" ? "OfficeHours" : each.key == "business-medium" ? "CarbonAware" : each.key == "enterprise-large" ? "Hybrid" : "WeekendOnly"
-    PowerConsumption = each.value.instance_type == "t3.micro" ? "8.2W" : each.value.instance_type == "t3.small" ? "10.7W" : each.value.instance_type == "t3.medium" ? "11.5W" : "18.4W"
-    ResearchFocus    = "German-SME-CarbonAware-FinOps"
+    Name          = "${local.project_name}-${each.key}"
+    CPUTarget     = each.value.cpu_target
+    Schedule      = each.value.schedule
+    Purpose       = each.value.purpose
+    Scenario      = each.key
+    TestInstance  = "true"
+    Thesis        = "BA-CarbonAware-FinOps-2025"
   })
 
   lifecycle {
