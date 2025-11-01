@@ -6,8 +6,7 @@ amazon-linux-extras install epel -y || true
 yum install -y stress-ng
 
 # Variable Load: Alternates between 30% and 70% CPU
-# This simulates dev/test environments with fluctuating workloads
-# Validates the power consumption model under variable conditions
+# Validates the power consumption model under fluctuating utilization patterns
 cat <<'SCRIPT' >/usr/local/bin/cpu-load.sh
 #!/bin/bash
 while true; do

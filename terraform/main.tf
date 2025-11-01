@@ -66,49 +66,41 @@ data "aws_ami" "amazon_linux" {
   }
 }
 
-# Test instances for Bachelor thesis - realistic SME scenarios
-# 4 m6a instances (non-burstable) representing typical German SME workloads
-# These instances validate the integrated Cost+CO2 monitoring approach
+# Test instances for Bachelor thesis - CPU load scenarios
+# 4 m6a instances (non-burstable) with varying CPU utilization levels
+# These instances validate the power consumption model and CO2 impact correlation
 resource "aws_instance" "test_instances" {
   for_each = var.test_instance_count > 0 ? {
-    # Scenario 1: Always-On Database (Baseline)
-    # Represents critical infrastructure that cannot be stopped
-    # Purpose: Baseline for comparison, validates 24/7 cost and carbon tracking
-    "baseline-24x7" = {
+    # Scenario 1: Low Load (40% CPU)
+    # Validates baseline power consumption at low utilization
+    "cpu-40pct" = {
       instance_type = "m6a.large"
       cpu_target    = "40%"
-      schedule      = "24/7"
-      purpose       = "Always-on baseline (critical database)"
+      workload_type = "Low-intensity baseline"
     }
 
-    # Scenario 2: Office-Hours Application
-    # Represents business applications used only during work hours (Mo-Fr 8-18h)
-    # Purpose: Demonstrates office-hours optimization potential (15-25% cost savings)
-    "office-hours" = {
+    # Scenario 2: Medium Load (60% CPU)
+    # Validates power consumption at moderate utilization
+    "cpu-60pct" = {
       instance_type = "m6a.large"
       cpu_target    = "60%"
-      schedule      = "Mo-Fr 8-18h"
-      purpose       = "Office-hours app (business hours only)"
+      workload_type = "Medium-intensity workload"
     }
 
-    # Scenario 3: Night Batch Processing
-    # Represents batch jobs scheduled during low-carbon grid times (22-6h)
-    # Purpose: Validates carbon-aware scheduling (15-35% CO2 reduction)
-    "night-batch" = {
+    # Scenario 3: High Load (80% CPU)
+    # Validates power consumption at high utilization
+    "cpu-80pct" = {
       instance_type = "m6a.large"
       cpu_target    = "80%"
-      schedule      = "Daily 22-6h"
-      purpose       = "Night batch job (carbon-aware candidate)"
+      workload_type = "High-intensity compute"
     }
 
-    # Scenario 4: Variable Workload
-    # Represents dev/test environments with fluctuating load patterns
-    # Purpose: Validates power consumption model with variable CPU utilization
-    "variable-load" = {
+    # Scenario 4: Variable Load (30-70% CPU alternating)
+    # Validates power consumption model under fluctuating utilization
+    "cpu-variable" = {
       instance_type = "m6a.large"
-      cpu_target    = "30-70% alternating"
-      schedule      = "Daily 6-22h"
-      purpose       = "Variable workload (dev/test environment)"
+      cpu_target    = "30-70%"
+      workload_type = "Fluctuating workload pattern"
     }
   } : {}
 
@@ -120,8 +112,7 @@ resource "aws_instance" "test_instances" {
   tags = merge(local.common_tags, {
     Name          = "${local.project_name}-${each.key}"
     CPUTarget     = each.value.cpu_target
-    Schedule      = each.value.schedule
-    Purpose       = each.value.purpose
+    WorkloadType  = each.value.workload_type
     Scenario      = each.key
     TestInstance  = "true"
     Thesis        = "BA-CarbonAware-FinOps-2025"

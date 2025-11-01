@@ -5,10 +5,9 @@ set -xeuo pipefail
 amazon-linux-extras install epel -y || true
 yum install -y stress-ng
 
-# Night Batch: High 80% CPU load (simulates batch processing)
-# This represents compute-intensive jobs that can be scheduled
-# during low-carbon grid times (Solar/Wind peaks: 22-6h)
-# Uses 2 CPU workers for xlarge instance
+# High Load: High 80% CPU load
+# Validates power consumption model at high utilization
+# Uses 2 CPU workers to simulate compute-intensive workloads
 cat <<'SCRIPT' >/usr/local/bin/cpu-load.sh
 #!/bin/bash
 while true; do
@@ -21,5 +20,4 @@ chmod +x /usr/local/bin/cpu-load.sh
 # Start CPU load in background
 nohup /usr/local/bin/cpu-load.sh >/var/log/cpu-load.log 2>&1 &
 
-echo "Night batch instance configured: 80% CPU load (2 workers)"
-echo "Note: Manual start/stop or EventBridge rules needed for night-only schedule (22-6h)"
+echo "CPU 80% instance configured: Constant high load (2 workers)"

@@ -5,8 +5,8 @@ set -xeuo pipefail
 amazon-linux-extras install epel -y || true
 yum install -y stress-ng
 
-# Baseline: Constant 40% CPU load (simulates always-on database)
-# This represents critical infrastructure that runs 24/7
+# Low Load: Constant 40% CPU load
+# Validates power consumption model at baseline utilization
 cat <<'SCRIPT' >/usr/local/bin/cpu-load.sh
 #!/bin/bash
 while true; do
@@ -19,4 +19,4 @@ chmod +x /usr/local/bin/cpu-load.sh
 # Start CPU load in background
 nohup /usr/local/bin/cpu-load.sh >/var/log/cpu-load.log 2>&1 &
 
-echo "Baseline 24x7 instance configured: 40% CPU load"
+echo "CPU 40% instance configured: Constant low load"

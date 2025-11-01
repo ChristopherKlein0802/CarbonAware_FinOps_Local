@@ -49,13 +49,15 @@ CloudTrail is primarily used for compliance [13]. This work examines its applica
 
 ## 6. Validation Status
 
-- **Test Environment:** Four AWS m6a.large instances (non-burstable) representing realistic SME scenarios:
-  - `baseline-24x7`: Always-on database (24/7, 40% CPU)
-  - `office-hours`: Business application (Mo-Fr 8-18h, 60% CPU)
-  - `night-batch`: Batch processing (daily 22-6h, 80% CPU)
-  - `variable-load`: Dev/test environment (daily 6-22h, 30-70% CPU)
+- **Test Environment:** Four AWS m6a.large instances (non-burstable) with varying CPU utilization levels to validate the power consumption model:
+  - `cpu-40pct`: Low-intensity baseline workload (40% CPU, 24/7)
+  - `cpu-60pct`: Medium-intensity workload (60% CPU, 24/7)
+  - `cpu-80pct`: High-intensity compute workload (80% CPU, 24/7)
+  - `cpu-variable`: Fluctuating workload pattern (30-70% CPU alternating, 24/7)
+- **Focus:** Validating the correlation between CPU utilization, power consumption, and CO₂ emissions across different grid carbon intensities
 - **Costs & Emissions:** Currently literature-based savings potentials; empirical confirmation requires production CloudTrail and Cost Explorer data
 - **Accuracy:** Without complete CloudTrail data, the validation factor remains theory-based
+- **Note:** Instances run continuously (24/7) to ensure consistent measurement data. Scheduling optimization potentials (office-hours, carbon-aware timing) are demonstrated conceptually based on the collected metrics
 
 **Validation Metrics:**
 - **CloudTrail Coverage:** Measures data quality through percentage of instances with complete runtime data (target: ≥90%)

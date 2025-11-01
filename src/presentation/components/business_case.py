@@ -73,7 +73,7 @@ def _render_business_case_summary(dashboard_data: DashboardData) -> None:
             "Monthly Savings",
             _format_eur(business_case.integrated_savings_eur),
             "vs current spending",
-            help="Estimated monthly cost savings from carbon-aware scheduling and office-hours optimization. "
+            help="Estimated monthly cost savings from potential workload optimization (right-sizing, scheduling). "
                  "Based on moderate scenario (15-25% factors from McKinsey). Adjusted for infrastructure size and data quality. "
                  "Conservative estimate requires empirical validation."
         )
