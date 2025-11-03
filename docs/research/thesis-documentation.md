@@ -24,16 +24,25 @@ CloudTrail is primarily used for compliance [13]. This work examines its applica
 
 1. **Problem Identification:** Analysis of existing FinOps and carbon tools using an evaluation matrix to identify integration gaps.
 
-2. **Data Integration:** ElectricityMaps (carbon intensity), Boavizta (hardware models), AWS Cost Explorer/Pricing (costs), CloudTrail (runtime), and CloudWatch (CPU utilization) are combined through the data orchestrator.
+2. **Data Integration:** ElectricityMaps (carbon intensity), Boavizta (hardware models), AWS Cost Explorer/Pricing (costs), CloudTrail (runtime), and CloudWatch (CPU utilization) are combined through the data orchestrator.[^1]
+
+[^1]: The system uses direct API integration without intermediate database storage (e.g., DynamoDB). This architectural decision simplifies the implementation and aligns with the No-Fallback Policy, ensuring real-time data freshness while reducing infrastructure complexity.
 
 3. **No-Fallback Policy:** API failures are transparently reported; no synthetic replacement values are used.
 
 4. **Calculation Models:**
    - CO₂ = Power (kW) × Intensity (g/kWh) × Runtime (h) / 1000 [4], [6]
-   - Power values based on the 30/70 model for server load [1], [2]
+   - Power values based on the energy-proportional computing model (30% idle, 70% variable) from Barroso & Hölzle [1]
    - Business factors use conservative literature values (15–25% costs, 15–35% CO₂) [7], [8], [15]
 
 5. **Uncertainties:** Dashboard responses include metadata on sources, measurement intervals, and uncertainties (±5% carbon, ±10% power, ±2% costs, ±15% scenarios).
+
+6. **Dual Calculation Methods (v2.0.0):**
+   - **Hourly-Precise Method:** Calculates CO₂ emissions using hourly carbon intensity data over a 24-hour period, then projects to monthly values
+   - **Average-Based Method:** Uses average power consumption and carbon intensity over the entire analysis period (1, 7, or 30 days)
+   - Both methods are calculated in parallel for cross-validation and increased confidence in results
+
+7. **Flexible Time Windows (v2.0.0):** The system supports analysis periods of 1, 7, or 30 days, allowing users to adapt the analysis scope to their specific needs. All cost validation and carbon calculations are period-aligned.
 
 ## 4. Ethical and Academic Considerations
 
@@ -57,11 +66,11 @@ CloudTrail is primarily used for compliance [13]. This work examines its applica
 - **Focus:** Validating the correlation between CPU utilization, power consumption, and CO₂ emissions across different grid carbon intensities
 - **Costs & Emissions:** Currently literature-based savings potentials; empirical confirmation requires production CloudTrail and Cost Explorer data
 - **Accuracy:** Without complete CloudTrail data, the validation factor remains theory-based
-- **Note:** Instances run continuously (24/7) to ensure consistent measurement data. Scheduling optimization potentials (office-hours, carbon-aware timing) are demonstrated conceptually based on the collected metrics
+- **Note:** Instances run continuously (24/7) to ensure consistent measurement data. Scheduling optimization potentials (e.g., office-hours, carbon-aware timing) are analyzed conceptually based on the collected metrics, though test instances themselves operate around-the-clock for validation purposes
 
 **Validation Metrics:**
 - **CloudTrail Coverage:** Measures data quality through percentage of instances with complete runtime data (target: ≥90%)
-- **Validation Factor:** Compares calculated costs (CloudTrail + Pricing API) with AWS Cost Explorer for plausibility check
+- **Validation Factor:** Compares calculated costs (CloudTrail + Pricing API) with AWS Cost Explorer for the selected analysis period (1, 7, or 30 days) for plausibility check
 
 ## 7. Future Work
 
@@ -72,3 +81,8 @@ CloudTrail is primarily used for compliance [13]. This work examines its applica
 ## 8. References
 
 All citations refer to the bibliography in `docs/research/references.md`.
+
+**Additional Technical Documentation:**
+- **System Architecture:** `docs/architecture/system-architecture.md` - Detailed component descriptions, API specifications, and cache strategies
+- **Calculation Methodology:** `docs/methodology/calculations.md` - In-depth formulas, uncertainty quantification, and validation approaches
+- **Implementation Details:** See source code documentation in `src/domain/`, `src/application/`, and `src/infrastructure/` for specific implementations
