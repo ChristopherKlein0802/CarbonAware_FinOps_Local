@@ -44,6 +44,37 @@ CloudTrail is primarily used for compliance [13]. This work examines its applica
 
 7. **Flexible Time Windows (v2.0.0):** The system supports analysis periods of 1, 7, or 30 days, allowing users to adapt the analysis scope to their specific needs. All cost validation and carbon calculations are period-aligned.
 
+8. **Technical Implementation Details (v2.0.0):**
+
+   **Period Propagation Pipeline:**
+   The `period_days` parameter flows through the entire data processing stack to ensure consistency:
+   ```
+   App.py (UI) → Orchestrator → FetchInfrastructureData → EnrichInstance → RuntimeService
+                                                        ↓
+                                                   AWSGateway (Cost Explorer)
+   ```
+
+   **Period-Aligned Cost Validation:**
+   - Cost Explorer queries use the same `period_days` window as CloudTrail runtime calculations
+   - Prevents contamination from historical instances no longer in service
+   - Cache keys include period: `costs_{period_days}d_{region}` to prevent cross-period data mixing
+
+   **Field Migration (Backward Compatible):**
+   - **Deprecated**: `monthly_co2_kg`, `monthly_cost_eur`, `total_cost_eur`, `total_co2_kg`
+   - **New**: `co2_kg_average`, `cost_eur_average`, `co2_kg_hourly`, `cost_eur_hourly`
+   - **Migration Path**: Fallback-safe getattr patterns for transition period
+   - All UI components use primary fields with optional deprecated fallbacks
+
+   **Cost Explorer Direct Storage:**
+   - New field `cost_explorer_eur` stores actual AWS Cost Explorer value in EUR
+   - Previously calculated via `total_cost × validation_factor` (removed for accuracy)
+   - Validation factor remains as ratio for comparison but not for calculation
+
+   **Cache Strategy:**
+   - Cache invalidation triggered on period change in session state
+   - Period-specific cache keys prevent stale data across different time windows
+   - Cost Explorer cached for 24h aligned to period boundaries
+
 ## 4. Ethical and Academic Considerations
 
 - **Privacy:** Only infrastructure metrics are processed, no personal data.

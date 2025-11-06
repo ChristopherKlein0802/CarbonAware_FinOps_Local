@@ -69,12 +69,18 @@ def _render_business_case_summary(dashboard_data: DashboardData) -> None:
 
     with impact_col1:
         st.markdown("**💰 Financial Impact**")
+
+        # Get analysis period to show which calculation method is used
+        period_days = getattr(dashboard_data, "analysis_period_days", 30)
+        period_label = f"{period_days}d" if period_days < 30 else "monthly"
+
         st.metric(
-            "Monthly Savings",
+            f"{period_label.title()} Savings",
             _format_eur(business_case.integrated_savings_eur),
             "vs current spending",
-            help="Estimated monthly cost savings from potential workload optimization (right-sizing, scheduling). "
-                 "Based on moderate scenario (15-25% factors from McKinsey). Adjusted for infrastructure size and data quality. "
+            help=f"Estimated {period_label} cost savings from potential workload optimization (right-sizing, scheduling). "
+                 "Uses **Average Runtime Based** calculation as baseline (most conservative estimate). "
+                 f"Based on moderate scenario (15-25% factors from McKinsey). Adjusted for infrastructure size and data quality. "
                  "Conservative estimate requires empirical validation."
         )
         st.metric(
@@ -87,7 +93,7 @@ def _render_business_case_summary(dashboard_data: DashboardData) -> None:
 
     with impact_col2:
         st.markdown("**🌍 Environmental Impact**")
-        current_co2 = dashboard_data.total_co2_kg
+        current_co2 = dashboard_data.total_co2_average  # Use average-based total (same as cost baseline)
         co2_savings = business_case.integrated_co2_reduction_kg or (current_co2 * 0.08 if current_co2 else 0.0)
         st.metric(
             "CO₂ Reduction",
@@ -123,7 +129,7 @@ def _render_csrd_readiness(dashboard_data: DashboardData) -> None:
         runtime_tracked = len([i for i in dashboard_data.instances if getattr(i, "runtime_hours", None) is not None])
 
         grid_available = dashboard_data.carbon_intensity is not None
-        cost_available = dashboard_data.total_cost_eur > 0
+        cost_available = dashboard_data.total_cost_average > 0
 
         col1, col2, col3 = st.columns(3)
 
@@ -242,10 +248,18 @@ def _render_action_recommendations(dashboard_data: DashboardData, carbon_series:
         cpu_value = getattr(inst, "cpu_utilization", None)
         if state_value == "running" and cpu_value is not None and cpu_value < 15:
             low_cpu_candidates.append(inst)
-    for inst in sorted(low_cpu_candidates, key=lambda i: (i.monthly_cost_eur or 0), reverse=True):
+    # Sort by cost (use period-agnostic field with fallback)
+    def get_cost(inst):
+        cost = getattr(inst, "cost_eur_average", None)
+        if cost is None and hasattr(inst, "monthly_cost_eur"):
+            cost = inst.monthly_cost_eur  # Fallback for backward compatibility
+        return cost or 0
+
+    for inst in sorted(low_cpu_candidates, key=get_cost, reverse=True):
         name = inst.instance_name or inst.instance_id
+        cost = get_cost(inst)
         recommendations.append(
-            f"💤 **Rightsize {name}** – {inst.cpu_utilization:.1f}% CPU at €{(inst.monthly_cost_eur or 0):.2f}/month."
+            f"💤 **Rightsize {name}** – {inst.cpu_utilization:.1f}% CPU at €{cost:.2f}/period."
             " Consider a smaller instance class or automated stop scheduling."
         )
 

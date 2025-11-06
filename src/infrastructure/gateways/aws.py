@@ -375,10 +375,20 @@ class AWSClient:
         # AWS Cost Explorer limits: HOURLY max 14 days, DAILY unlimited
         granularity = "HOURLY" if period_days <= 14 else "DAILY"
 
+        # AWS requires different date formats for different granularities:
+        # - HOURLY: "YYYY-MM-DDTHH:MM:SSZ" (ISO 8601 with time)
+        # - DAILY:  "YYYY-MM-DD" (date only, no time component)
+        if granularity == "HOURLY":
+            start_str = f"{start_date.isoformat()}T00:00:00Z"
+            end_str = f"{end_date.isoformat()}T00:00:00Z"
+        else:  # DAILY
+            start_str = start_date.isoformat()
+            end_str = end_date.isoformat()
+
         request_kwargs: Dict[str, Any] = {
             "TimePeriod": {
-                "Start": start_date.strftime("%Y-%m-%d"),
-                "End": end_date.strftime("%Y-%m-%d")
+                "Start": start_str,
+                "End": end_str
             },
             "Granularity": granularity,
             "Metrics": ["UnblendedCost"],

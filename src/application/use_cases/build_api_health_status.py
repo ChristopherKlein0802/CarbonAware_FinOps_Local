@@ -64,6 +64,10 @@ class BuildAPIHealthStatusUseCase:
         pricing_instances = [inst for inst in processed_instances if inst.hourly_price_usd is not None]
         power_instances = [inst for inst in processed_instances if inst.power_watts is not None]
 
+        # Filter for running instances only (stopped instances don't have power consumption)
+        running_instances = [inst for inst in processed_instances if inst.state and inst.state.lower() == "running"]
+        power_instances_running = [inst for inst in running_instances if inst.power_watts is not None]
+
         # Derive status for AWS services
         cloudtrail_status, cloudtrail_healthy, cloudtrail_message = self._derive_status(
             has_full=len(runtime_instances) == len(processed_instances),
@@ -93,12 +97,12 @@ class BuildAPIHealthStatusUseCase:
         )
 
         power_status, power_healthy, power_message = self._derive_status(
-            has_full=len(power_instances) == len(processed_instances),
-            has_partial=bool(power_instances),
-            partial_message="Partial power data",
+            has_full=len(power_instances_running) == len(running_instances),
+            has_partial=bool(power_instances_running),
+            partial_message="Partial power data for running instances",
             missing_message="Power model data unavailable",
             aws_auth_issue=aws_auth_issue,
-            processed_instances=processed_instances,
+            processed_instances=running_instances,
         )
 
         # Build complete status dictionary

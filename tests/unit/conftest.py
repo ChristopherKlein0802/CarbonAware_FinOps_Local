@@ -22,7 +22,7 @@ def mock_carbon_intensity_data():
 
 @pytest.fixture
 def mock_ec2_instance_data():
-    """Mock EC2 instance data for testing"""
+    """Mock EC2 instance data for testing (v2.0.0 fields)"""
     return {
         "instance_id": "i-1234567890abcdef0",
         "instance_type": "t3.medium",
@@ -30,8 +30,11 @@ def mock_ec2_instance_data():
         "region": "eu-central-1",
         "launch_time": datetime.now() - timedelta(hours=5),
         "power_watts": 45.2,
-        "monthly_co2_kg": 12.5,
-        "monthly_cost_eur": 67.50,
+        "co2_kg_average": 12.5,
+        "cost_eur_average": 67.50,
+        "co2_kg_hourly": 13.2,
+        "cost_eur_hourly": 69.00,
+        "period_days": 30,
         "confidence_level": "high",
         "data_sources": ["aws_api", "boavizta", "cloudtrail_audit"],
     }

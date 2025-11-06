@@ -105,19 +105,21 @@ class BusinessCaseCalculator:
         calculated_cost_eur: float,
         cost_data: Optional[AWSCostData],
         original_instances: Optional[List[Any]] = None,
-    ) -> float:
+    ) -> tuple[float, Optional[float]]:
         """Enhanced validation with state-awareness and runtime factors
 
         Returns:
-            float: Validation factor with improved accuracy assessment
+            tuple: (validation_factor, actual_cost_eur)
+                - validation_factor: Cost Explorer ÷ Calculated
+                - actual_cost_eur: Actual Cost Explorer value in EUR (or None if unavailable)
         """
         if not cost_data or cost_data.monthly_cost_usd <= 0:
             logger.warning("⚠️ No Cost Explorer data for enhanced validation")
-            return 1.0
+            return 1.0, None
 
         if calculated_cost_eur <= 0:
             logger.warning("⚠️ No calculated costs for validation")
-            return 1.0
+            return 1.0, None
 
         # Convert actual AWS costs to EUR
         actual_cost_eur = cost_data.monthly_cost_usd * AcademicConstants.get_eur_usd_rate()
@@ -186,4 +188,4 @@ class BusinessCaseCalculator:
         setattr(self, "_last_accuracy_status", accuracy_status)
         setattr(self, "_last_validation_factor", validation_factor)
 
-        return validation_factor
+        return validation_factor, actual_cost_eur

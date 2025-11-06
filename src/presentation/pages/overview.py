@@ -63,7 +63,7 @@ def render_overview_page(dashboard_data: Optional[DashboardData]) -> None:
 
     # Development Environment Warning
     # Use average-based total with fallback for backward compatibility
-    total_cost = getattr(dashboard_data, "total_cost_average", dashboard_data.total_cost_eur)
+    total_cost = dashboard_data.total_cost_average
     if total_cost < 1.0:
         st.warning("""
         ⚠️ **Development Environment Detected**

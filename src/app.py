@@ -203,6 +203,12 @@ def main() -> None:
 
     period_days = period_options[selected_period_label]
 
+    # Validate period_days (safety check)
+    VALID_PERIODS = {1, 7, 30}
+    if period_days not in VALID_PERIODS:
+        st.error(f"⚠️ Invalid analysis period: {period_days} days. Using default of 30 days.")
+        period_days = 30
+
     # Store in session state for cross-component access
     if "analysis_period_days" not in st.session_state or st.session_state["analysis_period_days"] != period_days:
         st.session_state["analysis_period_days"] = period_days

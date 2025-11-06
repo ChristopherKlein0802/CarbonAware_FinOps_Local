@@ -167,7 +167,7 @@ class FetchInfrastructureDataUseCase:
 
         # Step 9: Enhanced validation - compare calculated costs with actual AWS spending
         # NOTE: Use average-based costs for validation (factual runtime-based comparison)
-        validation_factor = self.calculator.calculate_cloudtrail_enhanced_accuracy(
+        validation_factor, cost_explorer_eur = self.calculator.calculate_cloudtrail_enhanced_accuracy(
             processed_instances,
             total_cost_average,  # Average-based total for validation
             cost_data,
@@ -210,6 +210,7 @@ class FetchInfrastructureDataUseCase:
             ],
             api_health_status={},  # Will be filled by orchestrator
             validation_factor=validation_factor,
+            cost_explorer_eur=cost_explorer_eur,
             accuracy_status=accuracy_status,
             cloudtrail_coverage=cloudtrail_coverage,
             cloudtrail_tracked_instances=cloudtrail_tracked,

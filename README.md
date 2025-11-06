@@ -39,6 +39,13 @@ The latest release introduces **flexible time window analysis**, allowing you to
 - Comparison section shows method differences
 - All charts and tables adapt to selected period
 
+**Technical Improvements**
+- **Period-aligned Cost Explorer queries**: Prevents data contamination from old instances
+- **Cache invalidation on period change**: Ensures data consistency across time windows
+- **Dynamic UI label system**: Central `get_period_label()` utility for consistency
+- **Cost Explorer direct storage**: Stores actual EUR value instead of back-calculation
+- **Backward-compatible field access**: Graceful fallbacks during migration period
+
 ### 📖 Documentation
 
 - [Migration Guide](docs/migration/field-deprecation.md) - Update existing code

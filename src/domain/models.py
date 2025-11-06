@@ -277,6 +277,9 @@ class DashboardData:
     validation_factor: Optional[float] = None
     """Cost validation: Cost Explorer ÷ Calculated (aligned period windows)"""
 
+    cost_explorer_eur: Optional[float] = None
+    """Actual AWS Cost Explorer value in EUR for the analysis period"""
+
     accuracy_status: Optional[str] = None
     cloudtrail_coverage: Optional[float] = None
     cloudtrail_tracked_instances: Optional[int] = None

@@ -36,8 +36,11 @@ class TestDashboardDataOrchestrator(unittest.TestCase):
             state="running",
             region="eu-central-1",
             power_watts=15.0,
-            monthly_cost_eur=45.0,
-            monthly_co2_kg=4.5,
+            cost_eur_average=45.0,
+            co2_kg_average=4.5,
+            cost_eur_hourly=46.0,
+            co2_kg_hourly=4.6,
+            period_days=30,
             confidence_level="high",
             data_sources=["test"],
             last_updated=datetime.now(),
@@ -72,8 +75,9 @@ class TestDashboardDataOrchestrator(unittest.TestCase):
         mock_dashboard_data = DashboardData(
             instances=[self.sample_instance],
             carbon_intensity=self.sample_carbon_intensity,
-            total_cost_eur=45.0,
-            total_co2_kg=4.5,
+            total_cost_average=45.0,
+            total_co2_average=4.5,
+            analysis_period_days=30,
             business_case=self.sample_business_case,
             data_freshness=datetime.now(),
             academic_disclaimers=[],
@@ -90,8 +94,9 @@ class TestDashboardDataOrchestrator(unittest.TestCase):
 
         self.assertIsInstance(result, DashboardData)
         self.assertEqual(len(result.instances), 1)
-        self.assertEqual(result.total_cost_eur, 45.0)
-        self.assertEqual(result.total_co2_kg, 4.5)
+        self.assertEqual(result.total_cost_average, 45.0)
+        self.assertEqual(result.total_co2_average, 4.5)
+        self.assertEqual(result.analysis_period_days, 30)
         self.assertEqual(result.business_case, self.sample_business_case)
 
     def test_get_infrastructure_data_no_carbon_intensity(self) -> None:
@@ -100,8 +105,9 @@ class TestDashboardDataOrchestrator(unittest.TestCase):
         mock_dashboard_data = DashboardData(
             instances=[],
             carbon_intensity=None,
-            total_cost_eur=0.0,
-            total_co2_kg=0.0,
+            total_cost_average=0.0,
+            total_co2_average=0.0,
+            analysis_period_days=30,
             business_case=None,
             data_freshness=datetime.now(),
             academic_disclaimers=["No carbon intensity data available"],
@@ -125,8 +131,9 @@ class TestDashboardDataOrchestrator(unittest.TestCase):
         mock_dashboard_data = DashboardData(
             instances=[],
             carbon_intensity=self.sample_carbon_intensity,
-            total_cost_eur=0.0,
-            total_co2_kg=0.0,
+            total_cost_average=0.0,
+            total_co2_average=0.0,
+            analysis_period_days=30,
             business_case=None,
             data_freshness=datetime.now(),
             academic_disclaimers=["No EC2 instances found"],
@@ -149,8 +156,9 @@ class TestDashboardDataOrchestrator(unittest.TestCase):
         mock_dashboard_data = DashboardData(
             instances=[],
             carbon_intensity=self.sample_carbon_intensity,
-            total_cost_eur=0.0,
-            total_co2_kg=0.0,
+            total_cost_average=0.0,
+            total_co2_average=0.0,
+            analysis_period_days=30,
             business_case=None,
             data_freshness=datetime.now(),
             academic_disclaimers=["Module error: Instance processing failed"],
@@ -177,8 +185,9 @@ class TestDashboardDataOrchestrator(unittest.TestCase):
         mock_error_response = DashboardData(
             instances=[],
             carbon_intensity=None,
-            total_cost_eur=0.0,
-            total_co2_kg=0.0,
+            total_cost_average=0.0,
+            total_co2_average=0.0,
+            analysis_period_days=30,
             business_case=None,
             data_freshness=datetime.now(),
             academic_disclaimers=["Validation error: Test validation error"],
@@ -191,7 +200,8 @@ class TestDashboardDataOrchestrator(unittest.TestCase):
         result = self.processor.get_infrastructure_data()
 
         self.assertEqual(result.instances, [])
-        self.assertEqual(result.total_cost_eur, 0.0)
+        self.assertEqual(result.total_cost_average, 0.0)
+        self.assertEqual(result.analysis_period_days, 30)
         self.assertTrue(any("error" in item.lower() for item in result.academic_disclaimers))
 
     def test_orchestrator_delegates_to_use_cases(self) -> None:
@@ -203,8 +213,9 @@ class TestDashboardDataOrchestrator(unittest.TestCase):
         mock_dashboard_data = DashboardData(
             instances=[],
             carbon_intensity=None,
-            total_cost_eur=0.0,
-            total_co2_kg=0.0,
+            total_cost_average=0.0,
+            total_co2_average=0.0,
+            analysis_period_days=30,
             business_case=None,
             data_freshness=datetime.now(),
             academic_disclaimers=[],

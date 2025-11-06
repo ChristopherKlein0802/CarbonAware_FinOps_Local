@@ -114,13 +114,16 @@ def calculate_co2_hourly_precise(
         eur_usd_rate: EUR/USD exchange rate (default: 0.92)
 
     Returns:
-        Dictionary containing:
+        Dictionary containing (NOTE: These are dict keys, not model field names):
         - total_co2_kg: Total CO2 emissions in kg (sum of all hours)
         - total_cost_eur: Total cost in EUR (sum of all hours, if price provided)
         - hourly_emissions: List of detailed hourly breakdowns (includes cost_eur if price provided)
         - data_quality: 'high' (≥20h), 'medium' (≥12h), or 'low' (<12h)
         - coverage_hours: Number of hours with valid data
         - method: Always 'hourly_24h_precise'
+
+        Note: Dictionary keys differ from DashboardData model fields. Model uses:
+        total_co2_average, total_cost_average, total_co2_hourly, total_cost_hourly
 
     Example:
         Hour 0 (23h ago): CPU=35%, Carbon=280g/kWh, Runtime=1.0h, Price=$0.042/h

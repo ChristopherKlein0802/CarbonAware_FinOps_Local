@@ -48,7 +48,7 @@ def _render_system_status(dashboard_data: DashboardData) -> None:
         total_apis = 5  # Known total APIs
 
     # Data quality indicators for system status
-    cost_available = dashboard_data and dashboard_data.total_cost_eur > 0
+    cost_available = dashboard_data and dashboard_data.total_cost_average > 0
     carbon_available = dashboard_data and dashboard_data.carbon_intensity
 
     col1, col2, col3, col4 = st.columns(4)

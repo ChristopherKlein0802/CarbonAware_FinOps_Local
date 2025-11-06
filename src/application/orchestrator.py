@@ -120,6 +120,11 @@ class DashboardDataOrchestrator:
         Returns:
             DashboardData with infrastructure metrics or error response
         """
+        # Validate period_days using central utility
+        from src.presentation.utils import validate_period_days
+        period_days = validate_period_days(period_days, default=30)
+        logger.info(f"📊 Starting analysis with {period_days}d period")
+
         carbon_intensity = None
 
         try:
@@ -129,7 +134,7 @@ class DashboardDataOrchestrator:
             # Enrich with API health status
             api_health_status = self.health_use_case.execute(
                 carbon_available=dashboard_data.carbon_intensity is not None,
-                cost_available=dashboard_data.total_cost_eur > 0,
+                cost_available=dashboard_data.total_cost_average > 0,
                 processed_instances=dashboard_data.instances,
                 api_last_calls=self.fetch_use_case.api_last_calls,
                 aws_auth_issue=False,
@@ -151,9 +156,9 @@ class DashboardDataOrchestrator:
                 pass
 
             if carbon_intensity:
-                return self.error_use_case.create_minimal_response(carbon_intensity, error_message)
+                return self.error_use_case.create_minimal_response(carbon_intensity, error_message, period_days)
             else:
-                return self.error_use_case.create_empty_response(error_message)
+                return self.error_use_case.create_empty_response(error_message, period_days)
 
         except (
             NoCredentialsError,
@@ -171,7 +176,7 @@ class DashboardDataOrchestrator:
             except Exception:
                 pass
 
-            return self.error_use_case.create_auth_error_response(carbon_intensity, ErrorMessages.AWS_SSO_EXPIRED)
+            return self.error_use_case.create_auth_error_response(carbon_intensity, ErrorMessages.AWS_SSO_EXPIRED, period_days)
 
         except ClientError as client_error:
             # AWS client errors
@@ -188,27 +193,27 @@ class DashboardDataOrchestrator:
             except Exception:
                 pass
 
-            return self.error_use_case.create_minimal_response(carbon_intensity, message or "AWS client error occurred")
+            return self.error_use_case.create_minimal_response(carbon_intensity, message or "AWS client error occurred", period_days)
 
         except (TypeError, KeyError) as e:
             # Data type/structure errors
             logger.error(f"Data type error: {e}")
-            return self.error_use_case.create_empty_response(f"Data type error: {str(e)}")
+            return self.error_use_case.create_empty_response(f"Data type error: {str(e)}", period_days)
 
         except (AttributeError, ImportError) as e:
             # Module/attribute errors
             logger.error(f"Module/attribute error: {e}", exc_info=True)
-            return self.error_use_case.create_empty_response(f"Module error: {str(e)}")
+            return self.error_use_case.create_empty_response(f"Module error: {str(e)}", period_days)
 
         except (ConnectionError, TimeoutError) as e:
             # Network/API errors
             logger.error(f"Network/API error: {e}")
-            return self.error_use_case.create_empty_response(f"Network error: {str(e)}")
+            return self.error_use_case.create_empty_response(f"Network error: {str(e)}", period_days)
 
         except Exception as e:
             # Unexpected errors
             logger.error(f"Unexpected error: {e}", exc_info=True)
-            return self.error_use_case.create_empty_response(f"Unexpected error: {str(e)}")
+            return self.error_use_case.create_empty_response(f"Unexpected error: {str(e)}", period_days)
 
     # All specialized functionality now properly delegated to use cases:
     # - FetchInfrastructureDataUseCase: Main workflow

@@ -8,6 +8,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from typing import Any, Optional
+from src.presentation.utils import get_period_label
 
 
 def render_infrastructure_page(dashboard_data: Optional[Any]) -> None:
@@ -45,10 +46,10 @@ def _render_infrastructure_overview(dashboard_data: Any) -> None:
 
     # Get analysis period (with fallback for backward compatibility)
     period_days = getattr(dashboard_data, "analysis_period_days", 30)
-    period_label = f"{period_days}d" if period_days < 30 else "monthly"
+    period_label = get_period_label(period_days, format_type="short")
 
     # Use average-based totals for overview metrics
-    total_cost = getattr(dashboard_data, "total_cost_average", dashboard_data.total_cost_eur)
+    total_cost = dashboard_data.total_cost_average
     avg_cost_per_instance = (
         total_cost / len(dashboard_data.instances) if dashboard_data.instances else 0
     )
@@ -123,15 +124,15 @@ def _prepare_instance_row_data(instance: Any, grid_intensity: Optional[float], p
     }.get(data_quality, "🔴 Limited")
 
     # Period label for column headers
-    period_label = f"{period_days}d" if period_days < 30 else "monthly"
+    period_label = get_period_label(period_days, format_type="short")
 
     # Formatted values - use new field names with fallback
     power_kw = f"{instance.power_watts / 1000:.3f}" if instance.power_watts is not None else "N/A"
     grid_intensity_display = f"{grid_intensity:.0f}" if grid_intensity else "N/A"
 
-    # Use new field names (with fallback for backward compatibility)
-    co2_avg = getattr(instance, "co2_kg_average", instance.monthly_co2_kg if hasattr(instance, "monthly_co2_kg") else None)
-    cost_avg = getattr(instance, "cost_eur_average", instance.monthly_cost_eur if hasattr(instance, "monthly_cost_eur") else None)
+    # Use primary field names (average-based method)
+    co2_avg = instance.co2_kg_average
+    cost_avg = instance.cost_eur_average
 
     co2_display = f"{co2_avg:.3f}" if co2_avg is not None else "⚠️ Not available"
     cost_display = f"€{cost_avg:.2f}" if cost_avg is not None else "⚠️ Not available"
@@ -161,9 +162,27 @@ def _render_dual_comparison_section(dashboard_data: Any) -> None:
 
     # Get analysis period
     period_days = getattr(dashboard_data, "analysis_period_days", 30)
-    period_label = f"{period_days}d" if period_days < 30 else "30d"
+    period_label = get_period_label(period_days, format_type="short")
 
-    st.caption(f"Hourly-Precise (24h scaled) vs. Average-Based ({period_label} actual) - Methodology Validation")
+    st.caption(f"**Hourly-Precise** (hourly carbon intensity scaled to {period_label}) vs. **Average-Based** (period-average carbon × actual runtime) - Methodology Validation")
+
+    # Add explanation expander
+    with st.expander("ℹ️ What's the difference between these methods?"):
+        st.markdown("""
+        **Hourly-Precise**:
+        - Uses 24-hour carbon intensity patterns from ElectricityMaps
+        - Scales power consumption × grid intensity for each hour
+        - More accurate for always-on or predictable workloads
+        - Requires complete 24h runtime and carbon data
+
+        **Average-Based**:
+        - Uses period-average carbon intensity × total runtime hours
+        - Fallback when 24h data is incomplete
+        - More conservative estimate for variable workloads
+        - Works with any runtime window ({period_label})
+
+        💡 **Why both?** Academic rigor - we validate our hourly method against the simpler average approach to demonstrate accuracy.
+        """)
 
     # Get aggregated values with new field names
     hourly_precise_count = getattr(dashboard_data, "hourly_precise_count", 0)
@@ -177,15 +196,15 @@ def _render_dual_comparison_section(dashboard_data: Any) -> None:
     col1, col2 = st.columns(2)
     with col1:
         st.metric(
-            "Hourly-Precise Instances",
-            f"{hourly_precise_count}",
-            help="Instances with complete 24h data (CPU, Carbon, Runtime) using hourly-precise calculation"
+            "Hourly-Precise",
+            f"{hourly_precise_count} instances",
+            help="Instances with complete 24h data (CPU, Carbon, Runtime) using hourly carbon intensity patterns"
         )
     with col2:
         st.metric(
-            "Fallback Instances",
-            f"{fallback_count}",
-            help="Instances using 30d average calculation (missing hourly data)"
+            "Average-Based",
+            f"{fallback_count} instances",
+            help="Instances using period-average calculation (fallback when 24h data incomplete)"
         )
 
     # Side-by-side comparison cards
@@ -194,15 +213,15 @@ def _render_dual_comparison_section(dashboard_data: Any) -> None:
 
     with col1:
         st.markdown("#### Hourly-Precise")
-        st.markdown(f"**{total_co2_hourly:.3f} kg**")
-        st.caption(f"24h data × {period_days}")
+        st.markdown(f"**{total_co2_hourly:.3f} kg CO₂**")
+        st.caption(f"Hourly patterns × {period_days} days")
         st.caption(f"({hourly_precise_count} instances)")
 
     with col2:
         st.markdown(f"#### Average-Based")
-        st.markdown(f"**{total_co2_average:.3f} kg**")
+        st.markdown(f"**{total_co2_average:.3f} kg CO₂**")
         st.caption(f"{period_label} runtime basis")
-        st.caption(f"({len(dashboard_data.instances)} instances)")
+        st.caption(f"({fallback_count} instances)")
 
     with col3:
         # Calculate difference and pattern
@@ -231,7 +250,7 @@ def _render_dual_comparison_section(dashboard_data: Any) -> None:
         st.markdown(f"#### Average-Based")
         st.markdown(f"**€{total_cost_average:.2f}**")
         st.caption(f"{period_label} runtime basis")
-        st.caption(f"({len(dashboard_data.instances)} instances)")
+        st.caption(f"({fallback_count} instances)")
 
     with col3:
         if total_cost_average > 0:
@@ -313,7 +332,7 @@ def _render_summary_metrics(dashboard_data: Any) -> None:
     """Render summary metrics and CO₂ formula info."""
     # Get analysis period
     period_days = getattr(dashboard_data, "analysis_period_days", 30)
-    period_label = f"{period_days}d" if period_days < 30 else "monthly"
+    period_label = get_period_label(period_days, format_type="short")
 
     # Use new field names with fallback
     total_cost = sum(
@@ -357,7 +376,7 @@ def _render_instance_detail_table(dashboard_data: Any) -> None:
     """Render detailed instance table with CO₂ formula components"""
     # Get analysis period
     period_days = getattr(dashboard_data, "analysis_period_days", 30)
-    period_label = f"{period_days}d" if period_days < 30 else "30-Day"
+    period_label = get_period_label(period_days, format_type="title")
 
     st.markdown(f"### 📊 Instance Analysis - {period_label} Average-Based Data")
     st.caption(f"Per-instance metrics calculated using {period_days}-day actual runtime and average CPU utilization")
@@ -554,10 +573,11 @@ def _render_instance_hourly_analysis(instance: Any) -> None:
             # Use new field name with fallback
             co2_average = getattr(instance, "co2_kg_average", instance.monthly_co2_kg if hasattr(instance, "monthly_co2_kg") else None)
             delta = period_projection - (co2_average or 0)
+            # Only show delta if co2_average is meaningful (not None and > 0)
             st.metric(
                 f"Period Projection ({period_days}d)",
                 f"{period_projection:.2f} kg",
-                delta=f"{delta:+.2f} kg" if co2_average else None,
+                delta=f"{delta:+.2f} kg" if co2_average and co2_average > 0 else None,
                 help=f"Period projection: daily × {period_days} days"
             )
 
@@ -568,10 +588,11 @@ def _render_instance_hourly_analysis(instance: Any) -> None:
             # Use new field name with fallback
             cost_average = getattr(instance, "cost_eur_average", instance.monthly_cost_eur if hasattr(instance, "monthly_cost_eur") else None)
             delta_cost = period_cost_projection - (cost_average or 0)
+            # Only show delta if cost_average is meaningful (not None and > 0)
             st.metric(
                 f"Period Cost Projection ({period_days}d)",
                 f"€{period_cost_projection:.2f}",
-                delta=f"€{delta_cost:+.2f}" if cost_average else None,
+                delta=f"€{delta_cost:+.2f}" if cost_average and cost_average > 0 else None,
                 help=f"Period cost projection: daily × {period_days} days"
             )
 

@@ -67,9 +67,10 @@ class TestBusinessCaseCalculator(unittest.TestCase):
         instances = []
         calculated_cost = 100.0
 
-        result = self.calculator.calculate_cloudtrail_enhanced_accuracy(instances, calculated_cost, None)
+        validation_factor, actual_cost_eur = self.calculator.calculate_cloudtrail_enhanced_accuracy(instances, calculated_cost, None)
 
-        self.assertEqual(result, 1.0)  # Default validation factor
+        self.assertEqual(validation_factor, 1.0)  # Default validation factor
+        self.assertIsNone(actual_cost_eur)  # No cost data available
 
     def test_calculate_cloudtrail_enhanced_accuracy_zero_calculated_cost(self):
         """Test accuracy calculation with zero calculated cost"""
@@ -77,9 +78,10 @@ class TestBusinessCaseCalculator(unittest.TestCase):
         cost_data = Mock()
         cost_data.monthly_cost_usd = 100.0
 
-        result = self.calculator.calculate_cloudtrail_enhanced_accuracy(instances, 0.0, cost_data)
+        validation_factor, actual_cost_eur = self.calculator.calculate_cloudtrail_enhanced_accuracy(instances, 0.0, cost_data)
 
-        self.assertEqual(result, 1.0)  # Default validation factor
+        self.assertEqual(validation_factor, 1.0)  # Default validation factor
+        self.assertIsNone(actual_cost_eur)  # No cost available when calculated cost is 0
 
     def test_calculate_cloudtrail_enhanced_accuracy_normal(self):
         """Test normal accuracy calculation"""
@@ -92,10 +94,11 @@ class TestBusinessCaseCalculator(unittest.TestCase):
 
         calculated_cost_eur = 100.0
 
-        result = self.calculator.calculate_cloudtrail_enhanced_accuracy(instances, calculated_cost_eur, cost_data)
+        validation_factor, actual_cost_eur = self.calculator.calculate_cloudtrail_enhanced_accuracy(instances, calculated_cost_eur, cost_data)
 
         # Expected: 84.64 / 100.0 = 0.8464
-        self.assertAlmostEqual(result, 0.8464, places=3)
+        self.assertAlmostEqual(validation_factor, 0.8464, places=3)
+        self.assertAlmostEqual(actual_cost_eur, 84.64, places=2)
 
     def test_calculate_cloudtrail_enhanced_accuracy_mostly_running(self):
         """Test accuracy calculation with mostly running instances"""
@@ -106,10 +109,11 @@ class TestBusinessCaseCalculator(unittest.TestCase):
 
         calculated_cost_eur = 100.0
 
-        result = self.calculator.calculate_cloudtrail_enhanced_accuracy(instances, calculated_cost_eur, cost_data)
+        validation_factor, actual_cost_eur = self.calculator.calculate_cloudtrail_enhanced_accuracy(instances, calculated_cost_eur, cost_data)
 
         # Should return validation factor: 101.2 / 100.0 = 1.012
-        self.assertAlmostEqual(result, 1.012, places=3)
+        self.assertAlmostEqual(validation_factor, 1.012, places=3)
+        self.assertAlmostEqual(actual_cost_eur, 101.2, places=1)
 
     def test_calculate_cloudtrail_enhanced_accuracy_mostly_stopped(self):
         """Test accuracy calculation with mostly stopped instances"""
@@ -120,10 +124,11 @@ class TestBusinessCaseCalculator(unittest.TestCase):
 
         calculated_cost_eur = 100.0
 
-        result = self.calculator.calculate_cloudtrail_enhanced_accuracy(instances, calculated_cost_eur, cost_data)
+        validation_factor, actual_cost_eur = self.calculator.calculate_cloudtrail_enhanced_accuracy(instances, calculated_cost_eur, cost_data)
 
         # Should return validation factor: 46.0 / 100.0 = 0.46
-        self.assertAlmostEqual(result, 0.46, places=2)
+        self.assertAlmostEqual(validation_factor, 0.46, places=2)
+        self.assertAlmostEqual(actual_cost_eur, 46.0, places=1)
 
     def test_calculate_cloudtrail_enhanced_accuracy_empty_instances(self):
         """Test accuracy calculation with empty instances list"""

@@ -48,7 +48,7 @@ class CreateErrorResponseUseCase:
         self.carbon_service = carbon_service
         self.health_use_case = health_use_case
 
-    def create_empty_response(self, error_message: str) -> DashboardData:
+    def create_empty_response(self, error_message: str, period_days: int = 30) -> DashboardData:
         """
         Create empty response structure for complete failure cases
 
@@ -59,6 +59,7 @@ class CreateErrorResponseUseCase:
 
         Args:
             error_message: Description of what went wrong
+            period_days: Analysis period in days (default: 30)
 
         Returns:
             DashboardData with empty instances and fallback data
@@ -74,6 +75,12 @@ class CreateErrorResponseUseCase:
         return DashboardData(
             instances=[],
             carbon_intensity=None,
+            analysis_period_days=period_days,
+            total_cost_average=0.0,
+            total_co2_average=0.0,
+            total_cost_hourly=0.0,
+            total_co2_hourly=0.0,
+            # DEPRECATED: Backward compatibility
             total_cost_eur=0.0,
             total_co2_kg=0.0,
             business_case=None,
@@ -81,12 +88,13 @@ class CreateErrorResponseUseCase:
             academic_disclaimers=[error_message, "Academic integrity maintained - no fallback data used"],
             api_health_status=api_health_status,
             validation_factor=None,
+            cost_explorer_eur=None,
             accuracy_status=None,
             cloudtrail_coverage=None,
             cloudtrail_tracked_instances=None,
         )
 
-    def create_minimal_response(self, carbon_intensity: Optional[CarbonIntensity], error_message: str) -> DashboardData:
+    def create_minimal_response(self, carbon_intensity: Optional[CarbonIntensity], error_message: str, period_days: int = 30) -> DashboardData:
         """
         Create minimal response with available API data but no instances
 
@@ -99,6 +107,7 @@ class CreateErrorResponseUseCase:
         Args:
             carbon_intensity: Available carbon intensity data
             error_message: Description of what went wrong
+            period_days: Analysis period in days (default: 30)
 
         Returns:
             DashboardData with carbon data but empty instances
@@ -114,6 +123,12 @@ class CreateErrorResponseUseCase:
         return DashboardData(
             instances=[],
             carbon_intensity=carbon_intensity,
+            analysis_period_days=period_days,
+            total_cost_average=0.0,
+            total_co2_average=0.0,
+            total_cost_hourly=0.0,
+            total_co2_hourly=0.0,
+            # DEPRECATED: Backward compatibility
             total_cost_eur=0.0,
             total_co2_kg=0.0,
             business_case=None,
@@ -121,13 +136,14 @@ class CreateErrorResponseUseCase:
             academic_disclaimers=[error_message, "Academic integrity maintained - preserving available API data"],
             api_health_status=api_health_status,
             validation_factor=None,
+            cost_explorer_eur=None,
             accuracy_status=None,
             cloudtrail_coverage=None,
             cloudtrail_tracked_instances=None,
         )
 
     def create_auth_error_response(
-        self, carbon_intensity: Optional[CarbonIntensity], error_message: str
+        self, carbon_intensity: Optional[CarbonIntensity], error_message: str, period_days: int = 30
     ) -> DashboardData:
         """
         Create response when AWS authentication is missing or expired
@@ -142,6 +158,7 @@ class CreateErrorResponseUseCase:
         Args:
             carbon_intensity: Available carbon intensity data (if any)
             error_message: Authentication error description
+            period_days: Analysis period in days (default: 30)
 
         Returns:
             DashboardData with auth error and guidance
@@ -159,6 +176,12 @@ class CreateErrorResponseUseCase:
         return DashboardData(
             instances=[],
             carbon_intensity=carbon_intensity,
+            analysis_period_days=period_days,
+            total_cost_average=0.0,
+            total_co2_average=0.0,
+            total_cost_hourly=0.0,
+            total_co2_hourly=0.0,
+            # DEPRECATED: Backward compatibility
             total_cost_eur=0.0,
             total_co2_kg=0.0,
             business_case=None,
@@ -166,6 +189,7 @@ class CreateErrorResponseUseCase:
             academic_disclaimers=[error_message, guidance],
             api_health_status=api_health_status,
             validation_factor=None,
+            cost_explorer_eur=None,
             accuracy_status=None,
             cloudtrail_coverage=None,
             cloudtrail_tracked_instances=None,

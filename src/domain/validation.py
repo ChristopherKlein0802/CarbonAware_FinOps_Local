@@ -36,12 +36,16 @@ def validate_instance_data(instance: EC2Instance) -> Dict[str, Any]:
         elif instance.hourly_price_usd < 0.001:
             warnings.append(f"Hourly price ${instance.hourly_price_usd:.3f} seems unusually low")
 
-    # CO2 validation
-    if instance.monthly_co2_kg is not None:
-        if instance.monthly_co2_kg > 1000:  # 1 tonne per instance per month
-            warnings.append(f"CO₂ emissions {instance.monthly_co2_kg:.1f}kg seem very high for single instance")
-        elif instance.monthly_co2_kg < 0:
-            errors.append(f"Invalid CO₂ emissions: {instance.monthly_co2_kg:.1f}kg")
+    # CO2 validation (use period-agnostic field with fallback)
+    co2_value = getattr(instance, "co2_kg_average", None)
+    if co2_value is None and hasattr(instance, "monthly_co2_kg"):
+        co2_value = instance.monthly_co2_kg  # Fallback for backward compatibility
+
+    if co2_value is not None:
+        if co2_value > 1000:  # 1 tonne per instance per period
+            warnings.append(f"CO₂ emissions {co2_value:.1f}kg seem very high for single instance")
+        elif co2_value < 0:
+            errors.append(f"Invalid CO₂ emissions: {co2_value:.1f}kg")
 
     # Power validation
     if instance.power_watts is not None:
@@ -117,8 +121,12 @@ def get_data_quality_score(instances: List[EC2Instance]) -> float:
         if hasattr(instance, "hourly_price_usd") and instance.hourly_price_usd is not None:
             quality_points += 1
 
-        # CO2 calculation completeness
-        if instance.monthly_co2_kg is not None and instance.monthly_co2_kg > 0:
+        # CO2 calculation completeness (use period-agnostic field with fallback)
+        co2_value = getattr(instance, "co2_kg_average", None)
+        if co2_value is None and hasattr(instance, "monthly_co2_kg"):
+            co2_value = instance.monthly_co2_kg  # Fallback for backward compatibility
+
+        if co2_value is not None and co2_value > 0:
             quality_points += 1
 
         # Power calculation completeness
