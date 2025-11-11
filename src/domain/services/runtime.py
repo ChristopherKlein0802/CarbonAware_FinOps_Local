@@ -179,8 +179,8 @@ class RuntimeService:
             Enriched EC2Instance with period-based calculations using both
             Hourly-Precise and Average-Based methods.
         """
-        # Fetch basic data (unchanged)
-        runtime_hours = self._get_precise_runtime_hours(instance, force_refresh=force_refresh)
+        # Fetch basic data (now period-aware)
+        runtime_hours = self._get_precise_runtime_hours(instance, force_refresh=force_refresh, period_days=period_days)
         power_data = self._gateway.get_power_consumption(instance["instance_type"])
         hourly_price = self._gateway.get_instance_pricing(instance["instance_type"], instance["region"])
 
@@ -389,10 +389,13 @@ class RuntimeService:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _get_precise_runtime_hours(self, instance: Dict, *, force_refresh: bool = False) -> Optional[float]:
+    def _get_precise_runtime_hours(self, instance: Dict, *, force_refresh: bool = False, period_days: Optional[int] = None) -> Optional[float]:
+        # Use provided period_days or fall back to config default
+        effective_period_days = period_days if period_days is not None else self.config.period_days
+
         instance_id = instance["instance_id"]
         region = instance.get("region", self.config.region)
-        cache_identifier = f"{instance_id}_{region}"
+        cache_identifier = f"{instance_id}_{region}_{effective_period_days}d"
         cache_path = self._repository.path("cloudtrail_runtime", cache_identifier)
 
         if not force_refresh and self._repository.is_valid(cache_path, CacheTTL.CLOUDTRAIL_EVENTS):
@@ -417,9 +420,10 @@ class RuntimeService:
                 if launch_time:
                     logger.debug(f"✅ Using cached launch time for {instance_id}: {launch_time}")
 
-            lookback_start = end_time - timedelta(days=self.config.period_days)
-            if launch_time:
-                lookback_start = min(lookback_start, launch_time - timedelta(hours=1))
+            # Calculate lookback window based on the desired period
+            lookback_start = end_time - timedelta(days=effective_period_days)
+            # Note: We don't adjust lookback_start to launch_time anymore,
+            # as we want to calculate runtime only within the specified period window
 
             events = self._gateway.lookup_instance_events(
                 instance_id=instance_id,
@@ -433,10 +437,13 @@ class RuntimeService:
             if not relevant_events:
                 state = (instance.get("state") or "").lower()
                 if launch_time and state == "running":
-                    runtime_hours = (end_time - launch_time).total_seconds() / 3600.0
+                    # Cap runtime to lookback window (only count runtime within period)
+                    effective_start = max(launch_time, lookback_start)
+                    runtime_hours = (end_time - effective_start).total_seconds() / 3600.0
                     logger.warning(
-                        "Fallback runtime estimation for %s using launch time (no CloudTrail events)",
+                        "Fallback runtime estimation for %s using launch time (no CloudTrail events, period: %dd)",
                         instance_id,
+                        effective_period_days,
                     )
                 else:
                     logger.warning("No CloudTrail state change events for %s within lookback window", instance_id)
@@ -507,7 +514,8 @@ class RuntimeService:
         if events:
             first_event_name = events[0].get("name")
             if first_event_name in stop_events and fallback_start is not None:
-                session_start = fallback_start
+                # Cap session start to lookback window (only count runtime within period)
+                session_start = max(fallback_start, lookback_start) if lookback_start else fallback_start
 
         instance_state_lower = (instance_state or "").lower()
 
@@ -516,18 +524,23 @@ class RuntimeService:
             event_name = event["name"]
 
             if event_name in start_events:
-                session_start = event_time
+                # Cap start time to lookback window (only count runtime within period)
+                session_start = max(event_time, lookback_start) if lookback_start else event_time
             elif event_name in stop_events and session_start is not None:
                 runtime_hours += (event_time - session_start).total_seconds() / 3600.0
                 session_start = None
             elif event_name in stop_events and session_start is None and fallback_start is not None:
-                runtime_hours += (event_time - fallback_start).total_seconds() / 3600.0
+                # Cap fallback start to lookback window
+                effective_start = max(fallback_start, lookback_start) if lookback_start else fallback_start
+                runtime_hours += (event_time - effective_start).total_seconds() / 3600.0
                 fallback_start = None
 
         if session_start is not None:
             runtime_hours += (end_time - session_start).total_seconds() / 3600.0
         elif instance_state_lower == "running" and fallback_start is not None:
-            runtime_hours += max((end_time - fallback_start).total_seconds() / 3600.0, 0.0)
+            # Cap fallback start to lookback window (only count runtime within period)
+            effective_start = max(fallback_start, lookback_start) if lookback_start else fallback_start
+            runtime_hours += max((end_time - effective_start).total_seconds() / 3600.0, 0.0)
 
         return round(runtime_hours, 2)
 

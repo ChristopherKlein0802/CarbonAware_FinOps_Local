@@ -9,7 +9,7 @@ Traditionelle FinOps-Werkzeuge schätzen Laufzeiten häufig aus Instanzzustände
 1. **Ereigniserfassung:** `RuntimeTracker.get_all_ec2_instances()` ruft Instanzen ab und lädt mittels `boto3.client("cloudtrail")` alle relevanten Audit-Events der vergangenen 30 Tage (`RunInstances`, `StartInstances`, `StopInstances`, `TerminateInstances`).
 2. **Eventauswertung:** `RuntimeTracker.process_instance_enhanced` ordnet Start- und Stop-Ereignisse, bildet Laufzeitslots und summiert die Dauer.
 3. **Validierung:** Die ermittelte Laufzeit fließt in `BusinessCaseCalculator.calculate_cloudtrail_enhanced_accuracy`, wo sie mit AWS Cost Explorer abgeglichen wird. Abweichungen werden als Validierungsfaktor im Dashboard angezeigt.
-4. **Zwischenspeicherung:** CloudTrail-Ergebnisse werden 6 Stunden zwischengespeichert (`CacheTTL.CLOUDTRAIL_EVENTS`), um aktuelle Runtime-Daten zu gewährleisten.
+4. **Zwischenspeicherung:** CloudTrail-Ergebnisse werden 3 Stunden zwischengespeichert (`CacheTTL.CLOUDTRAIL_EVENTS`), um aktuelle Runtime-Daten zu gewährleisten.
 
 ## 3. Vorteile gegenüber Schätzverfahren
 | Kriterium | Schätzung (State-basierend) | CloudTrail-Ansatz |

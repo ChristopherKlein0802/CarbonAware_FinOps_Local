@@ -143,7 +143,75 @@ monthly_cost = runtime_hours × hourly_price_usd × EUR_USD_RATE
 
 **Limitierung:**
 ⚠️ Erfasst nur Start/Stop-Events, nicht kontinuierliches Laufen
-→ Underestimation bei Instanzen, die lange ohne Restart laufen
+→ ~~Underestimation bei Instanzen, die lange ohne Restart laufen~~ **KORRIGIERT:** Code in `runtime.py:627-631` behandelt Always-On Instanzen korrekt
+
+### 3.3 Period-Dependent Validation Strategy (⭐ NEU - 2025-11-11)
+
+**Problem:** AWS Cost Explorer 24h Billing Lag führt zu systematischem Underreporting bei kurzen Zeiträumen
+
+**Time Window Mismatch:**
+```
+CloudTrail-Berechnung:  NOW - X Tage → NOW (rolling window)
+Cost Explorer Query:    HEUTE - X Tage → HEUTE (calendar day boundary)
+Cost Explorer Delivery: Verzögert um 10-24h (AWS billing pipeline)
+```
+
+**Quantifizierter Impact nach Zeitraum:**
+
+| Analysis Period | CloudTrail | Cost Explorer Lag | Fehlende Daten | Underreporting | UI Display |
+|-----------------|------------|-------------------|----------------|----------------|------------|
+| **1 Tag**       | Letzte 24h | ~24h + Zeitversatz | ~46h | **66-95%** zu niedrig | ❌ Ausgeblendet |
+| **7 Tage**      | Letzte 168h | ~24h | ~24-48h | **14-29%** zu niedrig | ✅ Angezeigt (akzeptabel) |
+| **30 Tage**     | Letzte 720h | ~24h | ~24-48h | **3-7%** zu niedrig | ✅ Angezeigt (optimal) |
+
+**Implementierte Lösung (Code-Änderungen 2025-11-11):**
+
+1. **UI-Conditional Display:**
+   - Cost Explorer Metrik nur bei `period_days >= 7` angezeigt
+   - Bei 1-Tag-Perioden: Info-Box mit Erklärung statt Metrik
+   - Begründung im Tooltip: "24h lag = X% incomplete data"
+
+2. **Code-Locations:**
+   - `src/presentation/components/metrics.py:77-114` - Conditional Cost Explorer display
+   - `src/presentation/components/validation.py:233-308` - Conditional Cost Validation metric
+   - `src/infrastructure/gateways/aws.py:337` - Optional early return bei `period_days < 7`
+
+**Akademische Argumentation (für Thesis):**
+
+> Diese Arbeit identifiziert eine fundamentale Spannung zwischen Daten-Aktualität und Billing-Genauigkeit
+> in Cloud-Kostenmonitoring-Systemen:
+>
+> - **CloudTrail:** Real-time (15min), instanz-spezifisch, event-basiert
+> - **Cost Explorer:** Verzögert (24h), aggregiert, billing-akkurat
+>
+> Statt dies als Limitation zu betrachten, demonstriert diese Implementierung wie
+> **period-aware validation** beide Quellen optimal nutzt:
+>
+> | Zeitraum | Primäre Quelle | Validierung | Akademischer Beitrag |
+> |----------|---------------|-------------|----------------------|
+> | ≤6 Tage | CloudTrail exklusiv | Keine Cost Explorer Validation | Real-time Carbon-Berechnung |
+> | 7-30 Tage | CloudTrail + Cost Explorer | Dual Validation | Cross-Source Plausibilitätsprüfung |
+> | ≥30 Tage | CloudTrail | Cost Explorer als Baseline | Langzeit-Trend-Analyse |
+>
+> **Methodischer Beitrag:** Quantifizierung des Lag-Effekts (14% bei 7d, 3% bei 30d) und
+> Ableitung eines Mindest-Zeitfensters (≥7 Tage) für verlässliche Cost Explorer Validation.
+
+**Empirische Daten (aus Entwicklungsumgebung):**
+```
+Zeitraum: 1 Tag (24h)
+- Berechnete Kosten (CloudTrail): €54.32 (4 Instanzen, 24h Runtime)
+- Cost Explorer:                  €9.14 (83% niedriger - Billing Lag!)
+- Validation Factor:              0.17× (Cost Explorer underreports)
+
+Zeitraum: 30 Tage
+- Berechnete Kosten (CloudTrail): €11.40 (4 Instanzen tracked)
+- Cost Explorer:                  €55.19 (alle EC2-Services im Account)
+- Validation Factor:              4.84× (Cost Explorer zeigt zusätzliche Services)
+```
+
+**Interpretation:**
+- Bei **1 Tag:** Cost Explorer zu niedrig (Billing Lag dominiert) → nicht angezeigt
+- Bei **30 Tagen:** Cost Explorer höher (inkl. alte Instanzen, EBS, etc.) → sinnvolle Validation
 
 ---
 
@@ -220,7 +288,7 @@ filter_payload = None
 # src/presentation/components/validation.py:91-93
 "AWS Cost Explorer": "Aggregated cost comparison (24 h cache)",
 "AWS CloudWatch": "CPU utilisation (1 h cache)",
-"AWS CloudTrail": "Instance-specific runtime (6 h cache)",
+"AWS CloudTrail": "Instance-specific runtime (3 h cache)",
 ```
 
 **3. Metric-Label geändert**

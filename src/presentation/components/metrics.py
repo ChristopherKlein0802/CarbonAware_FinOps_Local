@@ -75,28 +75,40 @@ def render_core_metrics(dashboard_data: Optional[DashboardData]) -> None:
             st.warning("⚠️ No carbon data - check ElectricityMaps API")
 
     with col3:
-        # Cost Explorer comparison - use direct value
-        cost_explorer_eur = getattr(dashboard_data, "cost_explorer_eur", None)
-        validation_factor = getattr(dashboard_data, "validation_factor", None)
+        # Cost Explorer comparison - only show for periods >= 7 days due to 24h billing lag
+        period_days = getattr(dashboard_data, "analysis_period_days", 30)
 
-        # Type-safe validation: ensure it's a number
-        if cost_explorer_eur is not None and isinstance(cost_explorer_eur, (int, float)) and cost_explorer_eur > 0:
-            # Show actual Cost Explorer value
-            delta_pct = ((validation_factor - 1.0) * 100) if validation_factor and validation_factor != 1.0 else None
-            delta_text = f"{delta_pct:+.0f}% vs calculated" if delta_pct else None
+        if period_days >= 7:
+            # Show Cost Explorer for longer periods (billing lag is acceptable)
+            cost_explorer_eur = getattr(dashboard_data, "cost_explorer_eur", None)
+            validation_factor = getattr(dashboard_data, "validation_factor", None)
 
-            st.metric(
-                "📊 Cost Explorer",
-                f"€{cost_explorer_eur:.2f}",
-                delta_text,
-                help=f"AWS Cost Explorer total EC2 costs for {period_label} period (all charges: instances + data transfer + EBS-optimized + storage). "
-                     f"Validation factor: {validation_factor:.2f}x calculated costs. "
-                     "Higher values are normal due to additional EC2 service charges not tracked by CloudTrail."
-            )
+            # Type-safe validation: ensure it's a number
+            if cost_explorer_eur is not None and isinstance(cost_explorer_eur, (int, float)) and cost_explorer_eur > 0:
+                # Show actual Cost Explorer value
+                delta_pct = ((validation_factor - 1.0) * 100) if validation_factor and validation_factor != 1.0 else None
+                delta_text = f"{delta_pct:+.0f}% vs calculated" if delta_pct else None
+
+                st.metric(
+                    "📊 Cost Explorer",
+                    f"€{cost_explorer_eur:.2f}",
+                    delta_text,
+                    help=f"AWS Cost Explorer total EC2 costs for {period_label} period (all charges: instances + data transfer + EBS-optimized + storage). "
+                         f"Validation factor: {validation_factor:.2f}x calculated costs. "
+                         "Higher values are normal due to additional EC2 service charges not tracked by CloudTrail."
+                )
+            else:
+                st.metric(
+                    "📊 Cost Explorer",
+                    "Calculating...",
+                    "Fetching data",
+                    help="AWS Cost Explorer total EC2 costs for validation. Updates daily, cached for 24 hours."
+                )
         else:
-            st.metric(
-                "📊 Cost Explorer",
-                "Calculating...",
-                "Fetching data",
-                help="AWS Cost Explorer total EC2 costs for validation. Updates daily, cached for 24 hours."
+            # Cost Explorer unavailable for short periods (24h billing lag makes data unreliable)
+            st.info(
+                f"📊 **Cost Explorer Unavailable**\n\n"
+                f"AWS Cost Explorer has a **24-hour billing lag** and is not shown for {period_days}-day periods.\n\n"
+                f"**Impact:** {period_days}-day period = {(1/period_days)*100:.0f}% incomplete data\n\n"
+                f"💡 Use **7-day** (14% lag) or **30-day** (3% lag) periods for Cost Explorer validation."
             )

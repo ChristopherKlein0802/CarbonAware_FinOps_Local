@@ -36,7 +36,7 @@ graph TB
     EC2 -.->|"Instances List<br/>TTL: 365 days"| Cache
 
     RuntimeService -->|"lookup_events()"| CloudTrail
-    CloudTrail -.->|"Start/Stop Events<br/>TTL: 6h"| Cache
+    CloudTrail -.->|"Start/Stop Events<br/>TTL: 3h"| Cache
 
     RuntimeService -->|"get_metric_data()"| CloudWatch
     CloudWatch -.->|"CPU Utilization<br/>TTL: 1h"| Cache

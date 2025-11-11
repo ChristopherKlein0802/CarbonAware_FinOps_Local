@@ -139,7 +139,7 @@ graph TD
 | AWS Pricing | `src/infrastructure/clients/aws.py` | 7 Tage (`PRICING_DATA`) | Listenpreise werden selten angepasst.
 | AWS Cost Explorer | `src/infrastructure/gateways/aws.py` | 24 Stunden (`COST_DATA`) | Cost Explorer aktualisiert täglich.
 | AWS CloudWatch | `src/infrastructure/gateways/aws.py` | 1 Stunde (`CPU_UTILIZATION`) | Synchron mit ElectricityMaps für operational metrics.
-| AWS CloudTrail | `src/domain/services/runtime.py` | 6 Stunden (`CLOUDTRAIL_EVENTS`) | Balance zwischen Aktualität und API-Kosten.
+| AWS CloudTrail | `src/domain/services/runtime.py` | 3 Stunden (`CLOUDTRAIL_EVENTS`) | Balance zwischen Aktualität und API-Kosten.
 | Cost/Carbon Time Series | `src/core/processor.py` | 48 Stunden (lokale JSON-Snapshots) | Grundlage für TAC-Visualisierung im Dashboard.
 
 Die Cache-Funktionen (`src/infrastructure/cache.py`) verwalten Pfade, TTLs und Bereinigung; `FileCacheRepository.clean_old` verhindert überalterte Artefakte. Dadurch sinkt das API-Aufkommen um >80 % und die Betriebskosten bleiben im KMU-Rahmen.

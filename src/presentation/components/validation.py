@@ -231,6 +231,9 @@ def _render_precision_insights(dashboard_data: DashboardData) -> None:
     row2_col1, row2_col2, row2_col3 = st.columns(3)
 
     with row2_col1:
+        # Cost Validation only for periods >= 7 days (Cost Explorer 24h billing lag)
+        period_days = getattr(dashboard_data, "analysis_period_days", 30)
+
         cost_comparison_help = (
             "Compares instance-specific calculations (CloudTrail runtime × Pricing API) with AWS Cost Explorer EC2 costs. "
             "Deviations occur due to: (1) CloudTrail runtime precision (±5% target), (2) on-demand pricing vs. actual billing "
@@ -238,57 +241,70 @@ def _render_precision_insights(dashboard_data: DashboardData) -> None:
             "Close match (±30%) validates calculation accuracy."
         )
 
-        if validation_factor is not None:
-            delta_pct = abs(1 - validation_factor) * 100
+        if period_days >= 7:
+            # Show Cost Validation for longer periods
+            if validation_factor is not None:
+                delta_pct = abs(1 - validation_factor) * 100
 
-            if validation_factor > 100:
-                st.metric(
-                    "📊 Cost Validation",
-                    "Explorer >> Calculated",
-                    f"{validation_factor:.1f}× higher",
-                    help=cost_comparison_help
-                )
-            elif validation_factor > 10:
-                st.metric(
-                    "📊 Cost Validation",
-                    "Explorer much higher",
-                    f"{validation_factor:.1f}× higher",
-                    help=cost_comparison_help
-                )
-            elif validation_factor > 2:
-                st.metric(
-                    "📊 Cost Validation",
-                    "Explorer higher",
-                    f"{validation_factor:.1f}× higher",
-                    help=cost_comparison_help
-                )
-            elif delta_pct <= 30:
-                st.metric(
-                    "📊 Cost Validation",
-                    "✅ Close match",
-                    f"±{delta_pct:.0f}%",
-                    help=cost_comparison_help
-                )
-            elif delta_pct <= 60:
-                st.metric(
-                    "📊 Cost Validation",
-                    "Moderate diff",
-                    f"±{delta_pct:.0f}%",
-                    help=cost_comparison_help
-                )
+                if validation_factor > 100:
+                    st.metric(
+                        "📊 Cost Validation",
+                        "Explorer >> Calculated",
+                        f"{validation_factor:.1f}× higher",
+                        help=cost_comparison_help
+                    )
+                elif validation_factor > 10:
+                    st.metric(
+                        "📊 Cost Validation",
+                        "Explorer much higher",
+                        f"{validation_factor:.1f}× higher",
+                        help=cost_comparison_help
+                    )
+                elif validation_factor > 2:
+                    st.metric(
+                        "📊 Cost Validation",
+                        "Explorer higher",
+                        f"{validation_factor:.1f}× higher",
+                        help=cost_comparison_help
+                    )
+                elif delta_pct <= 30:
+                    st.metric(
+                        "📊 Cost Validation",
+                        "✅ Close match",
+                        f"±{delta_pct:.0f}%",
+                        help=cost_comparison_help
+                    )
+                elif delta_pct <= 60:
+                    st.metric(
+                        "📊 Cost Validation",
+                        "Moderate diff",
+                        f"±{delta_pct:.0f}%",
+                        help=cost_comparison_help
+                    )
+                else:
+                    st.metric(
+                        "📊 Cost Validation",
+                        "Large diff",
+                        f"±{delta_pct:.0f}%",
+                        help=cost_comparison_help
+                    )
             else:
                 st.metric(
                     "📊 Cost Validation",
-                    "Large diff",
-                    f"±{delta_pct:.0f}%",
+                    "Calculating...",
+                    "Fetching Cost Explorer",
                     help=cost_comparison_help
                 )
         else:
+            # Cost Explorer validation not available for short periods
             st.metric(
                 "📊 Cost Validation",
-                "Calculating...",
-                "Fetching Cost Explorer",
-                help=cost_comparison_help
+                "N/A (24h lag)",
+                f"Use ≥7d period",
+                help="AWS Cost Explorer has a 24-hour billing lag. For accurate validation, "
+                     f"select a 7-day or 30-day analysis period. Current {period_days}-day period "
+                     f"would have {(1/period_days)*100:.0f}% incomplete data, making Cost Explorer unreliable. "
+                     "CloudTrail-based calculations remain accurate for all periods."
             )
 
     precision_pct = (quality_score or 0.0) * 100

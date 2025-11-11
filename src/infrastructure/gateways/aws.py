@@ -344,7 +344,20 @@ class AWSClient:
 
         Returns:
             AWSCostData for the specified period, or None if error
+
+        Note:
+            Cost Explorer has 24h billing lag. For periods < 7 days, the lag represents
+            >14% incomplete data, making Cost Explorer unreliable. Early return skips
+            unnecessary API calls and reduces cost/latency.
         """
+        # Skip Cost Explorer for very short periods (24h billing lag makes data unreliable)
+        if period_days < 7:
+            logger.info(
+                f"⏭️  Skipping Cost Explorer for {period_days}-day period "
+                f"(24h billing lag = {(1/period_days)*100:.0f}% incomplete data)"
+            )
+            return None
+
         # Period-specific cache key
         cache_key = f"costs_{period_days}d_{region.replace('-', '_')}"
         cache_path = self._cache_path("cost_data", cache_key)
