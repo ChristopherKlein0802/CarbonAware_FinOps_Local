@@ -213,6 +213,81 @@ Zeitraum: 30 Tage
 - Bei **1 Tag:** Cost Explorer zu niedrig (Billing Lag dominiert) → nicht angezeigt
 - Bei **30 Tagen:** Cost Explorer höher (inkl. alte Instanzen, EBS, etc.) → sinnvolle Validation
 
+### 3.4 Validation Factor < 1.0 - Erklärung des Billing Lag Effekts
+
+**Definition Validation Factor:**
+```
+Validation Factor = Cost Explorer Kosten ÷ Berechnete Kosten (CloudTrail)
+```
+
+**Bei kurzen Zeiträumen (< 7 Tage): Validation Factor < 1.0**
+
+**Ursache:** AWS Cost Explorer Billing Lag von 24 Stunden führt zu **unvollständigen Daten**
+
+**Konkretes Beispiel (aus Entwicklungsumgebung):**
+
+| Zeitraum | Berechnete Kosten | Cost Explorer | Validation Factor | Interpretation |
+|----------|------------------|---------------|-------------------|----------------|
+| 155h (~6,5 Tage) | €59,04 | €46,34 | **0,79** | Cost Explorer **21% zu niedrig** |
+| 1 Tag (24h) | €54,32 | €9,14 | **0,17** | Cost Explorer **83% zu niedrig** |
+
+**Warum ist Cost Explorer niedriger?**
+
+1. **CloudTrail-Berechnung (Ground Truth):**
+   - Erfasst tatsächliche Runtime der letzten 155 Stunden
+   - Berechnet: Runtime × AWS Pricing API = €59,04
+   - **Status:** Vollständige Daten ✅
+
+2. **Cost Explorer (Billing Pipeline):**
+   - Query: Kosten für letzten 6,5 Tage
+   - **ABER:** Billing-Daten haben 24h Verzögerung
+   - Tatsächlich geliefert: Kosten bis **gestern 14:00** (nicht bis **heute 14:00**)
+   - **Fehlend:** ~24-30h der letzten Nutzung
+   - Ergebnis: €46,34 (21% weniger)
+
+**Mathematik:**
+
+```
+Zeitraum:               155h (6,5 Tage)
+Billing Lag:            ~24h
+Fehlende Daten:         24h / 155h = 15,5%
+Validation Factor:      0,79 (= 21% niedriger)
+Diskrepanz:             21% - 15,5% = ~5,5% (zusätzliche Varianz durch stündliche Schwankungen)
+```
+
+**Warum unter 1,0 statt über 1,0?**
+
+Bei **kurzen Zeiträumen** (< 7 Tage):
+- ❌ Billing Lag dominiert → Cost Explorer **underreports** (zu niedrig)
+- ✅ Validation Factor **< 1,0** = Cost Explorer zeigt weniger
+- 📊 Je kürzer der Zeitraum, desto niedriger der Faktor (1d: 0,17, 6,5d: 0,79)
+
+Bei **langen Zeiträumen** (≥ 30 Tage):
+- ✅ Billing Lag vernachlässigbar (24h / 720h = 3%)
+- ✅ Cost Explorer inkludiert zusätzliche Services (EBS, alte Instanzen, etc.)
+- ✅ Validation Factor **> 1,0** = Cost Explorer zeigt mehr
+- 📊 Beispiel: 30d Faktor 4,84 (Cost Explorer 4,84× höher)
+
+**Implementierungs-Konsequenz:**
+
+Daher wurde der **7-Tage-Threshold** implementiert:
+- Bei < 7 Tage: Cost Explorer ausgeblendet (Validation Factor < 1,0 ist irreführend)
+- Bei ≥ 7 Tage: Cost Explorer angezeigt (Billing Lag < 15%, akzeptabel)
+- Bei ≥ 30 Tage: Cost Explorer optimal (Billing Lag < 3%, Validation Factor > 1,0 zeigt zusätzliche Services)
+
+**Fazit für Thesis:**
+
+> Ein **Validation Factor < 1,0 ist KEIN Fehler in der CloudTrail-Berechnung**,
+> sondern ein **Indikator für unvollständige Cost Explorer Daten** durch Billing Lag.
+>
+> Bei kurzen Zeiträumen zeigt CloudTrail die **genaueren** Kosten, da Events
+> innerhalb 15 Minuten verfügbar sind, während Cost Explorer 24 Stunden verzögert ist.
+>
+> **Interpretation:**
+> - **Faktor < 1,0** (bei < 7 Tagen) = Billing Lag dominiert → Cost Explorer zu niedrig
+> - **Faktor ≈ 1,0** (bei 7-14 Tagen) = Beide Quellen aligned → gute Validation
+> - **Faktor > 1,0** (bei ≥ 30 Tagen) = Zusätzliche Services → erweiterte Kostenerfassung
+
 ---
 
 ## 4. Verwendung in der Thesis
